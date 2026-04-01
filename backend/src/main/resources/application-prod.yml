@@ -1,0 +1,15 @@
+# PRODUCTION PROFILE — clean and debug features are permanently off
+spring:
+  flyway:
+    clean-disabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.arena: WARN

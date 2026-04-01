@@ -1,0 +1,41 @@
+# ── Environment & secrets ─────────────────────────────────────────────────
+.env
+*.pem
+*.key
+
+# ── Docker ────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── macOS ─────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── IDEs ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# ── Backend (Gradle / Spring Boot) ───────────────────────────────────────
+backend/.gradle/
+backend/build/
+backend/out/
+
+# ── Frontend (Node / Vite) ───────────────────────────────────────────────
+node_modules/
+web-nexus/dist/
+web-pulse/dist/
+web-arena/dist/
+web-coach/dist/
+
+# ── Mobile (KMP / Gradle) ───────────────────────────────────────────────
+mobile-arena/.gradle/
+mobile-arena/build/
+mobile-arena/shared/build/
+mobile-arena/androidApp/build/
+mobile-arena/iosApp/Pods/
+mobile-arena/iosApp/iosApp.xcworkspace/
+*.xcuserdata
+
+# ── Logs ──────────────────────────────────────────────────────────────────
+*.log

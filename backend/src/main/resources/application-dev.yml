@@ -1,0 +1,8 @@
+# DEV PROFILE — never use these settings in staging or production
+spring:
+  flyway:
+    clean-disabled: false
+
+logging:
+  level:
+    com.arena: DEBUG

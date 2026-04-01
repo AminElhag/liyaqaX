@@ -1,0 +1,9 @@
+# STAGING PROFILE — matches prod except observability is on
+spring:
+  flyway:
+    clean-disabled: true
+
+logging:
+  level:
+    root: WARN
+    com.arena: INFO
