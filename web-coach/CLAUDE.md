@@ -3,6 +3,13 @@
 Inherits all rules from the root `CLAUDE.md`, including the global RBAC requirement.
 This file adds rules specific to `web-coach`.
 
+## Required reading for every frontend session
+Read these files in this order before any frontend work:
+1. CLAUDE.md (root)
+2. web-coach/CLAUDE.md (this file)
+3. docs/rbac.md
+4. docs/domain-glossary.md
+
 ---
 
 ## 1. What this app is

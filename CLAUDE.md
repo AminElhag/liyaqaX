@@ -3,6 +3,24 @@
 This file applies to the entire repository. Every subfolder inherits these rules.
 Subfolder-specific `CLAUDE.md` files extend (never contradict) what is defined here.
 
+## Reference documents
+
+The following documents are part of this project and must be
+read alongside the relevant CLAUDE.md in every session:
+
+| File | Purpose |
+|---|---|
+| `docs/domain-glossary.md` | Authoritative definitions for all business terms |
+| `docs/rbac.md` | Cross-system role and permission rules |
+| `backend/DATABASE.md` | Database standards and migration rules |
+| `backend/API.md` | REST API design rules and OpenAPI standards |
+| `backend/TEMPLATES.md` | Backend file generation templates |
+| `docs/adr/` | All architecture decision records |
+
+When a term, a permission, a database convention, or an API
+pattern is used in a PLAN.md or in code, it must be consistent
+with the definitions in these documents.
+
 ---
 
 ## CRITICAL — Development workflow rule

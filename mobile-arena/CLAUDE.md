@@ -4,6 +4,13 @@ This repository is a **git submodule** of the main monorepo.
 It inherits the global rules defined in the monorepo root `CLAUDE.md`.
 This file adds rules specific to `mobile-arena`.
 
+## Required reading for every mobile session
+Read these files in this order before any mobile work:
+1. CLAUDE.md (root)
+2. mobile-arena/CLAUDE.md (this file)
+3. docs/rbac.md
+4. docs/domain-glossary.md
+
 ---
 
 ## 1. What this app is

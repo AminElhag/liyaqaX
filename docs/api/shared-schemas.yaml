@@ -1,0 +1,27 @@
+# Shared reusable schemas — referenced by all domain specs.
+# This file defines components that are common across every domain.
+
+components:
+  schemas:
+    # ProblemDetail — RFC 7807 error response
+    # Pagination — collection pagination wrapper
+    # MonetaryAmount — { amountHalalas: integer, currency: "SAR" }
+    # LocalizedText — { ar: string, en: string }
+    # AuditFields — createdAt, updatedAt, deletedAt
+    {}
+
+  responses:
+    # Unauthorized — 401
+    # Forbidden — 403
+    # NotFound — 404
+    # Conflict — 409
+    # ValidationFailed — 400 with errors array
+    # BusinessRuleViolation — 422
+    # RateLimitExceeded — 429
+    {}
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

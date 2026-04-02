@@ -1,0 +1,14 @@
+# Root OpenAPI spec — imports all domain-specific spec files.
+# Each domain (auth, members, memberships, etc.) has its own file.
+# Shared schemas and responses are defined in shared-schemas.yaml.
+
+openapi: 3.1.0
+
+info:
+  title: Liyaqa API
+  version: 0.1.0
+  description: Placeholder — full API specification will be built incrementally per feature.
+
+paths: {}
+
+components: {}
