@@ -93,10 +93,14 @@ jobs:
                 ') for the full report.\n\n';
             }
 
-            const frontends = ['nexus', 'pulse', 'coach', 'arena'];
-            for (const app of frontends) {
-              const stepOutcome = '${{ steps.audit_' + app + '.outcome }}';
-              if (stepOutcome === 'failure') {
+            const outcomes = {
+              nexus: '${{ steps.audit_nexus.outcome }}',
+              pulse: '${{ steps.audit_pulse.outcome }}',
+              coach: '${{ steps.audit_coach.outcome }}',
+              arena: '${{ steps.audit_arena.outcome }}',
+            };
+            for (const [app, outcome] of Object.entries(outcomes)) {
+              if (outcome === 'failure') {
                 body += `### web-${app} (pnpm audit)\n`;
                 body += `pnpm audit found vulnerabilities in web-${app}.\n\n`;
               }
