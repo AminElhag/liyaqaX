@@ -1,0 +1,5 @@
+packages:
+  - 'web-nexus'
+  - 'web-pulse'
+  - 'web-coach'
+  - 'web-arena'
