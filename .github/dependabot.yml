@@ -1,0 +1,56 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+
+  - package-ecosystem: npm
+    directory: /web-nexus
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - web-nexus
+
+  - package-ecosystem: npm
+    directory: /web-pulse
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - web-pulse
+
+  - package-ecosystem: npm
+    directory: /web-coach
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - web-coach
+
+  - package-ecosystem: npm
+    directory: /web-arena
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - web-arena
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci

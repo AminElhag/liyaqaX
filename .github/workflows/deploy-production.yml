@@ -1,0 +1,131 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  require-approval:
+    name: Require Manual Approval
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      # Approval is enforced by GitHub environment protection rules
+      # configured on the "production" environment.
+      # This job will pause and wait for a required reviewer to approve
+      # before proceeding to the build-and-deploy job.
+      - name: Approval gate
+        run: echo "Manual approval received via GitHub environment protection rules"
+
+  build-and-deploy:
+    name: Build and Deploy to Production
+    needs: require-approval
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Build backend production JAR
+        run: cd backend && ./gradlew bootJar --no-daemon
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Build web-nexus
+        run: cd web-nexus && pnpm install --frozen-lockfile && pnpm build
+
+      - name: Build web-pulse
+        run: cd web-pulse && pnpm install --frozen-lockfile && pnpm build
+
+      - name: Build web-coach
+        run: cd web-coach && pnpm install --frozen-lockfile && pnpm build
+
+      - name: Build web-arena
+        run: cd web-arena && pnpm install --frozen-lockfile && pnpm build
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/backend:latest
+
+      - name: Build and push web-nexus image
+        uses: docker/build-push-action@v6
+        with:
+          context: web-nexus
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/web-nexus:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/web-nexus:latest
+
+      - name: Build and push web-pulse image
+        uses: docker/build-push-action@v6
+        with:
+          context: web-pulse
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/web-pulse:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/web-pulse:latest
+
+      - name: Build and push web-coach image
+        uses: docker/build-push-action@v6
+        with:
+          context: web-coach
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/web-coach:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/web-coach:latest
+
+      - name: Build and push web-arena image
+        uses: docker/build-push-action@v6
+        with:
+          context: web-arena
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/web-arena:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/web-arena:latest
+
+      # Replace this placeholder with your actual production deployment step.
+      # Examples: kubectl apply, Terraform deploy, AWS ECS update, etc.
+      - name: Deploy to production
+        run: |
+          echo "Deploy to production environment"
+          echo "Backend image: ghcr.io/${{ github.repository }}/backend:${{ github.sha }}"
+          echo "All images tagged with: ${{ github.sha }} and latest"

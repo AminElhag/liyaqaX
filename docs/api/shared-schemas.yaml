@@ -1,0 +1,172 @@
+components:
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 7807 Problem Details error response
+      required:
+        - type
+        - title
+        - status
+        - detail
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://arena.app/errors/validation-failed"
+        title:
+          type: string
+          example: "Validation failed"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "One or more fields failed validation."
+        instance:
+          type: string
+          example: "/api/v1/members"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldError"
+
+    FieldError:
+      type: object
+      required:
+        - field
+        - code
+        - message
+      properties:
+        field:
+          type: string
+          example: "email"
+        code:
+          type: string
+          example: "INVALID_FORMAT"
+        message:
+          type: string
+          example: "Must be a valid email address"
+
+    Pagination:
+      type: object
+      required:
+        - page
+        - size
+        - totalElements
+        - totalPages
+        - hasNext
+        - hasPrevious
+      properties:
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 143
+        totalPages:
+          type: integer
+          example: 8
+        hasNext:
+          type: boolean
+          example: true
+        hasPrevious:
+          type: boolean
+          example: false
+
+  responses:
+    Unauthorized:
+      description: No valid authentication token provided
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          example:
+            type: "https://arena.app/errors/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "Authentication is required to access this resource"
+            instance: "/api/v1/members"
+
+    Forbidden:
+      description: Authenticated but not authorized for this action
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          example:
+            type: "https://arena.app/errors/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "Access denied"
+            instance: "/api/v1/members"
+
+    NotFound:
+      description: Resource does not exist or is soft-deleted
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          example:
+            type: "https://arena.app/errors/resource-not-found"
+            title: "Not Found"
+            status: 404
+            detail: "Resource not found"
+            instance: "/api/v1/members/550e8400-e29b-41d4-a716-446655440000"
+
+    Conflict:
+      description: Resource state conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+
+    ValidationFailed:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          example:
+            type: "https://arena.app/errors/validation-failed"
+            title: "Validation failed"
+            status: 400
+            detail: "One or more fields failed validation."
+            instance: "/api/v1/members"
+            errors:
+              - field: "email"
+                code: "INVALID_FORMAT"
+                message: "Must be a valid email address"
+
+    BusinessRuleViolation:
+      description: Request violates a business rule
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          example:
+            type: "https://arena.app/errors/rate-limit-exceeded"
+            title: "Rate limit exceeded"
+            status: 429
+            detail: "You have exceeded the rate limit of 100 requests per minute."
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -470,3 +470,4 @@ These are hard requirements — not guidelines. CI enforces them.
 - **One source of truth.** If the same value is defined in two places, one of them is wrong.
 - **Explicit over implicit.** Name things clearly. No magic values, no hidden coupling.
 - **Leave it better than you found it.** Every PR is an opportunity to improve a name, remove dead code, or add a missing test.
+
