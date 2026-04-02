@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/arena_db
+    username: arena
+    password: changeme
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    clean-disabled: false
+    clean-on-validation-error: true
+
+arena:
+  jwt:
+    secret: integration-test-secret-key-at-least-32-bytes!!
+    access-token-expiry: PT15M
+    refresh-token-expiry: P7D
+
+logging:
+  level:
+    com.arena: DEBUG

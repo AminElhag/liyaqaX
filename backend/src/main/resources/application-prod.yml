@@ -2,6 +2,11 @@
 spring:
   flyway:
     clean-disabled: true
+  # PRODUCTION: Hibernate validates schema only
+  # Schema changes must go through Flyway migrations
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
 springdoc:
   api-docs:

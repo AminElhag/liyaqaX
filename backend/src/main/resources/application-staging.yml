@@ -2,6 +2,9 @@
 spring:
   flyway:
     clean-disabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
 logging:
   level:
