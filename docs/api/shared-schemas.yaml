@@ -1,0 +1,105 @@
+components:
+
+  schemas:
+
+    ProblemDetail:
+      type: object
+      description: RFC 7807 Problem Details error response
+      required: [type, title, status, detail, instance]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://arena.app/errors/validation-failed"
+        title:
+          type: string
+          example: "Validation failed"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "One or more fields failed validation."
+        instance:
+          type: string
+          example: "/api/v1/members"
+        errors:
+          type: array
+          description: Field-level errors (validation failures only)
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+
+    Pagination:
+      type: object
+      required: [page, size, totalElements, totalPages, hasNext, hasPrevious]
+      properties:
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 143
+        totalPages:
+          type: integer
+          example: 8
+        hasNext:
+          type: boolean
+        hasPrevious:
+          type: boolean
+
+  responses:
+
+    Unauthorized:
+      description: No valid authentication token provided
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    Forbidden:
+      description: Authenticated but not authorized for this action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    NotFound:
+      description: Resource not found or soft-deleted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    Conflict:
+      description: Resource state conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    ValidationFailed:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

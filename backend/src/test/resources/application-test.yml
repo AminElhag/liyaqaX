@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/arena_db
+    username: arena
+    password: changeme
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+jwt:
+  secret: test-only-secret-key-that-must-be-at-least-256-bits-long-for-hmac-sha256
+  expiry-seconds: 3600

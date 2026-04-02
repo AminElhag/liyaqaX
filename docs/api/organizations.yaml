@@ -1,0 +1,291 @@
+paths:
+
+  /api/v1/organizations:
+    post:
+      summary: Create a new organization
+      operationId: createOrganization
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+
+    get:
+      summary: List all organizations
+      operationId: listOrganizations
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent, nexus:integration-specialist, nexus:read-only-auditor
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: createdAt
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Paginated list of organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+
+  /api/v1/organizations/{id}:
+    get:
+      summary: Get an organization by ID
+      operationId: getOrganizationById
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent, nexus:integration-specialist, nexus:read-only-auditor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Organization found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update an organization
+      operationId: updateOrganization
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrganizationRequest'
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+
+    delete:
+      summary: Soft-delete an organization
+      operationId: deleteOrganization
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Organization deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+components:
+  schemas:
+
+    CreateOrganizationRequest:
+      type: object
+      required: [nameAr, nameEn, email]
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+        vatNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+        crNumber:
+          type: string
+          maxLength: 50
+          nullable: true
+
+    UpdateOrganizationRequest:
+      type: object
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 50
+        country:
+          type: string
+          maxLength: 10
+        timezone:
+          type: string
+          maxLength: 50
+        locale:
+          type: string
+          maxLength: 10
+        isActive:
+          type: boolean
+        vatNumber:
+          type: string
+          maxLength: 50
+        crNumber:
+          type: string
+          maxLength: 50
+
+    OrganizationResponse:
+      type: object
+      required: [id, nameAr, nameEn, email, country, timezone, locale, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        country:
+          type: string
+        timezone:
+          type: string
+        locale:
+          type: string
+        isActive:
+          type: boolean
+        vatNumber:
+          type: string
+          nullable: true
+        crNumber:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrganizationSummaryResponse:
+      type: object
+      required: [id, nameAr, nameEn, isActive]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        isActive:
+          type: boolean
+
+    OrganizationPageResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
