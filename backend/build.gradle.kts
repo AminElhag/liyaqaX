@@ -5,6 +5,17 @@ plugins {
     id("org.springframework.boot") version "3.4.4"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "10.15.0"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+}
+
+ktlint {
+    version.set("1.3.1")
+    android.set(false)
+    ignoreFailures.set(false)
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+    }
 }
 
 group = "com.liyaqa"
@@ -43,4 +54,5 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    failOnNoDiscoveredTests = false
 }

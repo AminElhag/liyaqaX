@@ -334,6 +334,13 @@ These files must exist before feature development begins because
 everything depends on them. They are the only files created upfront.
 All domain files are generated on demand via PLAN.md.
 
+**Important:** Every skeleton file must contain a package declaration
+plus a minimal empty class, object, or interface matching the filename.
+A file with only a package declaration is treated as empty by ktlint
+and will fail CI. The declaration type should match the file's intended
+role (e.g., `object` for singletons/constants, `class` for services,
+`open class` for base exceptions, `data class` for DTOs).
+
 ```
 backend/src/main/kotlin/com/arena/
 
@@ -343,25 +350,25 @@ backend/src/main/kotlin/com/arena/
     audit/
       AuditEntity.kt               ← base entity (section 4 above)
     exception/
-      ArenaException.kt            ← base exception class
-      ErrorCodes.kt                ← error code constants
-      GlobalExceptionHandler.kt    ← @RestControllerAdvice
+      ArenaException.kt            ← base exception class (open class … : RuntimeException)
+      ErrorCodes.kt                ← error code constants (object)
+      GlobalExceptionHandler.kt    ← @RestControllerAdvice (class)
     dto/
-      ProblemDetailResponse.kt     ← RFC 7807 error response shape
-      PageResponse.kt              ← paginated collection wrapper
+      ProblemDetailResponse.kt     ← RFC 7807 error response shape (data class)
+      PageResponse.kt              ← paginated collection wrapper (data class)
     tenant/
-      TenantContext.kt             ← thread-local tenant scope holder
-      TenantInterceptor.kt         ← populates TenantContext from JWT
+      TenantContext.kt             ← thread-local tenant scope holder (object)
+      TenantInterceptor.kt         ← populates TenantContext from JWT (class)
 
   config/
-    SecurityConfig.kt              ← SecurityFilterChain
-    JacksonConfig.kt               ← ObjectMapper configuration
-    OpenApiConfig.kt               ← Springdoc configuration
+    SecurityConfig.kt              ← SecurityFilterChain (class)
+    JacksonConfig.kt               ← ObjectMapper configuration (class)
+    OpenApiConfig.kt               ← Springdoc configuration (class)
 
   security/
-    Roles.kt                       ← role constants (Roles.CLUB_OWNER etc.)
-    JwtService.kt                  ← JWT creation and validation
-    JwtAuthFilter.kt               ← OncePerRequestFilter for JWT
+    Roles.kt                       ← role constants (object)
+    JwtService.kt                  ← JWT creation and validation (class)
+    JwtAuthFilter.kt               ← OncePerRequestFilter for JWT (class)
 
 backend/src/test/kotlin/com/arena/
   ArenaApplicationTest.kt          ← context loads test
