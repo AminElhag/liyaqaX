@@ -78,7 +78,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: true
@@ -87,7 +87,7 @@ jobs:
             ghcr.io/${{ github.repository }}/backend:latest
 
       - name: Build and push web-nexus image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: web-nexus
           push: true
@@ -96,7 +96,7 @@ jobs:
             ghcr.io/${{ github.repository }}/web-nexus:latest
 
       - name: Build and push web-pulse image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: web-pulse
           push: true
@@ -105,7 +105,7 @@ jobs:
             ghcr.io/${{ github.repository }}/web-pulse:latest
 
       - name: Build and push web-coach image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: web-coach
           push: true
@@ -114,7 +114,7 @@ jobs:
             ghcr.io/${{ github.repository }}/web-coach:latest
 
       - name: Build and push web-arena image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: web-arena
           push: true
