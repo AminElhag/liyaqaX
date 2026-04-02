@@ -3,6 +3,23 @@
 This file defines the engineering standards Claude must follow in this codebase.
 Apply these rules to every file, endpoint, and PR — no exceptions.
 
+## Required reading for every backend session
+
+Read these files in this exact order at the start of every
+backend development session, before any implementation work:
+
+1. CLAUDE.md (root) — global monorepo rules
+2. backend/CLAUDE.md (this file) — backend-specific rules
+3. backend/DATABASE.md — database standards and migration rules
+4. backend/API.md — REST API design rules and OpenAPI standards
+5. backend/TEMPLATES.md — file generation templates per layer
+6. docs/rbac.md — cross-system access control rules
+7. docs/domain-glossary.md — authoritative business term definitions
+8. The ADR files relevant to the feature being worked on (docs/adr/)
+
+Do not begin any implementation until all applicable files
+have been read and confirmed.
+
 ---
 
 ## 1. Project structure
