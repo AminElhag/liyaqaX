@@ -190,7 +190,7 @@ jobs:
         run: cd ${{ matrix.app }} && pnpm lint
 
       - name: Test
-        run: cd ${{ matrix.app }} && pnpm test --run
+        run: cd ${{ matrix.app }} && pnpm exec vitest run
 
   security-scan:
     name: Security Scan
