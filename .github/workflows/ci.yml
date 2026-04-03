@@ -42,7 +42,7 @@ jobs:
           java-version: '21'
 
       - name: Cache Gradle dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -92,7 +92,7 @@ jobs:
           java-version: '21'
 
       - name: Cache Gradle dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -138,7 +138,7 @@ jobs:
           java-version: '21'
 
       - name: Cache Gradle dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -173,7 +173,7 @@ jobs:
           version: 9
 
       - name: Cache pnpm store
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/pnpm/store/v3
           key: pnpm-${{ matrix.app }}-${{ hashFiles('pnpm-lock.yaml') }}
