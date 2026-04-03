@@ -15,6 +15,10 @@ import com.liyaqa.rbac.UserRole
 import com.liyaqa.rbac.UserRoleRepository
 import com.liyaqa.role.Role
 import com.liyaqa.role.RoleRepository
+import com.liyaqa.staff.StaffBranchAssignment
+import com.liyaqa.staff.StaffBranchAssignmentRepository
+import com.liyaqa.staff.StaffMember
+import com.liyaqa.staff.StaffMemberRepository
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
 import org.slf4j.LoggerFactory
@@ -24,6 +28,7 @@ import org.springframework.context.event.EventListener
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 
 @Component
 @Profile("dev")
@@ -36,6 +41,8 @@ class DevDataLoader(
     private val roleRepository: RoleRepository,
     private val rolePermissionRepository: RolePermissionRepository,
     private val userRoleRepository: UserRoleRepository,
+    private val staffMemberRepository: StaffMemberRepository,
+    private val staffBranchAssignmentRepository: StaffBranchAssignmentRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -194,14 +201,15 @@ class DevDataLoader(
 
         val org = seedOrg()
         val club = seedClub(org)
-        val (riyadhBranch) = seedBranches(org, club)
-        val users = seedUsers(org, club, riyadhBranch)
+        val (riyadhBranch, jeddahBranch) = seedBranches(org, club)
+        val users = seedUsers(org, club)
         val permissions = seedPermissions()
         val roles = seedRoles(org, club, permissions)
         seedUserRoles(users, roles)
+        seedStaffMembers(org, club, users, roles, riyadhBranch, jeddahBranch)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff members.",
             users.size,
             permissions.size,
             roles.size,
@@ -261,18 +269,17 @@ class DevDataLoader(
     private fun seedUsers(
         org: Organization,
         club: Club,
-        riyadhBranch: Branch,
     ): List<User> {
         val users =
             listOf(
-                user("admin@liyaqa.com", "Admin1234!", null, null, null),
-                user("owner@elixir.com", "Owner1234!", org.id, club.id, null),
-                user("manager@elixir.com", "Manager1234!", org.id, club.id, riyadhBranch.id),
-                user("reception@elixir.com", "Recept1234!", org.id, club.id, riyadhBranch.id),
-                user("sales@elixir.com", "Sales1234!", org.id, club.id, riyadhBranch.id),
-                user("pt@elixir.com", "Trainer1234!", org.id, club.id, riyadhBranch.id),
-                user("gx@elixir.com", "Trainer1234!", org.id, club.id, riyadhBranch.id),
-                user("member@elixir.com", "Member1234!", org.id, club.id, riyadhBranch.id),
+                user("admin@liyaqa.com", "Admin1234!", null, null),
+                user("owner@elixir.com", "Owner1234!", org.id, club.id),
+                user("manager@elixir.com", "Manager1234!", org.id, club.id),
+                user("reception@elixir.com", "Recept1234!", org.id, club.id),
+                user("sales@elixir.com", "Sales1234!", org.id, club.id),
+                user("pt@elixir.com", "Trainer1234!", org.id, club.id),
+                user("gx@elixir.com", "Trainer1234!", org.id, club.id),
+                user("member@elixir.com", "Member1234!", org.id, club.id),
             )
         return userRepository.saveAll(users)
     }
@@ -282,13 +289,11 @@ class DevDataLoader(
         rawPassword: String,
         organizationId: Long?,
         clubId: Long?,
-        branchId: Long?,
     ) = User(
         email = email,
         passwordHash = passwordEncoder.encode(rawPassword),
         organizationId = organizationId,
         clubId = clubId,
-        branchId = branchId,
     )
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -402,5 +407,68 @@ class DevDataLoader(
             }
 
         userRoleRepository.saveAll(userRoles)
+    }
+
+    // ── Staff members ─────────────────────────────────────────────────────────
+
+    private fun seedStaffMembers(
+        org: Organization,
+        club: Club,
+        users: List<User>,
+        roles: Map<String, Role>,
+        riyadhBranch: Branch,
+        jeddahBranch: Branch,
+    ) {
+        val usersByEmail = users.associateBy { it.email }
+        val joinedAt = LocalDate.of(2024, 1, 1)
+
+        data class StaffSeed(
+            val email: String,
+            val roleName: String,
+            val firstNameAr: String,
+            val firstNameEn: String,
+            val lastNameAr: String,
+            val lastNameEn: String,
+            val branches: List<Branch>,
+        )
+
+        val seeds =
+            listOf(
+                StaffSeed("owner@elixir.com", "Owner", "أحمد", "Ahmed", "العمري", "Al-Omari", listOf(riyadhBranch, jeddahBranch)),
+                StaffSeed("manager@elixir.com", "Branch Manager", "سارة", "Sarah", "المنصوري", "Al-Mansouri", listOf(riyadhBranch)),
+                StaffSeed("reception@elixir.com", "Receptionist", "فاطمة", "Fatima", "الزهراني", "Al-Zahrani", listOf(riyadhBranch)),
+                StaffSeed("sales@elixir.com", "Sales Agent", "محمد", "Mohammed", "القحطاني", "Al-Qahtani", listOf(riyadhBranch)),
+            )
+
+        for (seed in seeds) {
+            val user = usersByEmail[seed.email] ?: continue
+            val role = roles[seed.roleName] ?: continue
+
+            val staff =
+                staffMemberRepository.save(
+                    StaffMember(
+                        organizationId = org.id,
+                        clubId = club.id,
+                        userId = user.id,
+                        roleId = role.id,
+                        firstNameAr = seed.firstNameAr,
+                        firstNameEn = seed.firstNameEn,
+                        lastNameAr = seed.lastNameAr,
+                        lastNameEn = seed.lastNameEn,
+                        employmentType = "full-time",
+                        joinedAt = joinedAt,
+                    ),
+                )
+
+            staffBranchAssignmentRepository.saveAll(
+                seed.branches.map {
+                    StaffBranchAssignment(
+                        staffMemberId = staff.id,
+                        branchId = it.id,
+                        organizationId = org.id,
+                    )
+                },
+            )
+        }
     }
 }

@@ -22,11 +22,23 @@ class JwtAuthFilter(
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 val claims = jwtService.parseToken(header.substring(7))
-                val roleId =
-                    (claims["roleId"] as? String)
-                        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                val jwtClaims =
+                    JwtClaims(
+                        userPublicId =
+                            runCatching { UUID.fromString(claims.subject) }.getOrNull(),
+                        roleId =
+                            (claims["roleId"] as? String)
+                                ?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                        scope = claims["scope"] as? String,
+                        organizationId =
+                            (claims["organizationId"] as? String)
+                                ?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                        clubId =
+                            (claims["clubId"] as? String)
+                                ?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                    )
                 val auth = UsernamePasswordAuthenticationToken(claims.subject, null, emptyList())
-                if (roleId != null) auth.details = roleId
+                auth.details = jwtClaims
                 SecurityContextHolder.getContext().authentication = auth
             } catch (_: Exception) {
                 // Invalid token — continue without authentication

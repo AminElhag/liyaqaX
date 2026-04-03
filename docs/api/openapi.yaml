@@ -23,6 +23,10 @@ tags:
     description: Club management (Nexus only)
   - name: Branches
     description: Branch management (Nexus only)
+  - name: Staff (Nexus)
+    description: Staff management endpoints — internal team
+  - name: Staff (Pulse)
+    description: Staff management endpoints — club operations
 
 paths:
 
@@ -46,6 +50,28 @@ paths:
 
   /api/v1/organizations/{orgId}/clubs/{clubId}/branches/{id}:
     $ref: './branches.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1branches~1{id}'
+
+  # ── Staff (Nexus) ───────────────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff:
+    $ref: './staff.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1staff'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff/{id}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1staff~1{id}'
+
+  # ── Staff (Pulse) ───────────────────────────────────────────────────────────
+
+  /api/v1/staff:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff'
+
+  /api/v1/staff/{id}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}'
+
+  /api/v1/staff/{id}/branches:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}~1branches'
+
+  /api/v1/staff/{id}/branches/{branchId}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}~1branches~1{branchId}'
 
 components:
   securitySchemes:

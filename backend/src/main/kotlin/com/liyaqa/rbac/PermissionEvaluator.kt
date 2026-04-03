@@ -1,9 +1,9 @@
 package com.liyaqa.rbac
 
+import com.liyaqa.security.JwtClaims
 import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Component
 import java.io.Serializable
-import java.util.UUID
 import org.springframework.security.access.PermissionEvaluator as SpringPermissionEvaluator
 
 @Component
@@ -16,7 +16,7 @@ class PermissionEvaluator(
         targetDomainObject: Any?,
         permission: Any,
     ): Boolean {
-        val roleId = authentication.details as? UUID ?: return false
+        val roleId = (authentication.details as? JwtClaims)?.roleId ?: return false
         val permissionCode = permission as? String ?: return false
         return permissionService.hasPermission(roleId, permissionCode)
     }
