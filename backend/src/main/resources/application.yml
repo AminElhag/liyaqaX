@@ -29,10 +29,14 @@ arena:
 server:
   port: ${SERVER_PORT:8080}
 
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-key-do-not-use-in-production-must-be-at-least-256-bits}
+  expiry-seconds: ${JWT_EXPIRY_SECONDS:3600}
+
 logging:
   level:
     root: WARN
-    com.arena: INFO
+    com.liyaqa: INFO
 
 springdoc:
   api-docs:

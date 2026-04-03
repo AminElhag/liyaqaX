@@ -5,18 +5,10 @@ spring:
     password: changeme
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: create-drop
   flyway:
-    enabled: true
-    clean-disabled: false
-    clean-on-validation-error: true
+    enabled: false
 
-arena:
-  jwt:
-    secret: integration-test-secret-key-at-least-32-bytes!!
-    access-token-expiry: PT15M
-    refresh-token-expiry: P7D
-
-logging:
-  level:
-    com.arena: DEBUG
+jwt:
+  secret: test-only-secret-key-that-must-be-at-least-256-bits-long-for-hmac-sha256
+  expiry-seconds: 3600

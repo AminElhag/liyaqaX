@@ -1,0 +1,11 @@
+{
+  "name": "liyaqa-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "web-nexus",
+    "web-pulse",
+    "web-coach",
+    "web-arena"
+  ]
+}

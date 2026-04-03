@@ -118,7 +118,7 @@ components:
         email:
           type: string
           format: email
-          example: "admin@arena.app"
+          example: "admin@liyaqa.com"
         password:
           type: string
           format: password
@@ -131,6 +131,8 @@ components:
         - refreshToken
         - tokenType
         - expiresIn
+        - userId
+        - role
       properties:
         accessToken:
           type: string
@@ -147,6 +149,20 @@ components:
           format: int64
           description: Access token lifetime in seconds
           example: 900
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          example: "nexus:super-admin"
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+        clubId:
+          type: string
+          format: uuid
+          nullable: true
 
     RefreshRequest:
       type: object

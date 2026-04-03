@@ -8,6 +8,7 @@ components:
         - title
         - status
         - detail
+        - instance
       properties:
         type:
           type: string
@@ -27,6 +28,7 @@ components:
           example: "/api/v1/members"
         errors:
           type: array
+          description: Field-level errors (validation failures only)
           items:
             $ref: "#/components/schemas/FieldError"
 

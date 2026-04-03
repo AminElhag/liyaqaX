@@ -1,0 +1,292 @@
+paths:
+
+  /api/v1/organizations/{orgId}/clubs:
+    post:
+      summary: Create a new club under an organization
+      operationId: createClub
+      tags: [Clubs]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClubRequest'
+      responses:
+        '201':
+          description: Club created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    get:
+      summary: List all clubs for an organization
+      operationId: listClubs
+      tags: [Clubs]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent, nexus:integration-specialist, nexus:read-only-auditor
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: createdAt
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Paginated list of clubs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/organizations/{orgId}/clubs/{id}:
+    get:
+      summary: Get a club by ID
+      operationId: getClubById
+      tags: [Clubs]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent, nexus:integration-specialist, nexus:read-only-auditor
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Club found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a club
+      operationId: updateClub
+      tags: [Clubs]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClubRequest'
+      responses:
+        '200':
+          description: Club updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClubResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    delete:
+      summary: Soft-delete a club
+      operationId: deleteClub
+      tags: [Clubs]
+      security:
+        - bearerAuth: []
+      x-required-role: nexus:super-admin, nexus:support-agent
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Club deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+components:
+  schemas:
+
+    CreateClubRequest:
+      type: object
+      required: [nameAr, nameEn]
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          nullable: true
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+
+    UpdateClubRequest:
+      type: object
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 50
+        isActive:
+          type: boolean
+
+    ClubResponse:
+      type: object
+      required: [id, organizationId, nameAr, nameEn, isActive, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ClubSummaryResponse:
+      type: object
+      required: [id, nameAr, nameEn, isActive]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        isActive:
+          type: boolean
+
+    ClubPageResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClubResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
