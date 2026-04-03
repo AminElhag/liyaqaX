@@ -176,12 +176,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.local/share/pnpm/store/v3
-          key: pnpm-${{ matrix.app }}-${{ hashFiles(format('{0}/pnpm-lock.yaml', matrix.app)) }}
+          key: pnpm-${{ matrix.app }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-${{ matrix.app }}-
 
       - name: Install dependencies
-        run: cd ${{ matrix.app }} && pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: cd ${{ matrix.app }} && pnpm typecheck
