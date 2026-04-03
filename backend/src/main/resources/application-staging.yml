@@ -9,4 +9,4 @@ spring:
 logging:
   level:
     root: WARN
-    com.arena: INFO
+    com.liyaqa: INFO
