@@ -1,8 +1,14 @@
 # DEV PROFILE — never use these settings in staging or production
 spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
   flyway:
-    clean-disabled: false
+    enabled: false
+
+jwt:
+  secret: dev-only-secret-key-do-not-use-in-production-must-be-at-least-256-bits
 
 logging:
   level:
-    com.arena: DEBUG
+    com.liyaqa: DEBUG

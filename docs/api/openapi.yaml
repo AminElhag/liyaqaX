@@ -1,0 +1,45 @@
+openapi: 3.1.0
+
+info:
+  title: Liyaqa API
+  version: 0.1.0
+  description: |
+    Backend API for the Liyaqa gym management platform.
+    All endpoints are versioned under /api/v1/.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Organizations
+    description: Organization management (Nexus only)
+  - name: Clubs
+    description: Club management (Nexus only)
+
+paths:
+
+  /api/v1/auth/login:
+    $ref: './auth.yaml#/paths/~1api~1v1~1auth~1login'
+
+  /api/v1/organizations:
+    $ref: './organizations.yaml#/paths/~1api~1v1~1organizations'
+
+  /api/v1/organizations/{id}:
+    $ref: './organizations.yaml#/paths/~1api~1v1~1organizations~1{id}'
+
+  /api/v1/organizations/{orgId}/clubs:
+    $ref: './clubs.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs'
+
+  /api/v1/organizations/{orgId}/clubs/{id}:
+    $ref: './clubs.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{id}'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './shared-schemas.yaml#/components/securitySchemes/bearerAuth'
