@@ -22,4 +22,9 @@ interface UserRepository : JpaRepository<User, Long> {
         clubId: Long,
         pageable: Pageable,
     ): Page<User>
+
+    fun findAllByBranchIdAndDeletedAtIsNull(
+        branchId: Long,
+        pageable: Pageable,
+    ): Page<User>
 }
