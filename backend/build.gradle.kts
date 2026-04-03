@@ -6,6 +6,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "10.15.0"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
+    id("org.owasp.dependencycheck") version "12.1.1"
 }
 
 group = "com.liyaqa"

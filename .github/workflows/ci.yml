@@ -192,14 +192,10 @@ jobs:
       - name: Test
         run: cd ${{ matrix.app }} && pnpm test
 
-  security-scan:
-    name: Security Scan
-    needs: [backend-test, frontend-checks]
+  backend-security-scan:
+    name: Backend Security Scan
+    needs: backend-test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [web-nexus, web-pulse, web-coach, web-arena]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -223,6 +219,25 @@ jobs:
       - name: OWASP dependency check
         run: cd backend && ./gradlew dependencyCheckAnalyze --no-daemon
 
+      - name: Upload OWASP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-report
+          path: backend/build/reports/dependency-check-report.html
+          retention-days: 14
+
+  frontend-security-scan:
+    name: Frontend Security Scan (${{ matrix.app }})
+    needs: frontend-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [web-nexus, web-pulse, web-coach, web-arena]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
@@ -234,12 +249,5 @@ jobs:
           version: 9
 
       - name: Run pnpm audit
-        run: cd ${{ matrix.app }} && pnpm install --frozen-lockfile && pnpm audit --audit-level=high
+        run: pnpm install --frozen-lockfile && pnpm audit --audit-level=high
         continue-on-error: true
-
-      - name: Upload OWASP report
-        uses: actions/upload-artifact@v4
-        with:
-          name: owasp-report-${{ matrix.app }}
-          path: backend/build/reports/dependency-check-report.html
-          retention-days: 14
