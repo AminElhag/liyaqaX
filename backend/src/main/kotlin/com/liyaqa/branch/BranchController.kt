@@ -5,7 +5,6 @@ import com.liyaqa.branch.dto.BranchSummaryResponse
 import com.liyaqa.branch.dto.CreateBranchRequest
 import com.liyaqa.branch.dto.UpdateBranchRequest
 import com.liyaqa.common.dto.PageResponse
-import com.liyaqa.security.Roles
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -33,7 +32,7 @@ class BranchController(
     private val branchService: BranchService,
 ) {
     @PostMapping
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'branch:create')")
     @Operation(summary = "Create a new branch under a club")
     fun create(
         @PathVariable orgId: UUID,
@@ -42,7 +41,7 @@ class BranchController(
     ): ResponseEntity<BranchResponse> = ResponseEntity.status(HttpStatus.CREATED).body(branchService.create(orgId, clubId, request))
 
     @GetMapping
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'branch:read')")
     @Operation(summary = "List all branches for a club")
     fun getAll(
         @PathVariable orgId: UUID,
@@ -51,7 +50,7 @@ class BranchController(
     ): ResponseEntity<PageResponse<BranchSummaryResponse>> = ResponseEntity.ok(branchService.getAll(orgId, clubId, pageable))
 
     @GetMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'branch:read')")
     @Operation(summary = "Get a branch by ID")
     fun getById(
         @PathVariable orgId: UUID,
@@ -60,7 +59,7 @@ class BranchController(
     ): ResponseEntity<BranchResponse> = ResponseEntity.ok(branchService.getByPublicId(orgId, clubId, id))
 
     @PatchMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'branch:update')")
     @Operation(summary = "Update a branch")
     fun update(
         @PathVariable orgId: UUID,
@@ -70,7 +69,7 @@ class BranchController(
     ): ResponseEntity<BranchResponse> = ResponseEntity.ok(branchService.update(orgId, clubId, id, request))
 
     @DeleteMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'branch:delete')")
     @Operation(summary = "Soft-delete a branch")
     fun delete(
         @PathVariable orgId: UUID,
