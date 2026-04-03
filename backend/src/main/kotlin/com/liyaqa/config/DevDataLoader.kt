@@ -1,5 +1,7 @@
 package com.liyaqa.config
 
+import com.liyaqa.branch.Branch
+import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.organization.Organization
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 class DevDataLoader(
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
+    private val branchRepository: BranchRepository,
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
@@ -58,20 +61,41 @@ class DevDataLoader(
                 ),
             )
 
+        val riyadhBranch =
+            branchRepository.save(
+                Branch(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "\u0641\u0631\u0639 \u0627\u0644\u0631\u064a\u0627\u0636",
+                    nameEn = "Elixir Gym - Riyadh",
+                    city = "Riyadh",
+                ),
+            )
+
+        branchRepository.save(
+            Branch(
+                organizationId = org.id,
+                clubId = club.id,
+                nameAr = "\u0641\u0631\u0639 \u062c\u062f\u0629",
+                nameEn = "Elixir Gym - Jeddah",
+                city = "Jeddah",
+            ),
+        )
+
         val users =
             listOf(
-                seedUser("admin@liyaqa.com", "Admin1234!", Roles.NEXUS_SUPER_ADMIN, null, null),
-                seedUser("owner@elixir.com", "Owner1234!", Roles.CLUB_OWNER, org.id, club.id),
-                seedUser("manager@elixir.com", "Manager1234!", Roles.CLUB_BRANCH_MANAGER, org.id, club.id),
-                seedUser("reception@elixir.com", "Recept1234!", Roles.CLUB_RECEPTIONIST, org.id, club.id),
-                seedUser("sales@elixir.com", "Sales1234!", Roles.CLUB_SALES_AGENT, org.id, club.id),
-                seedUser("pt@elixir.com", "Trainer1234!", Roles.TRAINER_PT, org.id, club.id),
-                seedUser("gx@elixir.com", "Trainer1234!", Roles.TRAINER_GX, org.id, club.id),
-                seedUser("member@elixir.com", "Member1234!", Roles.MEMBER, org.id, club.id),
+                seedUser("admin@liyaqa.com", "Admin1234!", Roles.NEXUS_SUPER_ADMIN, null, null, null),
+                seedUser("owner@elixir.com", "Owner1234!", Roles.CLUB_OWNER, org.id, club.id, null),
+                seedUser("manager@elixir.com", "Manager1234!", Roles.CLUB_BRANCH_MANAGER, org.id, club.id, riyadhBranch.id),
+                seedUser("reception@elixir.com", "Recept1234!", Roles.CLUB_RECEPTIONIST, org.id, club.id, riyadhBranch.id),
+                seedUser("sales@elixir.com", "Sales1234!", Roles.CLUB_SALES_AGENT, org.id, club.id, riyadhBranch.id),
+                seedUser("pt@elixir.com", "Trainer1234!", Roles.TRAINER_PT, org.id, club.id, riyadhBranch.id),
+                seedUser("gx@elixir.com", "Trainer1234!", Roles.TRAINER_GX, org.id, club.id, riyadhBranch.id),
+                seedUser("member@elixir.com", "Member1234!", Roles.MEMBER, org.id, club.id, riyadhBranch.id),
             )
         userRepository.saveAll(users)
 
-        log.info("Seeded 1 organization, 1 club, and {} users.", users.size)
+        log.info("Seeded 1 organization, 1 club, 2 branches, and {} users.", users.size)
     }
 
     private fun seedUser(
@@ -80,11 +104,13 @@ class DevDataLoader(
         role: String,
         organizationId: Long?,
         clubId: Long?,
+        branchId: Long?,
     ) = User(
         email = email,
         passwordHash = passwordEncoder.encode(rawPassword),
         role = role,
         organizationId = organizationId,
         clubId = clubId,
+        branchId = branchId,
     )
 }

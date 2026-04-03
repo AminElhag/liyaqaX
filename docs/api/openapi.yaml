@@ -21,6 +21,8 @@ tags:
     description: Organization management (Nexus only)
   - name: Clubs
     description: Club management (Nexus only)
+  - name: Branches
+    description: Branch management (Nexus only)
 
 paths:
 
@@ -38,6 +40,12 @@ paths:
 
   /api/v1/organizations/{orgId}/clubs/{id}:
     $ref: './clubs.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{id}'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/branches:
+    $ref: './branches.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1branches'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/branches/{id}:
+    $ref: './branches.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1branches~1{id}'
 
 components:
   securitySchemes:

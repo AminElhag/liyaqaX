@@ -21,6 +21,8 @@ class User(
     var organizationId: Long? = null,
     @Column(name = "club_id")
     var clubId: Long? = null,
+    @Column(name = "branch_id")
+    var branchId: Long? = null,
     @Column(name = "is_active", nullable = false)
     var isActive: Boolean = true,
 ) : AuditEntity()
