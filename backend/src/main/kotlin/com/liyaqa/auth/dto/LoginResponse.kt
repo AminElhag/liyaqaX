@@ -10,4 +10,7 @@ data class LoginResponse(
     val roleName: String,
     val organizationId: UUID?,
     val clubId: UUID?,
+    val trainerId: UUID? = null,
+    val trainerTypes: List<String>? = null,
+    val branchIds: List<UUID>? = null,
 )

@@ -8,4 +8,7 @@ data class JwtClaims(
     val scope: String?,
     val organizationId: UUID?,
     val clubId: UUID?,
+    val trainerId: UUID? = null,
+    val trainerTypes: List<String> = emptyList(),
+    val branchIds: List<UUID> = emptyList(),
 )

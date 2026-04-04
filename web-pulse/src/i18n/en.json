@@ -1,1 +1,70 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to your account",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "error": "Invalid email or password",
+      "scopeError": "This app is for club staff only. Trainers use Coach."
+    },
+    "logout": "Logout"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "staff": "Staff",
+    "members": "Members",
+    "memberships": "Memberships",
+    "finance": "Finance",
+    "pt": "Personal Training",
+    "gx": "Group Exercise",
+    "leads": "Leads",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "branch": {
+    "selector": "Branch",
+    "all": "All branches"
+  },
+  "staff": {
+    "title": "Staff",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "branches": "Branches",
+      "status": "Status"
+    },
+    "empty": "No staff members found",
+    "addStaff": "Add staff",
+    "detail": {
+      "title": "Staff member",
+      "phone": "Phone",
+      "nationalId": "National ID",
+      "employmentType": "Employment type",
+      "joinedAt": "Joined",
+      "branches": "Branches",
+      "notFound": "Staff member not found"
+    }
+  },
+  "common": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "noPermission": "You don't have permission to view this",
+    "forbidden": "Access denied",
+    "forbiddenMessage": "You don't have the required role to access this page.",
+    "notFound": "Page not found",
+    "goBack": "Go back",
+    "retry": "Try again",
+    "page": "Page",
+    "of": "of",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "language": {
+    "ar": "العربية",
+    "en": "English"
+  }
+}

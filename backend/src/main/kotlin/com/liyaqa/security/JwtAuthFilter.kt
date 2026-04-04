@@ -36,6 +36,16 @@ class JwtAuthFilter(
                         clubId =
                             (claims["clubId"] as? String)
                                 ?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                        trainerId =
+                            (claims["trainerId"] as? String)
+                                ?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                        trainerTypes =
+                            (claims["trainerTypes"] as? List<*>)
+                                ?.filterIsInstance<String>() ?: emptyList(),
+                        branchIds =
+                            (claims["branchIds"] as? List<*>)
+                                ?.mapNotNull { (it as? String)?.let { s -> runCatching { UUID.fromString(s) }.getOrNull() } }
+                                ?: emptyList(),
                     )
                 val auth = UsernamePasswordAuthenticationToken(claims.subject, null, emptyList())
                 auth.details = jwtClaims

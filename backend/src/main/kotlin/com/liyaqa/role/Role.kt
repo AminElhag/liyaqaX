@@ -15,7 +15,7 @@ class Role(
     var nameAr: String,
     @Column(name = "name_en", nullable = false, length = 100)
     var nameEn: String,
-    // "platform" | "club" | "member"
+    // "platform" | "club" | "trainer" | "member"
     @Column(name = "scope", nullable = false, length = 20)
     val scope: String,
     // null for platform-scoped roles

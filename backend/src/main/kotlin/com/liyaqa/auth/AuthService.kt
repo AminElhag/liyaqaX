@@ -2,12 +2,15 @@ package com.liyaqa.auth
 
 import com.liyaqa.auth.dto.LoginRequest
 import com.liyaqa.auth.dto.LoginResponse
+import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.rbac.UserRoleRepository
 import com.liyaqa.role.RoleRepository
 import com.liyaqa.security.JwtService
+import com.liyaqa.trainer.TrainerBranchAssignmentRepository
+import com.liyaqa.trainer.TrainerRepository
 import com.liyaqa.user.UserRepository
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -20,8 +23,11 @@ class AuthService(
     private val userRepository: UserRepository,
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
+    private val branchRepository: BranchRepository,
     private val userRoleRepository: UserRoleRepository,
     private val roleRepository: RoleRepository,
+    private val trainerRepository: TrainerRepository,
+    private val trainerBranchAssignmentRepository: TrainerBranchAssignmentRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtService: JwtService,
 ) {
@@ -72,6 +78,36 @@ class AuthService(
         orgPublicId?.let { claims["organizationId"] = it.toString() }
         clubPublicId?.let { claims["clubId"] = it.toString() }
 
+        var trainerPublicId: java.util.UUID? = null
+        var trainerTypes: List<String> = emptyList()
+        var branchIds: List<java.util.UUID> = emptyList()
+
+        if (role.scope == "trainer") {
+            val trainer =
+                trainerRepository.findByUserIdAndDeletedAtIsNull(user.id)
+                    .orElse(null)
+
+            if (trainer != null) {
+                trainerPublicId = trainer.publicId
+                claims["trainerId"] = trainer.publicId.toString()
+
+                val assignments = trainerBranchAssignmentRepository.findAllByTrainerId(trainer.id)
+                branchIds =
+                    assignments.mapNotNull { assignment ->
+                        branchRepository.findById(assignment.branchId)
+                            .map { it.publicId }.orElse(null)
+                    }
+                if (branchIds.isNotEmpty()) {
+                    claims["branchIds"] = branchIds.map { it.toString() }
+                }
+
+                trainerTypes = deriveTrainerTypes(role.nameEn)
+                if (trainerTypes.isNotEmpty()) {
+                    claims["trainerTypes"] = trainerTypes
+                }
+            }
+        }
+
         val token =
             jwtService.generateToken(
                 subject = user.publicId.toString(),
@@ -86,7 +122,18 @@ class AuthService(
             roleName = role.nameEn,
             organizationId = orgPublicId,
             clubId = clubPublicId,
+            trainerId = trainerPublicId,
+            trainerTypes = trainerTypes.ifEmpty { null },
+            branchIds = branchIds.ifEmpty { null },
         )
+    }
+
+    private fun deriveTrainerTypes(roleNameEn: String): List<String> {
+        val types = mutableListOf<String>()
+        val normalized = roleNameEn.lowercase()
+        if ("pt" in normalized || "personal" in normalized) types.add("pt")
+        if ("gx" in normalized || "group" in normalized) types.add("gx")
+        return types
     }
 
     private fun invalidCredentials() =

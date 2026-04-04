@@ -9,6 +9,8 @@ import java.util.Optional
 interface UserRoleRepository : JpaRepository<UserRole, Long> {
     fun findByUserId(userId: Long): Optional<UserRole>
 
+    fun findAllByUserId(userId: Long): List<UserRole>
+
     @Transactional
     fun deleteByUserId(userId: Long)
 }

@@ -19,6 +19,14 @@ import com.liyaqa.staff.StaffBranchAssignment
 import com.liyaqa.staff.StaffBranchAssignmentRepository
 import com.liyaqa.staff.StaffMember
 import com.liyaqa.staff.StaffMemberRepository
+import com.liyaqa.trainer.Trainer
+import com.liyaqa.trainer.TrainerBranchAssignment
+import com.liyaqa.trainer.TrainerBranchAssignmentRepository
+import com.liyaqa.trainer.TrainerCertification
+import com.liyaqa.trainer.TrainerCertificationRepository
+import com.liyaqa.trainer.TrainerRepository
+import com.liyaqa.trainer.TrainerSpecialization
+import com.liyaqa.trainer.TrainerSpecializationRepository
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
 import org.slf4j.LoggerFactory
@@ -43,6 +51,10 @@ class DevDataLoader(
     private val userRoleRepository: UserRoleRepository,
     private val staffMemberRepository: StaffMemberRepository,
     private val staffBranchAssignmentRepository: StaffBranchAssignmentRepository,
+    private val trainerRepository: TrainerRepository,
+    private val trainerBranchAssignmentRepository: TrainerBranchAssignmentRepository,
+    private val trainerCertificationRepository: TrainerCertificationRepository,
+    private val trainerSpecializationRepository: TrainerSpecializationRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -207,9 +219,10 @@ class DevDataLoader(
         val roles = seedRoles(org, club, permissions)
         seedUserRoles(users, roles)
         seedStaffMembers(org, club, users, roles, riyadhBranch, jeddahBranch)
+        seedTrainers(org, club, users, riyadhBranch)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff members.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers.",
             users.size,
             permissions.size,
             roles.size,
@@ -341,8 +354,8 @@ class DevDataLoader(
         roles["Branch Manager"] = seedRole("مدير الفرع", "Branch Manager", "club", org.id, club.id, true, clubBranchManager, permissions)
         roles["Receptionist"] = seedRole("موظف الاستقبال", "Receptionist", "club", org.id, club.id, true, clubReceptionist, permissions)
         roles["Sales Agent"] = seedRole("موظف المبيعات", "Sales Agent", "club", org.id, club.id, true, clubSalesAgent, permissions)
-        roles["PT Trainer"] = seedRole("مدرب شخصي", "PT Trainer", "club", org.id, club.id, true, trainerPt, permissions)
-        roles["GX Instructor"] = seedRole("مدرب جماعي", "GX Instructor", "club", org.id, club.id, true, trainerGx, permissions)
+        roles["PT Trainer"] = seedRole("مدرب شخصي", "PT Trainer", "trainer", org.id, club.id, true, trainerPt, permissions)
+        roles["GX Instructor"] = seedRole("مدرب جماعي", "GX Instructor", "trainer", org.id, club.id, true, trainerGx, permissions)
 
         // Member role
         roles["Member"] = seedRole("عضو", "Member", "member", null, null, true, memberPerms, permissions)
@@ -470,5 +483,141 @@ class DevDataLoader(
                 },
             )
         }
+    }
+
+    // ── Trainers ──────────────────────────────────────────────────────────────
+
+    private fun seedTrainers(
+        org: Organization,
+        club: Club,
+        users: List<User>,
+        riyadhBranch: Branch,
+    ) {
+        val usersByEmail = users.associateBy { it.email }
+        val joinedAt = LocalDate.of(2024, 3, 1)
+
+        data class TrainerSeed(
+            val email: String,
+            val firstNameAr: String,
+            val firstNameEn: String,
+            val lastNameAr: String,
+            val lastNameEn: String,
+            val bioAr: String?,
+            val bioEn: String?,
+        )
+
+        val seeds =
+            listOf(
+                TrainerSeed(
+                    "pt@elixir.com",
+                    "خالد",
+                    "Khalid",
+                    "الشمري",
+                    "Al-Shammari",
+                    "مدرب شخصي معتمد متخصص في فقدان الوزن وبناء العضلات",
+                    "Certified personal trainer specializing in weight loss and muscle building",
+                ),
+                TrainerSeed(
+                    "gx@elixir.com",
+                    "نورة",
+                    "Noura",
+                    "الحربي",
+                    "Al-Harbi",
+                    "مدربة جماعية متخصصة في اليوغا والبيلاتس",
+                    "Group exercise instructor specializing in yoga and pilates",
+                ),
+            )
+
+        for (seed in seeds) {
+            val user = usersByEmail[seed.email] ?: continue
+
+            val trainer =
+                trainerRepository.save(
+                    Trainer(
+                        organizationId = org.id,
+                        clubId = club.id,
+                        userId = user.id,
+                        firstNameAr = seed.firstNameAr,
+                        firstNameEn = seed.firstNameEn,
+                        lastNameAr = seed.lastNameAr,
+                        lastNameEn = seed.lastNameEn,
+                        bioAr = seed.bioAr,
+                        bioEn = seed.bioEn,
+                        joinedAt = joinedAt,
+                    ),
+                )
+
+            trainerBranchAssignmentRepository.save(
+                TrainerBranchAssignment(
+                    trainerId = trainer.id,
+                    branchId = riyadhBranch.id,
+                    organizationId = org.id,
+                ),
+            )
+
+            seedTrainerCertifications(trainer, org)
+            seedTrainerSpecializations(trainer, org, seed.email)
+        }
+    }
+
+    private fun seedTrainerCertifications(
+        trainer: Trainer,
+        org: Organization,
+    ) {
+        trainerCertificationRepository.saveAll(
+            listOf(
+                TrainerCertification(
+                    trainerId = trainer.id,
+                    organizationId = org.id,
+                    nameAr = "شهادة مدرب لياقة بدنية",
+                    nameEn = "Certified Fitness Trainer",
+                    issuingBody = "ACE",
+                    issuedAt = LocalDate.of(2022, 6, 15),
+                    expiresAt = LocalDate.of(2025, 6, 15),
+                    status = "approved",
+                ),
+                TrainerCertification(
+                    trainerId = trainer.id,
+                    organizationId = org.id,
+                    nameAr = "شهادة الإسعافات الأولية",
+                    nameEn = "First Aid Certificate",
+                    issuingBody = "Red Crescent",
+                    issuedAt = LocalDate.of(2023, 1, 10),
+                    expiresAt = LocalDate.of(2026, 1, 10),
+                    status = "pending-review",
+                ),
+            ),
+        )
+    }
+
+    private fun seedTrainerSpecializations(
+        trainer: Trainer,
+        org: Organization,
+        email: String,
+    ) {
+        val specs =
+            if (email == "pt@elixir.com") {
+                listOf(
+                    "فقدان الوزن" to "Weight Loss",
+                    "بناء العضلات" to "Muscle Building",
+                    "إعادة التأهيل" to "Rehabilitation",
+                )
+            } else {
+                listOf(
+                    "يوغا" to "Yoga",
+                    "بيلاتس" to "Pilates",
+                )
+            }
+
+        trainerSpecializationRepository.saveAll(
+            specs.map { (ar, en) ->
+                TrainerSpecialization(
+                    trainerId = trainer.id,
+                    organizationId = org.id,
+                    nameAr = ar,
+                    nameEn = en,
+                )
+            },
+        )
     }
 }
