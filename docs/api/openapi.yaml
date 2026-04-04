@@ -31,6 +31,10 @@ tags:
     description: Member viewing endpoints — internal team
   - name: Members (Pulse)
     description: Member management endpoints — club operations
+  - name: Membership Plans (Nexus)
+    description: Membership plan viewing endpoints — internal team
+  - name: Membership Plans (Pulse)
+    description: Membership plan management endpoints — club operations
 
 paths:
 
@@ -104,6 +108,22 @@ paths:
 
   /api/v1/members/{id}/waiver-sign:
     $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1waiver-sign'
+
+  # ── Membership Plans (Nexus) ────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/membership-plans:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1membership-plans'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/membership-plans/{id}:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1membership-plans~1{id}'
+
+  # ── Membership Plans (Pulse) ────────────────────────────────────────────
+
+  /api/v1/membership-plans:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1membership-plans'
+
+  /api/v1/membership-plans/{id}:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1membership-plans~1{id}'
 
 components:
   securitySchemes:

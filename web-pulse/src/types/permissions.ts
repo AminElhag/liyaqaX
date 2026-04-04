@@ -21,6 +21,12 @@ export const Permission = {
   MEMBER_UPDATE: 'member:update',
   MEMBER_DELETE: 'member:delete',
 
+  // Membership Plan
+  MEMBERSHIP_PLAN_CREATE: 'membership-plan:create',
+  MEMBERSHIP_PLAN_READ: 'membership-plan:read',
+  MEMBERSHIP_PLAN_UPDATE: 'membership-plan:update',
+  MEMBERSHIP_PLAN_DELETE: 'membership-plan:delete',
+
   // Membership
   MEMBERSHIP_CREATE: 'membership:create',
   MEMBERSHIP_READ: 'membership:read',

@@ -12,6 +12,8 @@ import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.member.WaiverSignature
 import com.liyaqa.member.WaiverSignatureRepository
+import com.liyaqa.membership.MembershipPlan
+import com.liyaqa.membership.MembershipPlanRepository
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.permission.Permission
@@ -67,6 +69,7 @@ class DevDataLoader(
     private val emergencyContactRepository: EmergencyContactRepository,
     private val healthWaiverRepository: HealthWaiverRepository,
     private val waiverSignatureRepository: WaiverSignatureRepository,
+    private val membershipPlanRepository: MembershipPlanRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -126,6 +129,8 @@ class DevDataLoader(
             PermissionConstants.ROLE_UPDATE, PermissionConstants.ROLE_DELETE,
             PermissionConstants.MEMBER_CREATE, PermissionConstants.MEMBER_READ,
             PermissionConstants.MEMBER_UPDATE, PermissionConstants.MEMBER_DELETE,
+            PermissionConstants.MEMBERSHIP_PLAN_CREATE, PermissionConstants.MEMBERSHIP_PLAN_READ,
+            PermissionConstants.MEMBERSHIP_PLAN_UPDATE, PermissionConstants.MEMBERSHIP_PLAN_DELETE,
             PermissionConstants.MEMBERSHIP_CREATE, PermissionConstants.MEMBERSHIP_READ,
             PermissionConstants.MEMBERSHIP_UPDATE, PermissionConstants.MEMBERSHIP_FREEZE,
             PermissionConstants.MEMBERSHIP_UNFREEZE, PermissionConstants.MEMBERSHIP_TRANSFER,
@@ -150,12 +155,14 @@ class DevDataLoader(
             setOf(
                 PermissionConstants.ROLE_CREATE, PermissionConstants.ROLE_READ,
                 PermissionConstants.ROLE_UPDATE, PermissionConstants.ROLE_DELETE,
+                PermissionConstants.MEMBERSHIP_PLAN_DELETE,
             )
 
     private val clubReceptionist =
         setOf(
             PermissionConstants.MEMBER_CREATE, PermissionConstants.MEMBER_READ,
             PermissionConstants.MEMBER_UPDATE, PermissionConstants.MEMBER_DELETE,
+            PermissionConstants.MEMBERSHIP_PLAN_READ,
             PermissionConstants.MEMBERSHIP_CREATE, PermissionConstants.MEMBERSHIP_READ,
             PermissionConstants.MEMBERSHIP_UPDATE, PermissionConstants.MEMBERSHIP_FREEZE,
             PermissionConstants.MEMBERSHIP_UNFREEZE, PermissionConstants.MEMBERSHIP_TRANSFER,
@@ -174,6 +181,7 @@ class DevDataLoader(
             PermissionConstants.LEAD_CONVERT,
             PermissionConstants.MEMBER_CREATE,
             PermissionConstants.MEMBER_READ,
+            PermissionConstants.MEMBERSHIP_PLAN_READ,
             PermissionConstants.PAYMENT_COLLECT,
             PermissionConstants.BRANCH_READ,
         )
@@ -233,9 +241,10 @@ class DevDataLoader(
         seedStaffMembers(org, club, users, roles, riyadhBranch, jeddahBranch)
         seedTrainers(org, club, users, riyadhBranch)
         seedMember(org, club, users, riyadhBranch)
+        seedMembershipPlans(org, club)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member, 3 plans.",
             users.size,
             permissions.size,
             roles.size,
@@ -631,6 +640,60 @@ class DevDataLoader(
                     nameEn = en,
                 )
             },
+        )
+    }
+
+    // ── Membership plans ───────────────────────────────────────────────────────
+
+    private fun seedMembershipPlans(
+        org: Organization,
+        club: Club,
+    ) {
+        membershipPlanRepository.saveAll(
+            listOf(
+                MembershipPlan(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "اشتراك شهري أساسي",
+                    nameEn = "Basic Monthly",
+                    priceHalalas = 15000,
+                    durationDays = 30,
+                    gracePeriodDays = 3,
+                    freezeAllowed = true,
+                    maxFreezeDays = 14,
+                    gxClassesIncluded = true,
+                    ptSessionsIncluded = false,
+                    sortOrder = 1,
+                ),
+                MembershipPlan(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "اشتراك ربع سنوي",
+                    nameEn = "Quarterly Standard",
+                    priceHalalas = 39900,
+                    durationDays = 90,
+                    gracePeriodDays = 5,
+                    freezeAllowed = true,
+                    maxFreezeDays = 21,
+                    gxClassesIncluded = true,
+                    ptSessionsIncluded = false,
+                    sortOrder = 2,
+                ),
+                MembershipPlan(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "اشتراك سنوي مميز",
+                    nameEn = "Annual Premium",
+                    priceHalalas = 129900,
+                    durationDays = 365,
+                    gracePeriodDays = 7,
+                    freezeAllowed = true,
+                    maxFreezeDays = 30,
+                    gxClassesIncluded = true,
+                    ptSessionsIncluded = true,
+                    sortOrder = 3,
+                ),
+            ),
         )
     }
 
