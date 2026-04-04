@@ -1,1 +1,194 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to your account",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "error": "Invalid email or password",
+      "scopeError": "This app is for club staff only. Trainers use Coach."
+    },
+    "logout": "Logout"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "staff": "Staff",
+    "members": "Members",
+    "memberships": "Memberships",
+    "finance": "Finance",
+    "pt": "Personal Training",
+    "gx": "Group Exercise",
+    "leads": "Leads",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "branch": {
+    "selector": "Branch",
+    "all": "All branches"
+  },
+  "staff": {
+    "title": "Staff",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "branches": "Branches",
+      "status": "Status"
+    },
+    "empty": "No staff members found",
+    "addStaff": "Add staff",
+    "detail": {
+      "title": "Staff member",
+      "phone": "Phone",
+      "nationalId": "National ID",
+      "employmentType": "Employment type",
+      "joinedAt": "Joined",
+      "branches": "Branches",
+      "notFound": "Staff member not found"
+    }
+  },
+  "members": {
+    "title": "Members",
+    "registerMember": "Register member",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "status": "Status",
+      "branch": "Branch",
+      "joinedAt": "Joined"
+    },
+    "status": {
+      "pending": "Pending",
+      "active": "Active",
+      "frozen": "Frozen",
+      "expired": "Expired",
+      "terminated": "Terminated"
+    },
+    "empty": "No members found",
+    "form": {
+      "step1": "Personal information",
+      "step2": "Emergency contact",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "phone": "Phone",
+      "dateOfBirth": "Date of birth",
+      "gender": "Gender",
+      "genderOptions": {
+        "male": "Male",
+        "female": "Female",
+        "unspecified": "Unspecified"
+      },
+      "nationalId": "National ID / Iqama",
+      "branch": "Home branch",
+      "notes": "Notes",
+      "emergencyName": "Emergency contact name",
+      "emergencyPhone": "Emergency contact phone",
+      "emergencyRelationship": "Relationship",
+      "passwordGenerated": "Auto-generated password",
+      "copyPassword": "Copy password",
+      "success": "Member registered successfully"
+    },
+    "profile": {
+      "title": "Member profile",
+      "overview": "Overview",
+      "membership": "Membership",
+      "payments": "Payments",
+      "pt": "PT",
+      "gx": "GX",
+      "emergencyContacts": "Emergency contacts",
+      "notFound": "Member not found",
+      "comingSoon": "Coming soon"
+    },
+    "waiver": {
+      "signed": "Waiver signed",
+      "notSigned": "Waiver not signed"
+    }
+  },
+  "membershipPlans": {
+    "title": "Membership plans",
+    "addPlan": "Add plan",
+    "editPlan": "Edit plan",
+    "durationDays": "days",
+    "features": {
+      "gxIncluded": "GX classes included",
+      "ptIncluded": "PT sessions included",
+      "freezeAllowed": "Freeze allowed",
+      "gracePeriod": "{{days}} days grace period"
+    },
+    "form": {
+      "nameAr": "Plan name (Arabic)",
+      "nameEn": "Plan name (English)",
+      "descriptionAr": "Description (Arabic)",
+      "descriptionEn": "Description (English)",
+      "price": "Price (SAR)",
+      "duration": "Duration (days)",
+      "gracePeriod": "Grace period (days)",
+      "freeze": "Allow freeze",
+      "maxFreezeDays": "Max freeze days per year",
+      "gxIncluded": "Include GX classes",
+      "ptIncluded": "Include PT sessions"
+    },
+    "empty": "No plans defined yet"
+  },
+  "membership": {
+    "activeTitle": "Active membership",
+    "noActive": "No active membership",
+    "assignPlan": "Assign membership plan",
+    "assignAndCollect": "Assign plan & collect payment",
+    "history": "Membership history",
+    "daysRemaining": "{{days}} days remaining",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "graceEndDate": "Grace period ends",
+    "freezeDaysUsed": "Freeze days used",
+    "paymentInfo": "Payment",
+    "invoiceInfo": "Invoice",
+    "viewInvoice": "View invoice",
+    "renewComingSoon": "Renewal coming soon",
+    "selectPlan": "Select a plan",
+    "paymentMethod": "Payment method",
+    "paymentMethods": {
+      "cash": "Cash",
+      "card": "Card",
+      "bank-transfer": "Bank transfer",
+      "other": "Other"
+    },
+    "amount": "Amount (SAR)",
+    "referenceNumber": "Reference number",
+    "notes": "Notes",
+    "success": "Membership assigned successfully",
+    "invoiceCreated": "Invoice {{number}} created",
+    "historyEmpty": "No membership history",
+    "historyColumns": {
+      "plan": "Plan",
+      "period": "Period",
+      "amount": "Amount",
+      "method": "Method",
+      "status": "Status"
+    }
+  },
+  "common": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "noPermission": "You don't have permission to view this",
+    "forbidden": "Access denied",
+    "forbiddenMessage": "You don't have the required role to access this page.",
+    "notFound": "Page not found",
+    "goBack": "Go back",
+    "retry": "Try again",
+    "page": "Page",
+    "of": "of",
+    "previous": "Previous",
+    "next": "Next",
+    "cancel": "Cancel",
+    "saving": "Saving..."
+  },
+  "language": {
+    "ar": "العربية",
+    "en": "English"
+  }
+}

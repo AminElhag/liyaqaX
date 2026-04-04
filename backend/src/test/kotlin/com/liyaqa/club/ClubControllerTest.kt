@@ -2,16 +2,18 @@ package com.liyaqa.club
 
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
+import com.liyaqa.rbac.PermissionService
 import com.liyaqa.security.JwtService
-import com.liyaqa.security.Roles
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.notNullValue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -19,6 +21,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -36,6 +39,12 @@ class ClubControllerTest {
     @Autowired
     lateinit var clubRepository: ClubRepository
 
+    @MockBean
+    lateinit var permissionService: PermissionService
+
+    private val testRoleId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+    private val noPermRoleId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+
     private lateinit var org: Organization
 
     @BeforeEach
@@ -52,10 +61,14 @@ class ClubControllerTest {
         organizationRepository.deleteAllInBatch()
     }
 
-    private fun bearerToken(role: String): String {
-        val token = jwtService.generateToken("test-user", mapOf("role" to role))
-        return "Bearer $token"
+    private fun bearerToken(vararg permissions: String): String {
+        permissions.forEach { perm ->
+            whenever(permissionService.hasPermission(testRoleId, perm)).thenReturn(true)
+        }
+        return "Bearer ${jwtService.generateToken("test-user", mapOf("roleId" to testRoleId.toString()))}"
     }
+
+    private fun forbiddenToken(): String = "Bearer ${jwtService.generateToken("test-user", mapOf("roleId" to noPermRoleId.toString()))}"
 
     private fun basePath() = "/api/v1/organizations/${org.publicId}/clubs"
 
@@ -67,7 +80,7 @@ class ClubControllerTest {
     @Test
     fun `POST creates club with nexus super-admin`() {
         mockMvc.post(basePath()) {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("club:create"))
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameAr": "نادي جديد", "nameEn": "New Club"}"""
         }.andExpect {
@@ -80,8 +93,8 @@ class ClubControllerTest {
 
     @Test
     fun `POST returns 404 for non-existent organization`() {
-        mockMvc.post("/api/v1/organizations/${java.util.UUID.randomUUID()}/clubs") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+        mockMvc.post("/api/v1/organizations/${UUID.randomUUID()}/clubs") {
+            header("Authorization", bearerToken("club:create"))
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameAr": "نادي", "nameEn": "Club"}"""
         }.andExpect {
@@ -94,7 +107,7 @@ class ClubControllerTest {
         createClub()
 
         mockMvc.get(basePath()) {
-            header("Authorization", bearerToken(Roles.NEXUS_READ_ONLY_AUDITOR))
+            header("Authorization", bearerToken("club:read"))
         }.andExpect {
             status { isOk() }
             jsonPath("$.items.length()", equalTo(1))
@@ -107,7 +120,7 @@ class ClubControllerTest {
         val club = createClub()
 
         mockMvc.get("${basePath()}/${club.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPPORT_AGENT))
+            header("Authorization", bearerToken("club:read"))
         }.andExpect {
             status { isOk() }
             jsonPath("$.id", equalTo(club.publicId.toString()))
@@ -117,8 +130,8 @@ class ClubControllerTest {
 
     @Test
     fun `GET by id returns 404 for non-existent club`() {
-        mockMvc.get("${basePath()}/${java.util.UUID.randomUUID()}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+        mockMvc.get("${basePath()}/${UUID.randomUUID()}") {
+            header("Authorization", bearerToken("club:read"))
         }.andExpect {
             status { isNotFound() }
         }
@@ -129,7 +142,7 @@ class ClubControllerTest {
         val club = createClub()
 
         mockMvc.patch("${basePath()}/${club.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPPORT_AGENT))
+            header("Authorization", bearerToken("club:update"))
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameEn": "Updated Club"}"""
         }.andExpect {
@@ -143,13 +156,13 @@ class ClubControllerTest {
         val club = createClub()
 
         mockMvc.delete("${basePath()}/${club.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("club:delete"))
         }.andExpect {
             status { isNoContent() }
         }
 
         mockMvc.get("${basePath()}/${club.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("club:read"))
         }.andExpect {
             status { isNotFound() }
         }
@@ -158,7 +171,7 @@ class ClubControllerTest {
     @Test
     fun `POST returns 403 for club owner`() {
         mockMvc.post(basePath()) {
-            header("Authorization", bearerToken(Roles.CLUB_OWNER))
+            header("Authorization", forbiddenToken())
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameAr": "نادي", "nameEn": "Club"}"""
         }.andExpect {
@@ -181,7 +194,7 @@ class ClubControllerTest {
         val club = createClub()
 
         mockMvc.delete("${basePath()}/${club.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_READ_ONLY_AUDITOR))
+            header("Authorization", forbiddenToken())
         }.andExpect {
             status { isForbidden() }
         }

@@ -1,14 +1,16 @@
 package com.liyaqa.organization
 
+import com.liyaqa.rbac.PermissionService
 import com.liyaqa.security.JwtService
-import com.liyaqa.security.Roles
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.notNullValue
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
@@ -16,6 +18,7 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -30,15 +33,25 @@ class OrganizationControllerTest {
     @Autowired
     lateinit var organizationRepository: OrganizationRepository
 
+    @MockBean
+    lateinit var permissionService: PermissionService
+
+    private val testRoleId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+    private val noPermRoleId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+
     @AfterEach
     fun cleanup() {
         organizationRepository.deleteAllInBatch()
     }
 
-    private fun bearerToken(role: String): String {
-        val token = jwtService.generateToken("test-user", mapOf("role" to role))
-        return "Bearer $token"
+    private fun bearerToken(vararg permissions: String): String {
+        permissions.forEach { perm ->
+            whenever(permissionService.hasPermission(testRoleId, perm)).thenReturn(true)
+        }
+        return "Bearer ${jwtService.generateToken("test-user", mapOf("roleId" to testRoleId.toString()))}"
     }
+
+    private fun forbiddenToken(): String = "Bearer ${jwtService.generateToken("test-user", mapOf("roleId" to noPermRoleId.toString()))}"
 
     private val createBody =
         """
@@ -57,7 +70,7 @@ class OrganizationControllerTest {
     @Test
     fun `POST creates organization with nexus super-admin`() {
         mockMvc.post("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("organization:create"))
             contentType = MediaType.APPLICATION_JSON
             content = createBody
         }.andExpect {
@@ -74,7 +87,7 @@ class OrganizationControllerTest {
         createOrg()
 
         mockMvc.post("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("organization:create"))
             contentType = MediaType.APPLICATION_JSON
             content = createBody
         }.andExpect {
@@ -86,7 +99,7 @@ class OrganizationControllerTest {
     @Test
     fun `POST returns 400 for invalid request`() {
         mockMvc.post("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("organization:create"))
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameAr": "", "nameEn": "", "email": "not-an-email"}"""
         }.andExpect {
@@ -99,7 +112,7 @@ class OrganizationControllerTest {
         createOrg()
 
         mockMvc.get("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.NEXUS_READ_ONLY_AUDITOR))
+            header("Authorization", bearerToken("organization:read"))
         }.andExpect {
             status { isOk() }
             jsonPath("$.items.length()", equalTo(1))
@@ -112,7 +125,7 @@ class OrganizationControllerTest {
         val org = createOrg()
 
         mockMvc.get("/api/v1/organizations/${org.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPPORT_AGENT))
+            header("Authorization", bearerToken("organization:read"))
         }.andExpect {
             status { isOk() }
             jsonPath("$.id", equalTo(org.publicId.toString()))
@@ -122,8 +135,8 @@ class OrganizationControllerTest {
 
     @Test
     fun `GET by id returns 404 for non-existent organization`() {
-        mockMvc.get("/api/v1/organizations/${java.util.UUID.randomUUID()}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+        mockMvc.get("/api/v1/organizations/${UUID.randomUUID()}") {
+            header("Authorization", bearerToken("organization:read"))
         }.andExpect {
             status { isNotFound() }
         }
@@ -134,7 +147,7 @@ class OrganizationControllerTest {
         val org = createOrg()
 
         mockMvc.patch("/api/v1/organizations/${org.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPPORT_AGENT))
+            header("Authorization", bearerToken("organization:update"))
             contentType = MediaType.APPLICATION_JSON
             content = """{"nameEn": "Updated Org"}"""
         }.andExpect {
@@ -148,13 +161,13 @@ class OrganizationControllerTest {
         val org = createOrg()
 
         mockMvc.delete("/api/v1/organizations/${org.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("organization:delete"))
         }.andExpect {
             status { isNoContent() }
         }
 
         mockMvc.get("/api/v1/organizations/${org.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_SUPER_ADMIN))
+            header("Authorization", bearerToken("organization:read"))
         }.andExpect {
             status { isNotFound() }
         }
@@ -163,7 +176,7 @@ class OrganizationControllerTest {
     @Test
     fun `POST returns 403 for club owner`() {
         mockMvc.post("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.CLUB_OWNER))
+            header("Authorization", forbiddenToken())
             contentType = MediaType.APPLICATION_JSON
             content = createBody
         }.andExpect {
@@ -184,7 +197,7 @@ class OrganizationControllerTest {
     @Test
     fun `GET returns 403 for club owner`() {
         mockMvc.get("/api/v1/organizations") {
-            header("Authorization", bearerToken(Roles.CLUB_OWNER))
+            header("Authorization", forbiddenToken())
         }.andExpect {
             status { isForbidden() }
         }
@@ -195,7 +208,7 @@ class OrganizationControllerTest {
         val org = createOrg()
 
         mockMvc.delete("/api/v1/organizations/${org.publicId}") {
-            header("Authorization", bearerToken(Roles.NEXUS_READ_ONLY_AUDITOR))
+            header("Authorization", forbiddenToken())
         }.andExpect {
             status { isForbidden() }
         }
