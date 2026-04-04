@@ -35,6 +35,10 @@ tags:
     description: Membership plan viewing endpoints — internal team
   - name: Membership Plans (Pulse)
     description: Membership plan management endpoints — club operations
+  - name: GX Classes (Pulse)
+    description: GX class type and instance management — club operations
+  - name: GX Bookings (Pulse)
+    description: GX class booking and attendance — club operations
 
 paths:
 
@@ -151,6 +155,38 @@ paths:
 
   /api/v1/invoices:
     $ref: './invoices.yaml#/paths/~1api~1v1~1invoices'
+
+  # ── GX Classes (Pulse) ─────────────────────────────────────────────────
+
+  /api/v1/gx/class-types:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1class-types'
+
+  /api/v1/gx/class-types/{id}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1class-types~1{id}'
+
+  /api/v1/gx/classes:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes'
+
+  /api/v1/gx/classes/{id}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{id}'
+
+  /api/v1/gx/classes/{id}/cancel:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{id}~1cancel'
+
+  /api/v1/gx/classes/{classId}/bookings:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1bookings'
+
+  /api/v1/gx/classes/{classId}/bookings/{bookingId}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1bookings~1{bookingId}'
+
+  /api/v1/gx/classes/{classId}/waitlist:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1waitlist'
+
+  /api/v1/gx/classes/{classId}/attendance:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1attendance'
+
+  /api/v1/gx/members/{memberId}/gx-bookings:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1members~1{memberId}~1gx-bookings'
 
 components:
   securitySchemes:
