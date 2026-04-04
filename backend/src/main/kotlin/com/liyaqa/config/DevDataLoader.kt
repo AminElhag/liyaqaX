@@ -4,6 +4,14 @@ import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
+import com.liyaqa.member.EmergencyContact
+import com.liyaqa.member.EmergencyContactRepository
+import com.liyaqa.member.HealthWaiver
+import com.liyaqa.member.HealthWaiverRepository
+import com.liyaqa.member.Member
+import com.liyaqa.member.MemberRepository
+import com.liyaqa.member.WaiverSignature
+import com.liyaqa.member.WaiverSignatureRepository
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.permission.Permission
@@ -55,6 +63,10 @@ class DevDataLoader(
     private val trainerBranchAssignmentRepository: TrainerBranchAssignmentRepository,
     private val trainerCertificationRepository: TrainerCertificationRepository,
     private val trainerSpecializationRepository: TrainerSpecializationRepository,
+    private val memberRepository: MemberRepository,
+    private val emergencyContactRepository: EmergencyContactRepository,
+    private val healthWaiverRepository: HealthWaiverRepository,
+    private val waiverSignatureRepository: WaiverSignatureRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -220,9 +232,10 @@ class DevDataLoader(
         seedUserRoles(users, roles)
         seedStaffMembers(org, club, users, roles, riyadhBranch, jeddahBranch)
         seedTrainers(org, club, users, riyadhBranch)
+        seedMember(org, club, users, riyadhBranch)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member.",
             users.size,
             permissions.size,
             roles.size,
@@ -357,8 +370,8 @@ class DevDataLoader(
         roles["PT Trainer"] = seedRole("مدرب شخصي", "PT Trainer", "trainer", org.id, club.id, true, trainerPt, permissions)
         roles["GX Instructor"] = seedRole("مدرب جماعي", "GX Instructor", "trainer", org.id, club.id, true, trainerGx, permissions)
 
-        // Member role
-        roles["Member"] = seedRole("عضو", "Member", "member", null, null, true, memberPerms, permissions)
+        // Member role (scoped to club so it can be looked up during registration)
+        roles["Member"] = seedRole("عضو", "Member", "member", org.id, club.id, true, memberPerms, permissions)
 
         return roles
     }
@@ -618,6 +631,66 @@ class DevDataLoader(
                     nameEn = en,
                 )
             },
+        )
+    }
+
+    // ── Member ───────────────────────────────────────────────────────────────
+
+    private fun seedMember(
+        org: Organization,
+        club: Club,
+        users: List<User>,
+        riyadhBranch: Branch,
+    ) {
+        val user = users.first { it.email == "member@elixir.com" }
+
+        val member =
+            memberRepository.save(
+                Member(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = riyadhBranch.id,
+                    userId = user.id,
+                    firstNameAr = "أحمد",
+                    firstNameEn = "Ahmed",
+                    lastNameAr = "الرشيدي",
+                    lastNameEn = "Al-Rashidi",
+                    phone = "+966501234567",
+                    membershipStatus = "pending",
+                ),
+            )
+
+        emergencyContactRepository.save(
+            EmergencyContact(
+                memberId = member.id,
+                organizationId = org.id,
+                nameAr = "محمد الرشيدي",
+                nameEn = "Mohammed Al-Rashidi",
+                phone = "+966507654321",
+                relationship = "Brother",
+            ),
+        )
+
+        val waiver =
+            healthWaiverRepository.save(
+                HealthWaiver(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    contentAr = "أقر بأنني على دراية بالمخاطر المحتملة المرتبطة بالتمارين البدنية وأتحمل المسؤولية الكاملة.",
+                    contentEn =
+                        "I acknowledge the potential risks associated with physical exercise " +
+                            "and assume full responsibility for my participation.",
+                    version = 1,
+                    isActive = true,
+                ),
+            )
+
+        waiverSignatureRepository.save(
+            WaiverSignature(
+                memberId = member.id,
+                waiverId = waiver.id,
+                organizationId = org.id,
+            ),
         )
     }
 }

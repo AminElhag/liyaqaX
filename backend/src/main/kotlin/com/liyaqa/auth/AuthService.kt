@@ -5,6 +5,7 @@ import com.liyaqa.auth.dto.LoginResponse
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
+import com.liyaqa.member.MemberRepository
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.rbac.UserRoleRepository
 import com.liyaqa.role.RoleRepository
@@ -28,6 +29,7 @@ class AuthService(
     private val roleRepository: RoleRepository,
     private val trainerRepository: TrainerRepository,
     private val trainerBranchAssignmentRepository: TrainerBranchAssignmentRepository,
+    private val memberRepository: MemberRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtService: JwtService,
 ) {
@@ -108,6 +110,25 @@ class AuthService(
             }
         }
 
+        var memberPublicId: java.util.UUID? = null
+        var memberBranchPublicId: java.util.UUID? = null
+
+        if (role.scope == "member") {
+            val member =
+                memberRepository.findByUserIdAndDeletedAtIsNull(user.id)
+                    .orElse(null)
+
+            if (member != null) {
+                memberPublicId = member.publicId
+                claims["memberId"] = member.publicId.toString()
+
+                memberBranchPublicId =
+                    branchRepository.findById(member.branchId)
+                        .map { it.publicId }.orElse(null)
+                memberBranchPublicId?.let { claims["branchId"] = it.toString() }
+            }
+        }
+
         val token =
             jwtService.generateToken(
                 subject = user.publicId.toString(),
@@ -125,6 +146,8 @@ class AuthService(
             trainerId = trainerPublicId,
             trainerTypes = trainerTypes.ifEmpty { null },
             branchIds = branchIds.ifEmpty { null },
+            memberId = memberPublicId,
+            branchId = memberBranchPublicId,
         )
     }
 
