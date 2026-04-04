@@ -318,6 +318,138 @@ export interface Payment {
   paidAt: string
 }
 
+// ── GX (Group Exercise) domain types ────────────────────────────────────────
+
+export type GXInstanceStatus =
+  | 'scheduled'
+  | 'in-progress'
+  | 'completed'
+  | 'cancelled'
+
+export type GXBookingStatus =
+  | 'confirmed'
+  | 'cancelled'
+  | 'waitlist'
+  | 'promoted'
+
+export type GXAttendanceStatus = 'present' | 'absent' | 'late'
+
+/** GX class type (template) response */
+export interface GXClassType {
+  id: string
+  nameAr: string
+  nameEn: string
+  descriptionAr: string | null
+  descriptionEn: string | null
+  defaultDurationMinutes: number
+  defaultCapacity: number
+  color: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** Class type summary embedded in instance responses */
+export interface GXClassTypeSummary {
+  id: string
+  nameAr: string
+  nameEn: string
+  color: string | null
+}
+
+/** Instructor summary embedded in instance responses */
+export interface GXInstructorSummary {
+  id: string
+  firstNameAr: string
+  firstNameEn: string
+  lastNameAr: string
+  lastNameEn: string
+}
+
+/** GX class instance (scheduled occurrence) response */
+export interface GXClassInstance {
+  id: string
+  classType: GXClassTypeSummary
+  instructor: GXInstructorSummary
+  scheduledAt: string
+  durationMinutes: number
+  capacity: number
+  bookingsCount: number
+  waitlistCount: number
+  availableSpots: number
+  room: string | null
+  status: GXInstanceStatus
+  notes: string | null
+  createdAt: string
+}
+
+/** Member summary embedded in booking responses */
+export interface GXMemberSummary {
+  id: string
+  firstNameAr: string
+  firstNameEn: string
+  lastNameAr: string
+  lastNameEn: string
+}
+
+/** GX booking response */
+export interface GXBooking {
+  id: string
+  instanceId: string
+  member: GXMemberSummary
+  status: GXBookingStatus
+  waitlistPosition: number | null
+  bookedAt: string
+  cancelledAt: string | null
+}
+
+/** GX attendance response */
+export interface GXAttendance {
+  id: string
+  instanceId: string
+  member: GXMemberSummary
+  status: GXAttendanceStatus
+  markedAt: string
+}
+
+/** Request body for POST /api/v1/gx/class-types */
+export interface CreateGXClassTypeRequest {
+  nameAr: string
+  nameEn: string
+  descriptionAr?: string
+  descriptionEn?: string
+  defaultDurationMinutes?: number
+  defaultCapacity?: number
+  color?: string
+}
+
+/** Request body for POST /api/v1/gx/classes */
+export interface CreateGXClassInstanceRequest {
+  classTypeId: string
+  instructorId: string
+  scheduledAt: string
+  durationMinutes?: number
+  capacity?: number
+  room?: string
+  notes?: string
+}
+
+/** Request body for POST /api/v1/gx/classes/:id/bookings */
+export interface BookMemberRequest {
+  memberId: string
+}
+
+/** Single entry in bulk attendance request */
+export interface AttendanceEntry {
+  memberId: string
+  status: GXAttendanceStatus
+}
+
+/** Request body for POST /api/v1/gx/classes/:id/attendance */
+export interface BulkAttendanceRequest {
+  attendance: AttendanceEntry[]
+}
+
 // ── Invoice domain types ───────────────────────────────────────────────────
 
 /** Invoice response (from GET /api/v1/members/:id/invoices) */

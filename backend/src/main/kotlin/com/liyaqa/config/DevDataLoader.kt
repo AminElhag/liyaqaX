@@ -4,6 +4,12 @@ import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
+import com.liyaqa.gx.GXBooking
+import com.liyaqa.gx.GXBookingRepository
+import com.liyaqa.gx.GXClassInstance
+import com.liyaqa.gx.GXClassInstanceRepository
+import com.liyaqa.gx.GXClassType
+import com.liyaqa.gx.GXClassTypeRepository
 import com.liyaqa.invoice.Invoice
 import com.liyaqa.invoice.InvoiceRepository
 import com.liyaqa.member.EmergencyContact
@@ -82,6 +88,9 @@ class DevDataLoader(
     private val membershipRepository: MembershipRepository,
     private val paymentRepository: PaymentRepository,
     private val invoiceRepository: InvoiceRepository,
+    private val gxClassTypeRepository: GXClassTypeRepository,
+    private val gxClassInstanceRepository: GXClassInstanceRepository,
+    private val gxBookingRepository: GXBookingRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -255,9 +264,11 @@ class DevDataLoader(
         val member = seedMember(org, club, users, riyadhBranch)
         val plans = seedMembershipPlans(org, club)
         seedMemberMembership(org, club, riyadhBranch, member, plans, users)
+        seedGXClasses(org, club, riyadhBranch, users, member)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member, 3 plans, 1 membership.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
+                "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, 1 booking.",
             users.size,
             permissions.size,
             roles.size,
@@ -841,5 +852,157 @@ class DevDataLoader(
 
         member.membershipStatus = "active"
         memberRepository.save(member)
+    }
+
+    // ── GX Classes ────────────────────────────────────────────────────────
+
+    private fun seedGXClasses(
+        org: Organization,
+        club: Club,
+        riyadhBranch: Branch,
+        users: List<User>,
+        member: Member,
+    ) {
+        val gxUser = users.first { it.email == "gx@elixir.com" }
+        val instructor =
+            trainerRepository.findByUserIdAndDeletedAtIsNull(gxUser.id)
+                .orElseThrow()
+
+        val yoga =
+            gxClassTypeRepository.save(
+                GXClassType(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "\u064a\u0648\u063a\u0627",
+                    nameEn = "Yoga",
+                    defaultDurationMinutes = 60,
+                    defaultCapacity = 15,
+                    color = "#8B5CF6",
+                ),
+            )
+
+        val hiit =
+            gxClassTypeRepository.save(
+                GXClassType(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "\u0647\u064a\u062a",
+                    nameEn = "HIIT",
+                    defaultDurationMinutes = 45,
+                    defaultCapacity = 20,
+                    color = "#EF4444",
+                ),
+            )
+
+        val spinning =
+            gxClassTypeRepository.save(
+                GXClassType(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "\u0633\u0628\u064a\u0646\u064a\u0646\u062c",
+                    nameEn = "Spinning",
+                    defaultDurationMinutes = 50,
+                    defaultCapacity = 15,
+                    color = "#F59E0B",
+                ),
+            )
+
+        val nextMonday = nextWeekday(java.time.DayOfWeek.MONDAY)
+        val nextWednesday = nextWeekday(java.time.DayOfWeek.WEDNESDAY)
+        val nextFriday = nextWeekday(java.time.DayOfWeek.FRIDAY)
+        val riyadhZone = java.time.ZoneId.of("Asia/Riyadh")
+
+        val mondayYoga =
+            gxClassInstanceRepository.save(
+                GXClassInstance(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = riyadhBranch.id,
+                    classTypeId = yoga.id,
+                    instructorId = instructor.id,
+                    scheduledAt = nextMonday.atTime(7, 0).atZone(riyadhZone).toInstant(),
+                    durationMinutes = 60,
+                    capacity = 15,
+                    room = "Room 1",
+                ),
+            )
+
+        gxClassInstanceRepository.save(
+            GXClassInstance(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                classTypeId = hiit.id,
+                instructorId = instructor.id,
+                scheduledAt = nextMonday.atTime(9, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 45,
+                capacity = 20,
+                room = "Room 2",
+            ),
+        )
+
+        gxClassInstanceRepository.save(
+            GXClassInstance(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                classTypeId = yoga.id,
+                instructorId = instructor.id,
+                scheduledAt = nextWednesday.atTime(7, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 60,
+                capacity = 15,
+                room = "Room 1",
+            ),
+        )
+
+        gxClassInstanceRepository.save(
+            GXClassInstance(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                classTypeId = hiit.id,
+                instructorId = instructor.id,
+                scheduledAt = nextWednesday.atTime(9, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 45,
+                capacity = 20,
+                room = "Room 2",
+            ),
+        )
+
+        gxClassInstanceRepository.save(
+            GXClassInstance(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                classTypeId = spinning.id,
+                instructorId = instructor.id,
+                scheduledAt = nextFriday.atTime(8, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 50,
+                capacity = 15,
+                room = "Room 3",
+            ),
+        )
+
+        // Book Ahmed into Monday Yoga
+        mondayYoga.bookingsCount = 1
+        gxClassInstanceRepository.save(mondayYoga)
+
+        gxBookingRepository.save(
+            GXBooking(
+                organizationId = org.id,
+                clubId = club.id,
+                instanceId = mondayYoga.id,
+                memberId = member.id,
+                bookingStatus = "confirmed",
+            ),
+        )
+    }
+
+    private fun nextWeekday(dayOfWeek: java.time.DayOfWeek): LocalDate {
+        var date = LocalDate.now().plusDays(1)
+        while (date.dayOfWeek != dayOfWeek) {
+            date = date.plusDays(1)
+        }
+        return date
     }
 }

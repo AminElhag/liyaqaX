@@ -1,0 +1,756 @@
+paths:
+
+  # ── GX Class Types ────────────────────────────────────────────────────────
+
+  /api/v1/gx/class-types:
+    post:
+      summary: Create a GX class type
+      operationId: createGXClassType
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGXClassTypeRequest'
+      responses:
+        '201':
+          description: Class type created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassTypeResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+
+    get:
+      summary: List all GX class types
+      operationId: listGXClassTypes
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/page'
+        - $ref: './shared-schemas.yaml#/components/parameters/size'
+      responses:
+        '200':
+          description: Paginated list of class types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassTypePageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+
+  /api/v1/gx/class-types/{id}:
+    get:
+      summary: Get a GX class type by ID
+      operationId: getGXClassType
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Class type found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassTypeResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a GX class type
+      operationId: updateGXClassType
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGXClassTypeRequest'
+      responses:
+        '200':
+          description: Class type updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassTypeResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    delete:
+      summary: Soft-delete a GX class type
+      operationId: deleteGXClassType
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Class type deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  # ── GX Class Instances ────────────────────────────────────────────────────
+
+  /api/v1/gx/classes:
+    post:
+      summary: Schedule a GX class instance
+      operationId: createGXClassInstance
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:create
+      parameters:
+        - name: branchId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGXClassInstanceRequest'
+      responses:
+        '201':
+          description: Class instance scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassInstanceResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '409':
+          description: Instructor double-booking conflict
+          content:
+            application/json:
+              schema:
+                $ref: './shared-schemas.yaml#/components/schemas/ProblemDetail'
+
+    get:
+      summary: List GX class instances for a branch
+      operationId: listGXClassInstances
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: branchId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: './shared-schemas.yaml#/components/parameters/page'
+        - $ref: './shared-schemas.yaml#/components/parameters/size'
+      responses:
+        '200':
+          description: Paginated list of class instances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassInstancePageResponse'
+
+  /api/v1/gx/classes/{id}:
+    get:
+      summary: Get a GX class instance by ID
+      operationId: getGXClassInstance
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Class instance found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassInstanceResponse'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a GX class instance
+      operationId: updateGXClassInstance
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGXClassInstanceRequest'
+      responses:
+        '200':
+          description: Class instance updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassInstanceResponse'
+
+  /api/v1/gx/classes/{id}/cancel:
+    post:
+      summary: Cancel a GX class instance and all its bookings
+      operationId: cancelGXClassInstance
+      tags: [GX Classes (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Class instance cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXClassInstanceResponse'
+        '409':
+          description: Already cancelled
+          content:
+            application/json:
+              schema:
+                $ref: './shared-schemas.yaml#/components/schemas/ProblemDetail'
+
+  # ── GX Bookings ───────────────────────────────────────────────────────────
+
+  /api/v1/gx/classes/{classId}/bookings:
+    post:
+      summary: Book a member into a GX class
+      operationId: bookMemberIntoGXClass
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:manage-bookings
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookMemberRequest'
+      responses:
+        '201':
+          description: Booking created (confirmed or waitlisted)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXBookingResponse'
+        '409':
+          description: Duplicate booking
+        '422':
+          description: Business rule violation (no GX membership, wrong club)
+
+    get:
+      summary: List bookings for a GX class instance
+      operationId: listGXClassBookings
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: './shared-schemas.yaml#/components/parameters/page'
+        - $ref: './shared-schemas.yaml#/components/parameters/size'
+      responses:
+        '200':
+          description: Paginated list of bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXBookingPageResponse'
+
+  /api/v1/gx/classes/{classId}/bookings/{bookingId}:
+    delete:
+      summary: Cancel a GX class booking
+      operationId: cancelGXBooking
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:manage-bookings
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Booking cancelled (waitlist promotion may occur)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXBookingResponse'
+
+  /api/v1/gx/classes/{classId}/waitlist:
+    get:
+      summary: View waitlist for a GX class instance
+      operationId: viewGXClassWaitlist
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ordered list of waitlisted bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GXBookingResponse'
+
+  # ── GX Attendance ─────────────────────────────────────────────────────────
+
+  /api/v1/gx/classes/{classId}/attendance:
+    post:
+      summary: Submit bulk attendance for a GX class
+      operationId: submitGXAttendance
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:mark-attendance
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAttendanceRequest'
+      responses:
+        '200':
+          description: Attendance recorded
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GXAttendanceResponse'
+        '422':
+          description: Cannot submit attendance for cancelled class
+
+    get:
+      summary: List attendance records for a GX class
+      operationId: listGXAttendance
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:mark-attendance
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GXAttendanceResponse'
+
+  # ── Member GX History ─────────────────────────────────────────────────────
+
+  /api/v1/gx/members/{memberId}/gx-bookings:
+    get:
+      summary: Get a member's GX booking history
+      operationId: getMemberGXBookings
+      tags: [GX Bookings (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: gx-class:read
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: './shared-schemas.yaml#/components/parameters/page'
+        - $ref: './shared-schemas.yaml#/components/parameters/size'
+      responses:
+        '200':
+          description: Paginated list of member's GX bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GXBookingPageResponse'
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+components:
+  schemas:
+
+    CreateGXClassTypeRequest:
+      type: object
+      required: [nameAr, nameEn]
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        descriptionAr:
+          type: string
+        descriptionEn:
+          type: string
+        defaultDurationMinutes:
+          type: integer
+          minimum: 1
+          maximum: 480
+          default: 60
+        defaultCapacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 20
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+
+    GXClassTypeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        descriptionAr:
+          type: string
+        descriptionEn:
+          type: string
+        defaultDurationMinutes:
+          type: integer
+        defaultCapacity:
+          type: integer
+        color:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GXClassTypePageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GXClassTypeResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+    CreateGXClassInstanceRequest:
+      type: object
+      required: [classTypeId, instructorId, scheduledAt]
+      properties:
+        classTypeId:
+          type: string
+          format: uuid
+        instructorId:
+          type: string
+          format: uuid
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          minimum: 1
+          maximum: 480
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        room:
+          type: string
+          maxLength: 100
+        notes:
+          type: string
+
+    GXClassInstanceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        classType:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            nameAr:
+              type: string
+            nameEn:
+              type: string
+            color:
+              type: string
+        instructor:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            firstNameAr:
+              type: string
+            firstNameEn:
+              type: string
+            lastNameAr:
+              type: string
+            lastNameEn:
+              type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        capacity:
+          type: integer
+        bookingsCount:
+          type: integer
+        waitlistCount:
+          type: integer
+        availableSpots:
+          type: integer
+        room:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, in-progress, completed, cancelled]
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    GXClassInstancePageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GXClassInstanceResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+    BookMemberRequest:
+      type: object
+      required: [memberId]
+      properties:
+        memberId:
+          type: string
+          format: uuid
+
+    GXBookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        instanceId:
+          type: string
+          format: uuid
+        member:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            firstNameAr:
+              type: string
+            firstNameEn:
+              type: string
+            lastNameAr:
+              type: string
+            lastNameEn:
+              type: string
+        status:
+          type: string
+          enum: [confirmed, cancelled, waitlist, promoted]
+        waitlistPosition:
+          type: integer
+        bookedAt:
+          type: string
+          format: date-time
+        cancelledAt:
+          type: string
+          format: date-time
+
+    GXBookingPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GXBookingResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+    BulkAttendanceRequest:
+      type: object
+      required: [attendance]
+      properties:
+        attendance:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [memberId, status]
+            properties:
+              memberId:
+                type: string
+                format: uuid
+              status:
+                type: string
+                enum: [present, absent, late]
+
+    GXAttendanceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        instanceId:
+          type: string
+          format: uuid
+        member:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            firstNameAr:
+              type: string
+            firstNameEn:
+              type: string
+            lastNameAr:
+              type: string
+            lastNameEn:
+              type: string
+        status:
+          type: string
+          enum: [present, absent, late]
+        markedAt:
+          type: string
+          format: date-time
