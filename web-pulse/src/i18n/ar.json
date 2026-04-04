@@ -106,6 +106,32 @@
       "notSigned": "لم يتم توقيع الإقرار"
     }
   },
+  "membershipPlans": {
+    "title": "خطط العضوية",
+    "addPlan": "إضافة خطة",
+    "editPlan": "تعديل الخطة",
+    "durationDays": "يوم",
+    "features": {
+      "gxIncluded": "تمارين جماعية مشمولة",
+      "ptIncluded": "تدريب شخصي مشمول",
+      "freezeAllowed": "التجميد مسموح",
+      "gracePeriod": "{{days}} أيام فترة سماح"
+    },
+    "form": {
+      "nameAr": "اسم الخطة (عربي)",
+      "nameEn": "اسم الخطة (إنجليزي)",
+      "descriptionAr": "الوصف (عربي)",
+      "descriptionEn": "الوصف (إنجليزي)",
+      "price": "السعر (ريال)",
+      "duration": "المدة (أيام)",
+      "gracePeriod": "فترة السماح (أيام)",
+      "freeze": "السماح بالتجميد",
+      "maxFreezeDays": "أقصى أيام تجميد في السنة",
+      "gxIncluded": "شمول التمارين الجماعية",
+      "ptIncluded": "شمول التدريب الشخصي"
+    },
+    "empty": "لا توجد خطط بعد"
+  },
   "common": {
     "active": "نشط",
     "inactive": "غير نشط",
@@ -120,7 +146,9 @@
     "page": "صفحة",
     "of": "من",
     "previous": "السابق",
-    "next": "التالي"
+    "next": "التالي",
+    "cancel": "إلغاء",
+    "saving": "جاري الحفظ..."
   },
   "language": {
     "ar": "العربية",

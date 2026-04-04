@@ -47,6 +47,12 @@ object PermissionConstants {
     const val MEMBER_UPDATE = "member:update"
     const val MEMBER_DELETE = "member:delete"
 
+    // ── Membership Plan ──────────────────────────────────────────────────────
+    const val MEMBERSHIP_PLAN_CREATE = "membership-plan:create"
+    const val MEMBERSHIP_PLAN_READ = "membership-plan:read"
+    const val MEMBERSHIP_PLAN_UPDATE = "membership-plan:update"
+    const val MEMBERSHIP_PLAN_DELETE = "membership-plan:delete"
+
     // ── Membership ────────────────────────────────────────────────────────────
     const val MEMBERSHIP_CREATE = "membership:create"
     const val MEMBERSHIP_READ = "membership:read"

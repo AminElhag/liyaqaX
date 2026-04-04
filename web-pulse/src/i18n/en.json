@@ -106,6 +106,32 @@
       "notSigned": "Waiver not signed"
     }
   },
+  "membershipPlans": {
+    "title": "Membership plans",
+    "addPlan": "Add plan",
+    "editPlan": "Edit plan",
+    "durationDays": "days",
+    "features": {
+      "gxIncluded": "GX classes included",
+      "ptIncluded": "PT sessions included",
+      "freezeAllowed": "Freeze allowed",
+      "gracePeriod": "{{days}} days grace period"
+    },
+    "form": {
+      "nameAr": "Plan name (Arabic)",
+      "nameEn": "Plan name (English)",
+      "descriptionAr": "Description (Arabic)",
+      "descriptionEn": "Description (English)",
+      "price": "Price (SAR)",
+      "duration": "Duration (days)",
+      "gracePeriod": "Grace period (days)",
+      "freeze": "Allow freeze",
+      "maxFreezeDays": "Max freeze days per year",
+      "gxIncluded": "Include GX classes",
+      "ptIncluded": "Include PT sessions"
+    },
+    "empty": "No plans defined yet"
+  },
   "common": {
     "active": "Active",
     "inactive": "Inactive",
@@ -120,7 +146,9 @@
     "page": "Page",
     "of": "of",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cancel": "Cancel",
+    "saving": "Saving..."
   },
   "language": {
     "ar": "العربية",

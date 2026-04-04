@@ -162,3 +162,72 @@ export interface CreateEmergencyContactRequest {
   phone: string
   relationship?: string
 }
+
+// ── Membership Plan domain types ────────────────────────────────────────────
+
+/** Full membership plan detail (from GET /api/v1/membership-plans/:id) */
+export interface MembershipPlan {
+  id: string
+  organizationId: string
+  clubId: string
+  nameAr: string
+  nameEn: string
+  descriptionAr: string | null
+  descriptionEn: string | null
+  priceHalalas: number
+  priceSar: string
+  durationDays: number
+  gracePeriodDays: number
+  freezeAllowed: boolean
+  maxFreezeDays: number
+  gxClassesIncluded: boolean
+  ptSessionsIncluded: boolean
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Plan list row (from GET /api/v1/membership-plans) */
+export interface MembershipPlanSummary {
+  id: string
+  nameAr: string
+  nameEn: string
+  priceHalalas: number
+  priceSar: string
+  durationDays: number
+  isActive: boolean
+}
+
+/** Request body for POST /api/v1/membership-plans */
+export interface CreateMembershipPlanRequest {
+  nameAr: string
+  nameEn: string
+  descriptionAr?: string
+  descriptionEn?: string
+  priceHalalas: number
+  durationDays: number
+  gracePeriodDays?: number
+  freezeAllowed?: boolean
+  maxFreezeDays?: number
+  gxClassesIncluded?: boolean
+  ptSessionsIncluded?: boolean
+  sortOrder?: number
+}
+
+/** Request body for PATCH /api/v1/membership-plans/:id */
+export interface UpdateMembershipPlanRequest {
+  nameAr?: string
+  nameEn?: string
+  descriptionAr?: string
+  descriptionEn?: string
+  priceHalalas?: number
+  durationDays?: number
+  gracePeriodDays?: number
+  freezeAllowed?: boolean
+  maxFreezeDays?: number
+  gxClassesIncluded?: boolean
+  ptSessionsIncluded?: boolean
+  isActive?: boolean
+  sortOrder?: number
+}
