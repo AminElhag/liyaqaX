@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import { Outlet, createRootRouteWithContext, useNavigate } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -14,17 +13,10 @@ interface RouterContext {
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-=======
-import * as React from 'react'
-import { Outlet, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
->>>>>>> Stashed changes
   component: RootComponent,
 })
 
 function RootComponent() {
-<<<<<<< Updated upstream
   const { isAuthenticated, user } = useAuthStore()
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -78,12 +70,5 @@ function RootComponent() {
         </div>
       </div>
     </ErrorBoundary>
-=======
-  return (
-    <React.Fragment>
-      <div>Hello "__root"!</div>
-      <Outlet />
-    </React.Fragment>
->>>>>>> Stashed changes
   )
 }

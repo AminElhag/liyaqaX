@@ -1,0 +1,223 @@
+paths:
+
+  /api/v1/members/{memberId}/memberships:
+    post:
+      summary: Assign a membership plan to a member
+      description: |
+        Creates a membership, records payment, generates invoice stub,
+        and activates the member — all in one atomic operation.
+      operationId: assignMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:create
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignMembershipRequest'
+      responses:
+        '201':
+          description: Membership assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+    get:
+      summary: Get membership history for a member
+      operationId: getMembershipHistory
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Membership history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MembershipSummaryResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+  /api/v1/members/{memberId}/memberships/active:
+    get:
+      summary: Get the active membership for a member
+      operationId: getActiveMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Active membership found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '204':
+          description: No active membership
+
+components:
+  schemas:
+    AssignMembershipRequest:
+      type: object
+      required: [planId, paymentMethod, amountHalalas]
+      properties:
+        planId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+          description: Defaults to today if omitted
+        paymentMethod:
+          type: string
+          enum: [cash, card, bank-transfer, other]
+        amountHalalas:
+          type: integer
+          format: int64
+          minimum: 1
+        referenceNumber:
+          type: string
+        notes:
+          type: string
+
+    MembershipResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        memberId:
+          type: string
+          format: uuid
+        plan:
+          $ref: '#/components/schemas/MembershipPlanSummaryInfo'
+        status:
+          type: string
+          enum: [pending, active, frozen, expired, terminated]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        graceEndDate:
+          type: string
+          format: date
+          nullable: true
+        freezeDaysUsed:
+          type: integer
+        payment:
+          $ref: '#/components/schemas/MembershipPaymentInfo'
+        invoice:
+          $ref: '#/components/schemas/MembershipInvoiceInfo'
+        createdAt:
+          type: string
+          format: date-time
+
+    MembershipSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        planNameAr:
+          type: string
+        planNameEn:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        amountHalalas:
+          type: integer
+          format: int64
+        amountSar:
+          type: string
+        paymentMethod:
+          type: string
+          nullable: true
+
+    MembershipPlanSummaryInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        priceHalalas:
+          type: integer
+          format: int64
+        priceSar:
+          type: string
+        durationDays:
+          type: integer
+
+    MembershipPaymentInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amountHalalas:
+          type: integer
+          format: int64
+        amountSar:
+          type: string
+        paymentMethod:
+          type: string
+        paidAt:
+          type: string
+          format: date-time
+
+    MembershipInvoiceInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        totalHalalas:
+          type: integer
+          format: int64
+        totalSar:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time

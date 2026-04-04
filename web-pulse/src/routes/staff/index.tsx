@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-<<<<<<< Updated upstream
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -56,13 +55,4 @@ function StaffListPage() {
       )}
     </PageShell>
   )
-=======
-
-export const Route = createFileRoute('/staff/')({
-  component: RouteComponent,
-})
-
-function RouteComponent() {
-  return <div>Hello "/staff/"!</div>
->>>>>>> Stashed changes
 }

@@ -132,6 +132,43 @@
     },
     "empty": "لا توجد خطط بعد"
   },
+  "membership": {
+    "activeTitle": "العضوية النشطة",
+    "noActive": "لا توجد عضوية نشطة",
+    "assignPlan": "تعيين خطة عضوية",
+    "assignAndCollect": "تعيين الخطة وتحصيل الدفع",
+    "history": "سجل العضويات",
+    "daysRemaining": "{{days}} يوم متبقي",
+    "startDate": "تاريخ البدء",
+    "endDate": "تاريخ الانتهاء",
+    "graceEndDate": "انتهاء فترة السماح",
+    "freezeDaysUsed": "أيام التجميد المستخدمة",
+    "paymentInfo": "الدفع",
+    "invoiceInfo": "الفاتورة",
+    "viewInvoice": "عرض الفاتورة",
+    "renewComingSoon": "التجديد قريبًا",
+    "selectPlan": "اختر خطة",
+    "paymentMethod": "طريقة الدفع",
+    "paymentMethods": {
+      "cash": "نقدًا",
+      "card": "بطاقة",
+      "bank-transfer": "تحويل بنكي",
+      "other": "أخرى"
+    },
+    "amount": "المبلغ (ريال)",
+    "referenceNumber": "رقم المرجع",
+    "notes": "ملاحظات",
+    "success": "تم تعيين العضوية بنجاح",
+    "invoiceCreated": "تم إنشاء الفاتورة {{number}}",
+    "historyEmpty": "لا يوجد سجل عضويات",
+    "historyColumns": {
+      "plan": "الخطة",
+      "period": "الفترة",
+      "amount": "المبلغ",
+      "method": "الطريقة",
+      "status": "الحالة"
+    }
+  },
   "common": {
     "active": "نشط",
     "inactive": "غير نشط",

@@ -20,4 +20,9 @@ interface BranchRepository : JpaRepository<Branch, Long> {
         clubId: Long,
         pageable: Pageable,
     ): Page<Branch>
+
+    fun findByPublicIdAndOrganizationIdAndDeletedAtIsNull(
+        publicId: UUID,
+        organizationId: Long,
+    ): Optional<Branch>
 }

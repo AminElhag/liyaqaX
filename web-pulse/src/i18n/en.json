@@ -132,6 +132,43 @@
     },
     "empty": "No plans defined yet"
   },
+  "membership": {
+    "activeTitle": "Active membership",
+    "noActive": "No active membership",
+    "assignPlan": "Assign membership plan",
+    "assignAndCollect": "Assign plan & collect payment",
+    "history": "Membership history",
+    "daysRemaining": "{{days}} days remaining",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "graceEndDate": "Grace period ends",
+    "freezeDaysUsed": "Freeze days used",
+    "paymentInfo": "Payment",
+    "invoiceInfo": "Invoice",
+    "viewInvoice": "View invoice",
+    "renewComingSoon": "Renewal coming soon",
+    "selectPlan": "Select a plan",
+    "paymentMethod": "Payment method",
+    "paymentMethods": {
+      "cash": "Cash",
+      "card": "Card",
+      "bank-transfer": "Bank transfer",
+      "other": "Other"
+    },
+    "amount": "Amount (SAR)",
+    "referenceNumber": "Reference number",
+    "notes": "Notes",
+    "success": "Membership assigned successfully",
+    "invoiceCreated": "Invoice {{number}} created",
+    "historyEmpty": "No membership history",
+    "historyColumns": {
+      "plan": "Plan",
+      "period": "Period",
+      "amount": "Amount",
+      "method": "Method",
+      "status": "Status"
+    }
+  },
   "common": {
     "active": "Active",
     "inactive": "Inactive",
