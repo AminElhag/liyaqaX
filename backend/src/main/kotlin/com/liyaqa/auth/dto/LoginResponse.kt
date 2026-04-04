@@ -13,4 +13,6 @@ data class LoginResponse(
     val trainerId: UUID? = null,
     val trainerTypes: List<String>? = null,
     val branchIds: List<UUID>? = null,
+    val memberId: UUID? = null,
+    val branchId: UUID? = null,
 )

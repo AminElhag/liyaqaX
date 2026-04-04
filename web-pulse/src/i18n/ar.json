@@ -47,6 +47,65 @@
       "notFound": "الموظف غير موجود"
     }
   },
+  "members": {
+    "title": "الأعضاء",
+    "registerMember": "تسجيل عضو",
+    "columns": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "status": "الحالة",
+      "branch": "الفرع",
+      "joinedAt": "تاريخ الانضمام"
+    },
+    "status": {
+      "pending": "قيد الانتظار",
+      "active": "نشط",
+      "frozen": "مجمد",
+      "expired": "منتهي",
+      "terminated": "ملغى"
+    },
+    "empty": "لا يوجد أعضاء",
+    "form": {
+      "step1": "المعلومات الشخصية",
+      "step2": "جهة الاتصال في حالات الطوارئ",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "dateOfBirth": "تاريخ الميلاد",
+      "gender": "الجنس",
+      "genderOptions": {
+        "male": "ذكر",
+        "female": "أنثى",
+        "unspecified": "غير محدد"
+      },
+      "nationalId": "رقم الهوية / الإقامة",
+      "branch": "الفرع الرئيسي",
+      "notes": "ملاحظات",
+      "emergencyName": "اسم جهة الاتصال في الطوارئ",
+      "emergencyPhone": "هاتف الطوارئ",
+      "emergencyRelationship": "صلة القرابة",
+      "passwordGenerated": "كلمة المرور المولدة تلقائياً",
+      "copyPassword": "نسخ كلمة المرور",
+      "success": "تم تسجيل العضو بنجاح"
+    },
+    "profile": {
+      "title": "ملف العضو",
+      "overview": "نظرة عامة",
+      "membership": "العضوية",
+      "payments": "المدفوعات",
+      "pt": "التدريب الشخصي",
+      "gx": "التمارين الجماعية",
+      "emergencyContacts": "جهات الاتصال في الطوارئ",
+      "notFound": "العضو غير موجود",
+      "comingSoon": "قريباً"
+    },
+    "waiver": {
+      "signed": "تم توقيع الإقرار",
+      "notSigned": "لم يتم توقيع الإقرار"
+    }
+  },
   "common": {
     "active": "نشط",
     "inactive": "غير نشط",

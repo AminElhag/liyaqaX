@@ -47,6 +47,65 @@
       "notFound": "Staff member not found"
     }
   },
+  "members": {
+    "title": "Members",
+    "registerMember": "Register member",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "status": "Status",
+      "branch": "Branch",
+      "joinedAt": "Joined"
+    },
+    "status": {
+      "pending": "Pending",
+      "active": "Active",
+      "frozen": "Frozen",
+      "expired": "Expired",
+      "terminated": "Terminated"
+    },
+    "empty": "No members found",
+    "form": {
+      "step1": "Personal information",
+      "step2": "Emergency contact",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "phone": "Phone",
+      "dateOfBirth": "Date of birth",
+      "gender": "Gender",
+      "genderOptions": {
+        "male": "Male",
+        "female": "Female",
+        "unspecified": "Unspecified"
+      },
+      "nationalId": "National ID / Iqama",
+      "branch": "Home branch",
+      "notes": "Notes",
+      "emergencyName": "Emergency contact name",
+      "emergencyPhone": "Emergency contact phone",
+      "emergencyRelationship": "Relationship",
+      "passwordGenerated": "Auto-generated password",
+      "copyPassword": "Copy password",
+      "success": "Member registered successfully"
+    },
+    "profile": {
+      "title": "Member profile",
+      "overview": "Overview",
+      "membership": "Membership",
+      "payments": "Payments",
+      "pt": "PT",
+      "gx": "GX",
+      "emergencyContacts": "Emergency contacts",
+      "notFound": "Member not found",
+      "comingSoon": "Coming soon"
+    },
+    "waiver": {
+      "signed": "Waiver signed",
+      "notSigned": "Waiver not signed"
+    }
+  },
   "common": {
     "active": "Active",
     "inactive": "Inactive",

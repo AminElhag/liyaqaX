@@ -27,6 +27,10 @@ tags:
     description: Staff management endpoints — internal team
   - name: Staff (Pulse)
     description: Staff management endpoints — club operations
+  - name: Members (Nexus)
+    description: Member viewing endpoints — internal team
+  - name: Members (Pulse)
+    description: Member management endpoints — club operations
 
 paths:
 
@@ -72,6 +76,34 @@ paths:
 
   /api/v1/staff/{id}/branches/{branchId}:
     $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}~1branches~1{branchId}'
+
+  # ── Members (Nexus) ─────────────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members:
+    $ref: './members.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1members'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members/{id}:
+    $ref: './members.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1members~1{id}'
+
+  # ── Members (Pulse) ─────────────────────────────────────────────────────────
+
+  /api/v1/members:
+    $ref: './members.yaml#/paths/~1api~1v1~1members'
+
+  /api/v1/members/{id}:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}'
+
+  /api/v1/members/{id}/emergency-contacts:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1emergency-contacts'
+
+  /api/v1/members/{id}/emergency-contacts/{contactId}:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1emergency-contacts~1{contactId}'
+
+  /api/v1/members/{id}/waiver-status:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1waiver-status'
+
+  /api/v1/members/{id}/waiver-sign:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1waiver-sign'
 
 components:
   securitySchemes:

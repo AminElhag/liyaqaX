@@ -1,0 +1,676 @@
+paths:
+
+  # ── Nexus-facing endpoints ──────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members:
+    get:
+      summary: List members for a club (Nexus)
+      operationId: listMembersNexus
+      tags: [Members (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+      responses:
+        '200':
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberSummaryPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members/{id}:
+    get:
+      summary: Get a member by ID (Nexus)
+      operationId: getMemberByIdNexus
+      tags: [Members (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Member found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  # ── Pulse-facing endpoints ─────────────────────────────────────────────────
+
+  /api/v1/members:
+    post:
+      summary: Register a new member
+      operationId: createMember
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMemberRequest'
+      responses:
+        '201':
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+    get:
+      summary: List members for the caller's club
+      operationId: listMembers
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+      responses:
+        '200':
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberSummaryPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+
+  /api/v1/members/{id}:
+    get:
+      summary: Get a member by ID
+      operationId: getMemberById
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Member found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a member's information
+      operationId: updateMember
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:update
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+      responses:
+        '200':
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    delete:
+      summary: Soft-delete a member
+      operationId: deleteMember
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:delete
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '204':
+          description: Member deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  # ── Emergency contact endpoints ────────────────────────────────────────────
+
+  /api/v1/members/{id}/emergency-contacts:
+    get:
+      summary: List emergency contacts for a member
+      operationId: listEmergencyContacts
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Emergency contacts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmergencyContactResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    post:
+      summary: Add an emergency contact to a member
+      operationId: addEmergencyContact
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:update
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmergencyContactRequest'
+      responses:
+        '201':
+          description: Emergency contact added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmergencyContactResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/members/{id}/emergency-contacts/{contactId}:
+    delete:
+      summary: Remove an emergency contact from a member
+      operationId: deleteEmergencyContact
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:update
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+        - $ref: '#/components/parameters/ContactIdPath'
+      responses:
+        '204':
+          description: Emergency contact removed
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  # ── Waiver endpoints ───────────────────────────────────────────────────────
+
+  /api/v1/members/{id}/waiver-status:
+    get:
+      summary: Check if a member has signed the current health waiver
+      operationId: getWaiverStatus
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:read
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Waiver signing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaiverStatusResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/members/{id}/waiver-sign:
+    post:
+      summary: Record a waiver signature on behalf of a member
+      operationId: signWaiver
+      tags: [Members (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: member:update
+      parameters:
+        - $ref: '#/components/parameters/MemberIdPath'
+      responses:
+        '201':
+          description: Waiver signed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaiverStatusResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+
+# ── Components ─────────────────────────────────────────────────────────────────
+
+components:
+  parameters:
+    OrgIdPath:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ClubIdPath:
+      name: clubId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    MemberIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ContactIdPath:
+      name: contactId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    PageQuery:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+
+    SizeQuery:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+
+    SortQuery:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: createdAt
+
+    OrderQuery:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+  schemas:
+    BranchSummary:
+      type: object
+      required: [id, nameAr, nameEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+
+    EmergencyContactRequest:
+      type: object
+      required: [nameAr, nameEn, phone]
+      properties:
+        nameAr:
+          type: string
+          maxLength: 255
+        nameEn:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 50
+        relationship:
+          type: string
+          maxLength: 100
+
+    EmergencyContactResponse:
+      type: object
+      required: [id, nameAr, nameEn, phone, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        phone:
+          type: string
+        relationship:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateMemberRequest:
+      type: object
+      required:
+        - email
+        - password
+        - firstNameAr
+        - firstNameEn
+        - lastNameAr
+        - lastNameEn
+        - phone
+        - branchId
+        - emergencyContact
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+        firstNameAr:
+          type: string
+          maxLength: 100
+        firstNameEn:
+          type: string
+          maxLength: 100
+        lastNameAr:
+          type: string
+          maxLength: 100
+        lastNameEn:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+        nationalId:
+          type: string
+          maxLength: 50
+          nullable: true
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, unspecified]
+          nullable: true
+        branchId:
+          type: string
+          format: uuid
+        notes:
+          type: string
+          nullable: true
+        emergencyContact:
+          $ref: '#/components/schemas/EmergencyContactRequest'
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        firstNameAr:
+          type: string
+          maxLength: 100
+        firstNameEn:
+          type: string
+          maxLength: 100
+        lastNameAr:
+          type: string
+          maxLength: 100
+        lastNameEn:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+        nationalId:
+          type: string
+          maxLength: 50
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, unspecified]
+        notes:
+          type: string
+
+    MemberResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - organizationId
+        - clubId
+        - branch
+        - firstNameAr
+        - firstNameEn
+        - lastNameAr
+        - lastNameEn
+        - email
+        - phone
+        - membershipStatus
+        - joinedAt
+        - emergencyContacts
+        - hasSignedWaiver
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        clubId:
+          type: string
+          format: uuid
+        branch:
+          $ref: '#/components/schemas/BranchSummary'
+        firstNameAr:
+          type: string
+        firstNameEn:
+          type: string
+        lastNameAr:
+          type: string
+        lastNameEn:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        nationalId:
+          type: string
+          nullable: true
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, unspecified]
+          nullable: true
+        membershipStatus:
+          type: string
+          enum: [pending, active, frozen, expired, terminated]
+        notes:
+          type: string
+          nullable: true
+        joinedAt:
+          type: string
+          format: date
+        emergencyContacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmergencyContactResponse'
+        hasSignedWaiver:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MemberSummaryResponse:
+      type: object
+      required:
+        - id
+        - firstNameAr
+        - firstNameEn
+        - lastNameAr
+        - lastNameEn
+        - email
+        - phone
+        - membershipStatus
+        - branch
+        - joinedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstNameAr:
+          type: string
+        firstNameEn:
+          type: string
+        lastNameAr:
+          type: string
+        lastNameEn:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        membershipStatus:
+          type: string
+          enum: [pending, active, frozen, expired, terminated]
+        branch:
+          $ref: '#/components/schemas/BranchSummary'
+        joinedAt:
+          type: string
+          format: date
+
+    MemberSummaryPageResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberSummaryResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+    WaiverStatusResponse:
+      type: object
+      required: [hasSignedCurrentWaiver]
+      properties:
+        hasSignedCurrentWaiver:
+          type: boolean
+        waiverId:
+          type: string
+          format: uuid
+          nullable: true
+        waiverVersion:
+          type: integer
+          nullable: true
+        signedAt:
+          type: string
+          format: date-time
+          nullable: true

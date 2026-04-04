@@ -11,4 +11,6 @@ data class JwtClaims(
     val trainerId: UUID? = null,
     val trainerTypes: List<String> = emptyList(),
     val branchIds: List<UUID> = emptyList(),
+    val memberId: UUID? = null,
+    val branchId: UUID? = null,
 )
