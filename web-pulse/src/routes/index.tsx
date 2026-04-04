@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-<<<<<<< Updated upstream
 import { useTranslation } from 'react-i18next'
 import { PageShell } from '@/components/layout/PageShell'
 
@@ -19,13 +18,4 @@ function DashboardPage() {
       </div>
     </PageShell>
   )
-=======
-
-export const Route = createFileRoute('/')({
-  component: RouteComponent,
-})
-
-function RouteComponent() {
-  return <div>Hello "/"!</div>
->>>>>>> Stashed changes
 }

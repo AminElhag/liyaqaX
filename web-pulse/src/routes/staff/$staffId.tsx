@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -119,14 +118,4 @@ function Row({
       <dd className="text-sm text-gray-900">{value}</dd>
     </div>
   )
-=======
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/staff/$staffId')({
-  component: RouteComponent,
-})
-
-function RouteComponent() {
-  return <div>Hello "/staff/$staffId"!</div>
->>>>>>> Stashed changes
 }

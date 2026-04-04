@@ -231,3 +231,109 @@ export interface UpdateMembershipPlanRequest {
   isActive?: boolean
   sortOrder?: number
 }
+
+// ── Membership (instance) domain types ─────────────────────────────────────
+
+/** Plan summary embedded in membership responses */
+export interface MembershipPlanSummaryInfo {
+  id: string
+  nameAr: string
+  nameEn: string
+  priceHalalas: number
+  priceSar: string
+  durationDays: number
+}
+
+/** Payment info embedded in membership responses */
+export interface MembershipPaymentInfo {
+  id: string
+  amountHalalas: number
+  amountSar: string
+  paymentMethod: string
+  paidAt: string
+}
+
+/** Invoice info embedded in membership responses */
+export interface MembershipInvoiceInfo {
+  id: string
+  invoiceNumber: string
+  totalHalalas: number
+  totalSar: string
+  issuedAt: string
+}
+
+/** Full membership response (from GET /api/v1/members/:id/memberships/active) */
+export interface Membership {
+  id: string
+  memberId: string
+  plan: MembershipPlanSummaryInfo
+  status: MembershipStatus
+  startDate: string
+  endDate: string
+  graceEndDate: string | null
+  freezeDaysUsed: number
+  payment: MembershipPaymentInfo | null
+  invoice: MembershipInvoiceInfo | null
+  createdAt: string
+}
+
+/** Membership history row */
+export interface MembershipSummary {
+  id: string
+  planNameAr: string
+  planNameEn: string
+  status: string
+  startDate: string
+  endDate: string
+  amountHalalas: number
+  amountSar: string
+  paymentMethod: string | null
+}
+
+/** Request body for POST /api/v1/members/:id/memberships */
+export interface AssignMembershipRequest {
+  planId: string
+  startDate?: string
+  paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'other'
+  amountHalalas: number
+  referenceNumber?: string
+  notes?: string
+}
+
+// ── Payment domain types ───────────────────────────────────────────────────
+
+export type PaymentMethod = 'cash' | 'card' | 'bank-transfer' | 'other'
+
+/** Payment response (from GET /api/v1/members/:id/payments) */
+export interface Payment {
+  id: string
+  memberId: string
+  memberName: string
+  amountHalalas: number
+  amountSar: string
+  paymentMethod: string
+  referenceNumber: string | null
+  invoiceNumber: string | null
+  collectedBy: string
+  paidAt: string
+}
+
+// ── Invoice domain types ───────────────────────────────────────────────────
+
+/** Invoice response (from GET /api/v1/members/:id/invoices) */
+export interface Invoice {
+  id: string
+  invoiceNumber: string
+  memberId: string
+  memberName: string
+  subtotalHalalas: number
+  subtotalSar: string
+  vatRate: number
+  vatAmountHalalas: number
+  vatAmountSar: string
+  totalHalalas: number
+  totalSar: string
+  paymentMethod: string
+  issuedAt: string
+  zatcaStatus: string
+}

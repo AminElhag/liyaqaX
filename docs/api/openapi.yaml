@@ -125,6 +125,33 @@ paths:
   /api/v1/membership-plans/{id}:
     $ref: './membership-plans.yaml#/paths/~1api~1v1~1membership-plans~1{id}'
 
+  # ── Memberships (Pulse) ─────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/memberships:
+    $ref: './memberships.yaml#/paths/~1api~1v1~1members~1{memberId}~1memberships'
+
+  /api/v1/members/{memberId}/memberships/active:
+    $ref: './memberships.yaml#/paths/~1api~1v1~1members~1{memberId}~1memberships~1active'
+
+  # ── Payments (Pulse) ────────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/payments:
+    $ref: './payments.yaml#/paths/~1api~1v1~1members~1{memberId}~1payments'
+
+  /api/v1/payments:
+    $ref: './payments.yaml#/paths/~1api~1v1~1payments'
+
+  # ── Invoices (Pulse) ────────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/invoices:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1members~1{memberId}~1invoices'
+
+  /api/v1/members/{memberId}/invoices/{invoiceId}:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1members~1{memberId}~1invoices~1{invoiceId}'
+
+  /api/v1/invoices:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1invoices'
+
 components:
   securitySchemes:
     bearerAuth:

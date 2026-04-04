@@ -4,6 +4,8 @@ import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
+import com.liyaqa.invoice.Invoice
+import com.liyaqa.invoice.InvoiceRepository
 import com.liyaqa.member.EmergencyContact
 import com.liyaqa.member.EmergencyContactRepository
 import com.liyaqa.member.HealthWaiver
@@ -12,10 +14,14 @@ import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.member.WaiverSignature
 import com.liyaqa.member.WaiverSignatureRepository
+import com.liyaqa.membership.Membership
 import com.liyaqa.membership.MembershipPlan
 import com.liyaqa.membership.MembershipPlanRepository
+import com.liyaqa.membership.MembershipRepository
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
+import com.liyaqa.payment.Payment
+import com.liyaqa.payment.PaymentRepository
 import com.liyaqa.permission.Permission
 import com.liyaqa.permission.PermissionConstants
 import com.liyaqa.permission.PermissionRepository
@@ -46,6 +52,9 @@ import org.springframework.context.event.EventListener
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.time.Instant
 import java.time.LocalDate
 
 @Component
@@ -70,6 +79,9 @@ class DevDataLoader(
     private val healthWaiverRepository: HealthWaiverRepository,
     private val waiverSignatureRepository: WaiverSignatureRepository,
     private val membershipPlanRepository: MembershipPlanRepository,
+    private val membershipRepository: MembershipRepository,
+    private val paymentRepository: PaymentRepository,
+    private val invoiceRepository: InvoiceRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -240,11 +252,12 @@ class DevDataLoader(
         seedUserRoles(users, roles)
         seedStaffMembers(org, club, users, roles, riyadhBranch, jeddahBranch)
         seedTrainers(org, club, users, riyadhBranch)
-        seedMember(org, club, users, riyadhBranch)
-        seedMembershipPlans(org, club)
+        val member = seedMember(org, club, users, riyadhBranch)
+        val plans = seedMembershipPlans(org, club)
+        seedMemberMembership(org, club, riyadhBranch, member, plans, users)
 
         log.info(
-            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member, 3 plans.",
+            "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, 4 staff, 2 trainers, 1 member, 3 plans, 1 membership.",
             users.size,
             permissions.size,
             roles.size,
@@ -648,7 +661,7 @@ class DevDataLoader(
     private fun seedMembershipPlans(
         org: Organization,
         club: Club,
-    ) {
+    ): List<MembershipPlan> =
         membershipPlanRepository.saveAll(
             listOf(
                 MembershipPlan(
@@ -695,7 +708,6 @@ class DevDataLoader(
                 ),
             ),
         )
-    }
 
     // ── Member ───────────────────────────────────────────────────────────────
 
@@ -704,7 +716,7 @@ class DevDataLoader(
         club: Club,
         users: List<User>,
         riyadhBranch: Branch,
-    ) {
+    ): Member {
         val user = users.first { it.email == "member@elixir.com" }
 
         val member =
@@ -755,5 +767,79 @@ class DevDataLoader(
                 organizationId = org.id,
             ),
         )
+
+        return member
+    }
+
+    // ── Membership assignment ─────────────────────────────────────────────────
+
+    private fun seedMemberMembership(
+        org: Organization,
+        club: Club,
+        branch: Branch,
+        member: Member,
+        plans: List<MembershipPlan>,
+        users: List<User>,
+    ) {
+        val basicPlan = plans.first { it.nameEn == "Basic Monthly" }
+        val receptionUser = users.first { it.email == "reception@elixir.com" }
+        val today = LocalDate.now()
+
+        val membership =
+            membershipRepository.save(
+                Membership(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = branch.id,
+                    memberId = member.id,
+                    planId = basicPlan.id,
+                    membershipStatus = "active",
+                    startDate = today,
+                    endDate = today.plusDays(basicPlan.durationDays.toLong()),
+                    graceEndDate = today.plusDays((basicPlan.durationDays + basicPlan.gracePeriodDays).toLong()),
+                ),
+            )
+
+        val payment =
+            paymentRepository.save(
+                Payment(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = branch.id,
+                    memberId = member.id,
+                    membershipId = membership.id,
+                    amountHalalas = basicPlan.priceHalalas,
+                    paymentMethod = "cash",
+                    collectedById = receptionUser.id,
+                    paidAt = Instant.now(),
+                ),
+            )
+
+        val subtotalHalalas = basicPlan.priceHalalas
+        val vatAmountHalalas =
+            BigDecimal(subtotalHalalas)
+                .multiply(BigDecimal("0.1500"))
+                .setScale(0, RoundingMode.HALF_UP)
+                .toLong()
+        val totalHalalas = subtotalHalalas + vatAmountHalalas
+        val year = today.year
+        val clubCode = club.nameEn.take(3).uppercase()
+
+        invoiceRepository.save(
+            Invoice(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = branch.id,
+                memberId = member.id,
+                paymentId = payment.id,
+                invoiceNumber = "INV-$year-$clubCode-00001",
+                subtotalHalalas = subtotalHalalas,
+                vatAmountHalalas = vatAmountHalalas,
+                totalHalalas = totalHalalas,
+            ),
+        )
+
+        member.membershipStatus = "active"
+        memberRepository.save(member)
     }
 }

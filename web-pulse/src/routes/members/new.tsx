@@ -106,7 +106,7 @@ function NewMemberPage() {
 
         {mutation.error && (
           <div className="mb-4 rounded-md bg-red-50 p-4 text-sm text-red-700">
-            {(mutation.error as ApiError).detail ?? t('common.error')}
+            {(mutation.error as unknown as ApiError).detail ?? t('common.error')}
           </div>
         )}
 
