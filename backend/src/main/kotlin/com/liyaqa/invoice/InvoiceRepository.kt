@@ -34,7 +34,8 @@ interface InvoiceRepository : JpaRepository<Invoice, Long> {
     fun findByPaymentId(paymentId: Long): Optional<Invoice>
 
     @Query(
-        "SELECT COUNT(i) FROM Invoice i WHERE i.clubId = :clubId AND YEAR(i.issuedAt) = :year",
+        value = "SELECT COUNT(*) FROM invoices i WHERE i.club_id = :clubId AND EXTRACT(YEAR FROM i.issued_at) = :year",
+        nativeQuery = true,
     )
     fun countByClubIdAndYear(
         clubId: Long,

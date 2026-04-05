@@ -218,7 +218,7 @@ class GXClassServiceTest {
         whenever(trainerRepository.findByPublicIdAndOrganizationIdAndClubIdAndDeletedAtIsNull(instructorPublicId, org.id, club.id))
             .thenReturn(Optional.of(instructor))
         whenever(classInstanceRepository.existsOverlappingInstance(any(), any(), any()))
-            .thenReturn(true)
+            .thenReturn(1)
 
         val request =
             CreateGXClassInstanceRequest(
@@ -262,7 +262,7 @@ class GXClassServiceTest {
             ),
         ).thenReturn(Optional.of(instructor))
         whenever(classInstanceRepository.existsOverlappingInstance(any(), any(), any()))
-            .thenReturn(false)
+            .thenReturn(0)
         whenever(classInstanceRepository.save(any<GXClassInstance>()))
             .thenAnswer { it.arguments[0] as GXClassInstance }
 
