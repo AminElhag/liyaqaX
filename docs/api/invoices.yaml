@@ -1,0 +1,147 @@
+paths:
+
+  /api/v1/members/{memberId}/invoices:
+    get:
+      summary: Get invoice history for a member
+      operationId: getMemberInvoices
+      tags: [Invoices (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: invoice:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Invoice history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+  /api/v1/members/{memberId}/invoices/{invoiceId}:
+    get:
+      summary: Get a single invoice detail
+      operationId: getInvoice
+      tags: [Invoices (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: invoice:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/invoices:
+    get:
+      summary: List all invoices (branch-scoped, paginated)
+      operationId: getAllInvoices
+      tags: [Invoices (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: invoice:read
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Paginated invoice list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InvoiceResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+components:
+  schemas:
+    InvoiceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        memberId:
+          type: string
+          format: uuid
+        memberName:
+          type: string
+        subtotalHalalas:
+          type: integer
+          format: int64
+        subtotalSar:
+          type: string
+        vatRate:
+          type: number
+          example: 0.15
+        vatAmountHalalas:
+          type: integer
+          format: int64
+        vatAmountSar:
+          type: string
+        totalHalalas:
+          type: integer
+          format: int64
+        totalSar:
+          type: string
+        paymentMethod:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        zatcaStatus:
+          type: string
+          enum: [pending, submitted, accepted, rejected]
+
+    InvoiceSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        totalHalalas:
+          type: integer
+          format: int64
+        totalSar:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        zatcaStatus:
+          type: string

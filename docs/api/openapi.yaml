@@ -21,6 +21,24 @@ tags:
     description: Organization management (Nexus only)
   - name: Clubs
     description: Club management (Nexus only)
+  - name: Branches
+    description: Branch management (Nexus only)
+  - name: Staff (Nexus)
+    description: Staff management endpoints — internal team
+  - name: Staff (Pulse)
+    description: Staff management endpoints — club operations
+  - name: Members (Nexus)
+    description: Member viewing endpoints — internal team
+  - name: Members (Pulse)
+    description: Member management endpoints — club operations
+  - name: Membership Plans (Nexus)
+    description: Membership plan viewing endpoints — internal team
+  - name: Membership Plans (Pulse)
+    description: Membership plan management endpoints — club operations
+  - name: GX Classes (Pulse)
+    description: GX class type and instance management — club operations
+  - name: GX Bookings (Pulse)
+    description: GX class booking and attendance — club operations
 
 paths:
 
@@ -38,6 +56,137 @@ paths:
 
   /api/v1/organizations/{orgId}/clubs/{id}:
     $ref: './clubs.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{id}'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/branches:
+    $ref: './branches.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1branches'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/branches/{id}:
+    $ref: './branches.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1branches~1{id}'
+
+  # ── Staff (Nexus) ───────────────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff:
+    $ref: './staff.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1staff'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff/{id}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1staff~1{id}'
+
+  # ── Staff (Pulse) ───────────────────────────────────────────────────────────
+
+  /api/v1/staff:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff'
+
+  /api/v1/staff/{id}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}'
+
+  /api/v1/staff/{id}/branches:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}~1branches'
+
+  /api/v1/staff/{id}/branches/{branchId}:
+    $ref: './staff.yaml#/paths/~1api~1v1~1staff~1{id}~1branches~1{branchId}'
+
+  # ── Members (Nexus) ─────────────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members:
+    $ref: './members.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1members'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/members/{id}:
+    $ref: './members.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1members~1{id}'
+
+  # ── Members (Pulse) ─────────────────────────────────────────────────────────
+
+  /api/v1/members:
+    $ref: './members.yaml#/paths/~1api~1v1~1members'
+
+  /api/v1/members/{id}:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}'
+
+  /api/v1/members/{id}/emergency-contacts:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1emergency-contacts'
+
+  /api/v1/members/{id}/emergency-contacts/{contactId}:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1emergency-contacts~1{contactId}'
+
+  /api/v1/members/{id}/waiver-status:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1waiver-status'
+
+  /api/v1/members/{id}/waiver-sign:
+    $ref: './members.yaml#/paths/~1api~1v1~1members~1{id}~1waiver-sign'
+
+  # ── Membership Plans (Nexus) ────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/membership-plans:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1membership-plans'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/membership-plans/{id}:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1organizations~1{orgId}~1clubs~1{clubId}~1membership-plans~1{id}'
+
+  # ── Membership Plans (Pulse) ────────────────────────────────────────────
+
+  /api/v1/membership-plans:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1membership-plans'
+
+  /api/v1/membership-plans/{id}:
+    $ref: './membership-plans.yaml#/paths/~1api~1v1~1membership-plans~1{id}'
+
+  # ── Memberships (Pulse) ─────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/memberships:
+    $ref: './memberships.yaml#/paths/~1api~1v1~1members~1{memberId}~1memberships'
+
+  /api/v1/members/{memberId}/memberships/active:
+    $ref: './memberships.yaml#/paths/~1api~1v1~1members~1{memberId}~1memberships~1active'
+
+  # ── Payments (Pulse) ────────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/payments:
+    $ref: './payments.yaml#/paths/~1api~1v1~1members~1{memberId}~1payments'
+
+  /api/v1/payments:
+    $ref: './payments.yaml#/paths/~1api~1v1~1payments'
+
+  # ── Invoices (Pulse) ────────────────────────────────────────────────────
+
+  /api/v1/members/{memberId}/invoices:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1members~1{memberId}~1invoices'
+
+  /api/v1/members/{memberId}/invoices/{invoiceId}:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1members~1{memberId}~1invoices~1{invoiceId}'
+
+  /api/v1/invoices:
+    $ref: './invoices.yaml#/paths/~1api~1v1~1invoices'
+
+  # ── GX Classes (Pulse) ─────────────────────────────────────────────────
+
+  /api/v1/gx/class-types:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1class-types'
+
+  /api/v1/gx/class-types/{id}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1class-types~1{id}'
+
+  /api/v1/gx/classes:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes'
+
+  /api/v1/gx/classes/{id}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{id}'
+
+  /api/v1/gx/classes/{id}/cancel:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{id}~1cancel'
+
+  /api/v1/gx/classes/{classId}/bookings:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1bookings'
+
+  /api/v1/gx/classes/{classId}/bookings/{bookingId}:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1bookings~1{bookingId}'
+
+  /api/v1/gx/classes/{classId}/waitlist:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1waitlist'
+
+  /api/v1/gx/classes/{classId}/attendance:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1classes~1{classId}~1attendance'
+
+  /api/v1/gx/members/{memberId}/gx-bookings:
+    $ref: './gx.yaml#/paths/~1api~1v1~1gx~1members~1{memberId}~1gx-bookings'
 
 components:
   securitySchemes:

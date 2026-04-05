@@ -4,7 +4,6 @@ import com.liyaqa.common.dto.PageResponse
 import com.liyaqa.organization.dto.CreateOrganizationRequest
 import com.liyaqa.organization.dto.OrganizationResponse
 import com.liyaqa.organization.dto.UpdateOrganizationRequest
-import com.liyaqa.security.Roles
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -32,28 +31,28 @@ class OrganizationController(
     private val organizationService: OrganizationService,
 ) {
     @PostMapping
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'organization:create')")
     @Operation(summary = "Create a new organization")
     fun create(
         @Valid @RequestBody request: CreateOrganizationRequest,
     ): ResponseEntity<OrganizationResponse> = ResponseEntity.status(HttpStatus.CREATED).body(organizationService.create(request))
 
     @GetMapping
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'organization:read')")
     @Operation(summary = "List all organizations")
     fun getAll(
         @PageableDefault(size = 20) pageable: Pageable,
     ): ResponseEntity<PageResponse<OrganizationResponse>> = ResponseEntity.ok(organizationService.getAll(pageable))
 
     @GetMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'organization:read')")
     @Operation(summary = "Get an organization by ID")
     fun getById(
         @PathVariable id: UUID,
     ): ResponseEntity<OrganizationResponse> = ResponseEntity.ok(organizationService.getByPublicId(id))
 
     @PatchMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'organization:update')")
     @Operation(summary = "Update an organization")
     fun update(
         @PathVariable id: UUID,
@@ -61,7 +60,7 @@ class OrganizationController(
     ): ResponseEntity<OrganizationResponse> = ResponseEntity.ok(organizationService.update(id, request))
 
     @DeleteMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'organization:delete')")
     @Operation(summary = "Soft-delete an organization")
     fun delete(
         @PathVariable id: UUID,

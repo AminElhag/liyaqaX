@@ -15,8 +15,6 @@ class User(
     var email: String,
     @Column(name = "password_hash", nullable = false)
     var passwordHash: String,
-    @Column(name = "role", nullable = false, length = 50)
-    var role: String,
     @Column(name = "organization_id")
     var organizationId: Long? = null,
     @Column(name = "club_id")

@@ -1,1 +1,230 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "تسجيل الدخول إلى حسابك",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "submit": "تسجيل الدخول",
+      "error": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+      "scopeError": "هذا التطبيق مخصص لموظفي النادي فقط. المدربون يستخدمون تطبيق Coach."
+    },
+    "logout": "خروج"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "staff": "الموظفون",
+    "members": "الأعضاء",
+    "memberships": "العضويات",
+    "finance": "المالية",
+    "pt": "التدريب الشخصي",
+    "gx": "التمارين الجماعية",
+    "leads": "العملاء المحتملون",
+    "reports": "التقارير",
+    "settings": "الإعدادات"
+  },
+  "branch": {
+    "selector": "الفرع",
+    "all": "جميع الفروع"
+  },
+  "staff": {
+    "title": "الموظفون",
+    "columns": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "branches": "الفروع",
+      "status": "الحالة"
+    },
+    "empty": "لا يوجد موظفون",
+    "addStaff": "إضافة موظف",
+    "detail": {
+      "title": "الموظف",
+      "phone": "الهاتف",
+      "nationalId": "رقم الهوية",
+      "employmentType": "نوع التوظيف",
+      "joinedAt": "تاريخ الانضمام",
+      "branches": "الفروع",
+      "notFound": "الموظف غير موجود"
+    }
+  },
+  "members": {
+    "title": "الأعضاء",
+    "registerMember": "تسجيل عضو",
+    "columns": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "status": "الحالة",
+      "branch": "الفرع",
+      "joinedAt": "تاريخ الانضمام"
+    },
+    "status": {
+      "pending": "قيد الانتظار",
+      "active": "نشط",
+      "frozen": "مجمد",
+      "expired": "منتهي",
+      "terminated": "ملغى"
+    },
+    "empty": "لا يوجد أعضاء",
+    "form": {
+      "step1": "المعلومات الشخصية",
+      "step2": "جهة الاتصال في حالات الطوارئ",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "dateOfBirth": "تاريخ الميلاد",
+      "gender": "الجنس",
+      "genderOptions": {
+        "male": "ذكر",
+        "female": "أنثى",
+        "unspecified": "غير محدد"
+      },
+      "nationalId": "رقم الهوية / الإقامة",
+      "branch": "الفرع الرئيسي",
+      "notes": "ملاحظات",
+      "emergencyName": "اسم جهة الاتصال في الطوارئ",
+      "emergencyPhone": "هاتف الطوارئ",
+      "emergencyRelationship": "صلة القرابة",
+      "passwordGenerated": "كلمة المرور المولدة تلقائياً",
+      "copyPassword": "نسخ كلمة المرور",
+      "success": "تم تسجيل العضو بنجاح"
+    },
+    "profile": {
+      "title": "ملف العضو",
+      "overview": "نظرة عامة",
+      "membership": "العضوية",
+      "payments": "المدفوعات",
+      "pt": "التدريب الشخصي",
+      "gx": "التمارين الجماعية",
+      "emergencyContacts": "جهات الاتصال في الطوارئ",
+      "notFound": "العضو غير موجود",
+      "comingSoon": "قريباً"
+    },
+    "waiver": {
+      "signed": "تم توقيع الإقرار",
+      "notSigned": "لم يتم توقيع الإقرار"
+    }
+  },
+  "membershipPlans": {
+    "title": "خطط العضوية",
+    "addPlan": "إضافة خطة",
+    "editPlan": "تعديل الخطة",
+    "durationDays": "يوم",
+    "features": {
+      "gxIncluded": "تمارين جماعية مشمولة",
+      "ptIncluded": "تدريب شخصي مشمول",
+      "freezeAllowed": "التجميد مسموح",
+      "gracePeriod": "{{days}} أيام فترة سماح"
+    },
+    "form": {
+      "nameAr": "اسم الخطة (عربي)",
+      "nameEn": "اسم الخطة (إنجليزي)",
+      "descriptionAr": "الوصف (عربي)",
+      "descriptionEn": "الوصف (إنجليزي)",
+      "price": "السعر (ريال)",
+      "duration": "المدة (أيام)",
+      "gracePeriod": "فترة السماح (أيام)",
+      "freeze": "السماح بالتجميد",
+      "maxFreezeDays": "أقصى أيام تجميد في السنة",
+      "gxIncluded": "شمول التمارين الجماعية",
+      "ptIncluded": "شمول التدريب الشخصي"
+    },
+    "empty": "لا توجد خطط بعد"
+  },
+  "membership": {
+    "activeTitle": "العضوية النشطة",
+    "noActive": "لا توجد عضوية نشطة",
+    "assignPlan": "تعيين خطة عضوية",
+    "assignAndCollect": "تعيين الخطة وتحصيل الدفع",
+    "history": "سجل العضويات",
+    "daysRemaining": "{{days}} يوم متبقي",
+    "startDate": "تاريخ البدء",
+    "endDate": "تاريخ الانتهاء",
+    "graceEndDate": "انتهاء فترة السماح",
+    "freezeDaysUsed": "أيام التجميد المستخدمة",
+    "paymentInfo": "الدفع",
+    "invoiceInfo": "الفاتورة",
+    "viewInvoice": "عرض الفاتورة",
+    "renewComingSoon": "التجديد قريبًا",
+    "selectPlan": "اختر خطة",
+    "paymentMethod": "طريقة الدفع",
+    "paymentMethods": {
+      "cash": "نقدًا",
+      "card": "بطاقة",
+      "bank-transfer": "تحويل بنكي",
+      "other": "أخرى"
+    },
+    "amount": "المبلغ (ريال)",
+    "referenceNumber": "رقم المرجع",
+    "notes": "ملاحظات",
+    "success": "تم تعيين العضوية بنجاح",
+    "invoiceCreated": "تم إنشاء الفاتورة {{number}}",
+    "historyEmpty": "لا يوجد سجل عضويات",
+    "historyColumns": {
+      "plan": "الخطة",
+      "period": "الفترة",
+      "amount": "المبلغ",
+      "method": "الطريقة",
+      "status": "الحالة"
+    },
+    "renew": "تجديد",
+    "renewAndCollect": "تجديد العضوية وتحصيل الدفع",
+    "renewSuccess": "تم تجديد العضوية بنجاح",
+    "freeze": "تجميد",
+    "freezeTitle": "تجميد العضوية",
+    "freezeStartDate": "تاريخ بدء التجميد",
+    "freezeEndDate": "تاريخ انتهاء التجميد",
+    "freezeReason": "السبب (اختياري)",
+    "freezeDaysCalc": "{{requested}} يوم تجميد — {{remaining}} يوم متبقي من {{max}} كحد أقصى",
+    "freezeExceedsLimit": "أيام التجميد تتجاوز الحد المسموح",
+    "freezeSubmit": "تجميد العضوية",
+    "freezeSuccess": "تم تجميد العضوية بنجاح",
+    "unfreeze": "إلغاء التجميد",
+    "unfreezeConfirm": "هل أنت متأكد من إلغاء تجميد هذه العضوية؟ سيتم تعديل تاريخ الانتهاء ليعكس أيام التجميد الفعلية.",
+    "unfreezeSuccess": "تم إلغاء تجميد العضوية بنجاح",
+    "terminate": "إنهاء",
+    "terminateConfirm": "هذا الإجراء لا يمكن التراجع عنه. سيتم إنهاء العضوية نهائيًا.",
+    "terminateReason": "سبب الإنهاء (مطلوب)",
+    "terminateSuccess": "تم إنهاء العضوية",
+    "timeline": "الجدول الزمني",
+    "timelineStart": "بدء العضوية",
+    "timelineEnd": "انتهاء العضوية",
+    "timelineGrace": "انتهاء فترة السماح",
+    "expiringTitle": "العضويات المنتهية قريبًا",
+    "expiringEmpty": "لا توجد عضويات منتهية قريبًا",
+    "filterDays": "{{days}} يوم",
+    "overdue": "متأخرة",
+    "renewAction": "تجديد",
+    "expiringColumns": {
+      "member": "العضو",
+      "plan": "الخطة",
+      "expiryDate": "تاريخ الانتهاء",
+      "daysRemaining": "الأيام المتبقية",
+      "phone": "الهاتف",
+      "action": "الإجراء"
+    }
+  },
+  "common": {
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ ما",
+    "noPermission": "ليس لديك صلاحية لعرض هذا المحتوى",
+    "forbidden": "تم رفض الوصول",
+    "forbiddenMessage": "ليس لديك الدور المطلوب للوصول إلى هذه الصفحة.",
+    "notFound": "الصفحة غير موجودة",
+    "goBack": "العودة",
+    "retry": "إعادة المحاولة",
+    "page": "صفحة",
+    "of": "من",
+    "previous": "السابق",
+    "next": "التالي",
+    "cancel": "إلغاء",
+    "saving": "جاري الحفظ..."
+  },
+  "language": {
+    "ar": "العربية",
+    "en": "English"
+  }
+}

@@ -1,0 +1,494 @@
+paths:
+
+  /api/v1/members/{memberId}/memberships:
+    post:
+      summary: Assign a membership plan to a member
+      description: |
+        Creates a membership, records payment, generates invoice stub,
+        and activates the member — all in one atomic operation.
+      operationId: assignMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:create
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignMembershipRequest'
+      responses:
+        '201':
+          description: Membership assigned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+    get:
+      summary: Get membership history for a member
+      operationId: getMembershipHistory
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Membership history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MembershipSummaryResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+  /api/v1/members/{memberId}/memberships/active:
+    get:
+      summary: Get the active membership for a member
+      operationId: getActiveMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+      responses:
+        '200':
+          description: Active membership found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '204':
+          description: No active membership
+
+  /api/v1/members/{memberId}/memberships/{membershipId}/renew:
+    post:
+      summary: Renew a membership
+      description: |
+        Creates a new membership record for the member, records payment,
+        and generates an invoice. The old membership stays as history.
+      operationId: renewMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:create
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: '#/components/parameters/MembershipIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenewMembershipRequest'
+      responses:
+        '201':
+          description: Membership renewed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  /api/v1/members/{memberId}/memberships/{membershipId}/freeze:
+    post:
+      summary: Freeze a membership
+      description: |
+        Pauses the membership and extends the end date by the freeze duration.
+        Only active memberships on freeze-allowed plans can be frozen.
+      operationId: freezeMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:freeze
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: '#/components/parameters/MembershipIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreezeMembershipRequest'
+      responses:
+        '200':
+          description: Membership frozen successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  /api/v1/members/{memberId}/memberships/{membershipId}/unfreeze:
+    post:
+      summary: Unfreeze a frozen membership
+      description: |
+        Resumes a frozen membership and adjusts the end date to reflect
+        only the days actually frozen.
+      operationId: unfreezeMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:unfreeze
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: '#/components/parameters/MembershipIdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnfreezeMembershipRequest'
+      responses:
+        '200':
+          description: Membership unfrozen successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  /api/v1/members/{memberId}/memberships/{membershipId}/terminate:
+    post:
+      summary: Terminate a membership
+      description: |
+        Permanently terminates an active or frozen membership.
+        Requires a reason. This action is irreversible.
+      operationId: terminateMembership
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:update
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: '#/components/parameters/MembershipIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminateMembershipRequest'
+      responses:
+        '200':
+          description: Membership terminated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  /api/v1/memberships/expiring:
+    get:
+      summary: Get memberships expiring within N days
+      description: |
+        Returns a paginated list of memberships expiring within the
+        specified number of days. Used for the renewals queue.
+      operationId: getExpiringMemberships
+      tags: [Memberships (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: membership:read
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 90
+          description: Number of days to look ahead
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Expiring memberships
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExpiringMembershipResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+components:
+  parameters:
+    MembershipIdPath:
+      name: membershipId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    AssignMembershipRequest:
+      type: object
+      required: [planId, paymentMethod, amountHalalas]
+      properties:
+        planId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+          description: Defaults to today if omitted
+        paymentMethod:
+          type: string
+          enum: [cash, card, bank-transfer, other]
+        amountHalalas:
+          type: integer
+          format: int64
+          minimum: 1
+        referenceNumber:
+          type: string
+        notes:
+          type: string
+
+    MembershipResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        memberId:
+          type: string
+          format: uuid
+        plan:
+          $ref: '#/components/schemas/MembershipPlanSummaryInfo'
+        status:
+          type: string
+          enum: [pending, active, frozen, expired, terminated]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        graceEndDate:
+          type: string
+          format: date
+          nullable: true
+        freezeDaysUsed:
+          type: integer
+        payment:
+          $ref: '#/components/schemas/MembershipPaymentInfo'
+        invoice:
+          $ref: '#/components/schemas/MembershipInvoiceInfo'
+        createdAt:
+          type: string
+          format: date-time
+
+    MembershipSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        planNameAr:
+          type: string
+        planNameEn:
+          type: string
+        status:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        amountHalalas:
+          type: integer
+          format: int64
+        amountSar:
+          type: string
+        paymentMethod:
+          type: string
+          nullable: true
+
+    MembershipPlanSummaryInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+        priceHalalas:
+          type: integer
+          format: int64
+        priceSar:
+          type: string
+        durationDays:
+          type: integer
+
+    MembershipPaymentInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amountHalalas:
+          type: integer
+          format: int64
+        amountSar:
+          type: string
+        paymentMethod:
+          type: string
+        paidAt:
+          type: string
+          format: date-time
+
+    MembershipInvoiceInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        totalHalalas:
+          type: integer
+          format: int64
+        totalSar:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+
+    RenewMembershipRequest:
+      type: object
+      required: [planId, paymentMethod, amountHalalas]
+      properties:
+        planId:
+          type: string
+          format: uuid
+          description: Can renew on same or different plan
+        startDate:
+          type: string
+          format: date
+          description: Defaults to current membership endDate + 1
+        paymentMethod:
+          type: string
+          enum: [cash, card, bank-transfer, other]
+        amountHalalas:
+          type: integer
+          format: int64
+          minimum: 1
+        referenceNumber:
+          type: string
+        notes:
+          type: string
+
+    FreezeMembershipRequest:
+      type: object
+      required: [freezeStartDate, freezeEndDate]
+      properties:
+        freezeStartDate:
+          type: string
+          format: date
+          description: Must be today or in the future
+        freezeEndDate:
+          type: string
+          format: date
+          description: Must be after freezeStartDate
+        reason:
+          type: string
+
+    UnfreezeMembershipRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+
+    TerminateMembershipRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          description: Reason for termination (required)
+
+    ExpiringMembershipResponse:
+      type: object
+      properties:
+        memberId:
+          type: string
+          format: uuid
+        memberName:
+          type: string
+        memberPhone:
+          type: string
+        planNameAr:
+          type: string
+        planNameEn:
+          type: string
+        endDate:
+          type: string
+          format: date
+        daysRemaining:
+          type: integer
+        membershipId:
+          type: string
+          format: uuid
+        membershipStatus:
+          type: string
