@@ -23,6 +23,12 @@ import org.springframework.test.web.servlet.post
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AuthControllerTest {
+    companion object {
+        private const val TEST_PASSWORD = "Test@12345678"
+        private const val WRONG_PASSWORD = "Wrong@12345678"
+        private const val ANY_PASSWORD = "Any@12345678"
+    }
+
     @Autowired
     lateinit var mockMvc: MockMvc
 
@@ -65,11 +71,11 @@ class AuthControllerTest {
 
     @Test
     fun `login returns response with roleId, scope, and roleName`() {
-        val (user, role) = setupUserWithRole("admin@test.com", "password123", "Super Admin", "platform")
+        val (user, role) = setupUserWithRole("admin@test.com", TEST_PASSWORD, "Super Admin", "platform")
 
         mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email": "admin@test.com", "password": "password123"}"""
+            content = """{"email": "admin@test.com", "password": "$TEST_PASSWORD"}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.accessToken", notNullValue())
@@ -82,11 +88,11 @@ class AuthControllerTest {
 
     @Test
     fun `login returns 401 for wrong password`() {
-        setupUserWithRole("user@test.com", "correctpass", "Member", "member")
+        setupUserWithRole("user@test.com", TEST_PASSWORD, "Member", "member")
 
         mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email": "user@test.com", "password": "wrongpass"}"""
+            content = """{"email": "user@test.com", "password": "$WRONG_PASSWORD"}"""
         }.andExpect {
             status { isUnauthorized() }
         }
@@ -96,7 +102,7 @@ class AuthControllerTest {
     fun `login returns 401 for non-existent user`() {
         mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email": "ghost@test.com", "password": "anypass"}"""
+            content = """{"email": "ghost@test.com", "password": "$ANY_PASSWORD"}"""
         }.andExpect {
             status { isUnauthorized() }
         }
