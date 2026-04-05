@@ -125,7 +125,7 @@ class MemberPulseControllerTest {
         """
         {
             "email": "$email",
-            "password": "Pass1234!",
+            "password": "Test@12345678",
             "firstNameAr": "أحمد",
             "firstNameEn": "Ahmed",
             "lastNameAr": "الرشيدي",

@@ -150,7 +150,7 @@ class TrainerPulseControllerTest {
         """
         {
             "email": "trainer-${UUID.randomUUID()}@test.com",
-            "password": "Pass1234!",
+            "password": "Test@12345678",
             "firstNameAr": "خالد",
             "firstNameEn": "Khalid",
             "lastNameAr": "الشمري",

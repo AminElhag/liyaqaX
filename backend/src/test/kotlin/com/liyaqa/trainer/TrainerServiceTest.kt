@@ -73,7 +73,7 @@ class TrainerServiceTest {
         branchIds: List<UUID> = listOf(branch.publicId),
     ) = CreateTrainerRequest(
         email = "trainer@test.com",
-        password = "Pass1234!",
+        password = "Test@12345678",
         firstNameAr = "خالد",
         firstNameEn = "Khalid",
         lastNameAr = "الشمري",

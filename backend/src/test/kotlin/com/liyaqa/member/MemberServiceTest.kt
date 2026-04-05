@@ -69,7 +69,7 @@ class MemberServiceTest {
     private fun createRequest() =
         CreateMemberRequest(
             email = "member@test.com",
-            password = "Pass1234!",
+            password = "Test@12345678",
             firstNameAr = "أحمد",
             firstNameEn = "Ahmed",
             lastNameAr = "الرشيدي",

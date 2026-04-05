@@ -69,7 +69,7 @@ class StaffMemberServiceTest {
         branchIds: List<UUID> = listOf(branch.publicId),
     ) = CreateStaffMemberRequest(
         email = "new@test.com",
-        password = "Pass1234!",
+        password = "Test@12345678",
         firstNameAr = "أحمد",
         firstNameEn = "Ahmed",
         lastNameAr = "العمري",
