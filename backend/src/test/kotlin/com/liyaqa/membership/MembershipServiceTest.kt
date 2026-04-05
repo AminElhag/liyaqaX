@@ -39,6 +39,8 @@ class MembershipServiceTest {
 
     @Mock lateinit var membershipPlanRepository: MembershipPlanRepository
 
+    @Mock lateinit var freezePeriodRepository: FreezePeriodRepository
+
     @Mock lateinit var memberRepository: MemberRepository
 
     @Mock lateinit var organizationRepository: OrganizationRepository

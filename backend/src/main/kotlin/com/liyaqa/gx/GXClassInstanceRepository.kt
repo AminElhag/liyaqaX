@@ -31,19 +31,20 @@ interface GXClassInstanceRepository : JpaRepository<GXClassInstance, Long> {
     ): Page<GXClassInstance>
 
     @Query(
-        """
-        SELECT COUNT(i) > 0
-        FROM GXClassInstance i
-        WHERE i.instructorId = :instructorId
-          AND i.instanceStatus != 'cancelled'
-          AND i.deletedAt IS NULL
-          AND i.scheduledAt < :endAt
-          AND (i.scheduledAt + (i.durationMinutes * 60000000000L)) > :startAt
+        value = """
+            SELECT COUNT(i.id) > 0
+            FROM gx_class_instances i
+            WHERE i.instructor_id = :instructorId
+              AND i.status != 'cancelled'
+              AND i.deleted_at IS NULL
+              AND i.scheduled_at < :endAt
+              AND (i.scheduled_at + (i.duration_minutes || ' minutes')::interval) > :startAt
         """,
+        nativeQuery = true,
     )
     fun existsOverlappingInstance(
         instructorId: Long,
         startAt: Instant,
         endAt: Instant,
-    ): Boolean
+    ): Int
 }

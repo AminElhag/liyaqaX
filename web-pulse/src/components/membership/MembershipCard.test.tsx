@@ -15,6 +15,8 @@ const activeMembership: Membership = {
     priceHalalas: 15000,
     priceSar: '150.00',
     durationDays: 30,
+    freezeAllowed: true,
+    maxFreezeDays: 30,
   },
   status: 'active',
   startDate: new Date().toISOString().split('T')[0],

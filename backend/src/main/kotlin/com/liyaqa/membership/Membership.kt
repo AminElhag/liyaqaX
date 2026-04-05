@@ -28,9 +28,9 @@ class Membership(
     @Column(name = "start_date", nullable = false)
     val startDate: LocalDate,
     @Column(name = "end_date", nullable = false)
-    val endDate: LocalDate,
+    var endDate: LocalDate,
     @Column(name = "grace_end_date")
-    val graceEndDate: LocalDate? = null,
+    var graceEndDate: LocalDate? = null,
     @Column(name = "freeze_days_used", nullable = false)
     var freezeDaysUsed: Int = 0,
     @Column(name = "notes", columnDefinition = "TEXT")

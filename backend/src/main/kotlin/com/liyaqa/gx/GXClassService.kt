@@ -154,7 +154,7 @@ class GXClassService(
         val endAt = startAt.plusSeconds(durationMinutes.toLong() * 60)
 
         // Business rule 10 — Instructor double-booking check
-        if (classInstanceRepository.existsOverlappingInstance(instructor.id, startAt, endAt)) {
+        if (classInstanceRepository.existsOverlappingInstance(instructor.id, startAt, endAt) > 0) {
             throw ArenaException(
                 HttpStatus.CONFLICT,
                 "conflict",
@@ -251,7 +251,7 @@ class GXClassService(
             startAt != instance.scheduledAt ||
             durationMinutes != instance.durationMinutes
         ) {
-            if (classInstanceRepository.existsOverlappingInstance(instructor.id, startAt, endAt)) {
+            if (classInstanceRepository.existsOverlappingInstance(instructor.id, startAt, endAt) > 0) {
                 throw ArenaException(
                     HttpStatus.CONFLICT,
                     "conflict",

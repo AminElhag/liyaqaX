@@ -25,6 +25,8 @@ data class MembershipPlanSummaryInfo(
     val priceHalalas: Long,
     val priceSar: String,
     val durationDays: Int,
+    val freezeAllowed: Boolean,
+    val maxFreezeDays: Int,
 )
 
 data class MembershipPaymentInfo(

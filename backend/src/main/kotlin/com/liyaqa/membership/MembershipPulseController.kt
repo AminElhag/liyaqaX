@@ -11,8 +11,13 @@ import com.liyaqa.invoice.dto.InvoiceResponse
 import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.membership.dto.AssignMembershipRequest
+import com.liyaqa.membership.dto.ExpiringMembershipResponse
+import com.liyaqa.membership.dto.FreezeMembershipRequest
 import com.liyaqa.membership.dto.MembershipResponse
 import com.liyaqa.membership.dto.MembershipSummaryResponse
+import com.liyaqa.membership.dto.RenewMembershipRequest
+import com.liyaqa.membership.dto.TerminateMembershipRequest
+import com.liyaqa.membership.dto.UnfreezeMembershipRequest
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.payment.PaymentRepository
 import com.liyaqa.payment.PaymentService
@@ -111,6 +116,114 @@ class MembershipPulseController(
                 orgPublicId = claims.requireOrganizationId(),
                 clubPublicId = claims.requireClubId(),
                 memberPublicId = memberId,
+                pageable = pageable,
+            ),
+        )
+    }
+
+    // ── Membership lifecycle endpoints ──────────────────────────────────────
+
+    @PostMapping("/members/{memberId}/memberships/{membershipId}/renew")
+    @PreAuthorize("hasPermission(null, 'membership:create')")
+    @Operation(summary = "Renew a membership by creating a new membership and collecting payment")
+    fun renewMembership(
+        @PathVariable memberId: UUID,
+        @PathVariable membershipId: UUID,
+        @Valid @RequestBody request: RenewMembershipRequest,
+        authentication: Authentication,
+    ): ResponseEntity<MembershipResponse> {
+        val claims = authentication.pulseContext()
+        val response =
+            membershipService.renew(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                memberPublicId = memberId,
+                membershipPublicId = membershipId,
+                request = request,
+                callerUserPublicId = claims.requireUserPublicId(),
+            )
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @PostMapping("/members/{memberId}/memberships/{membershipId}/freeze")
+    @PreAuthorize("hasPermission(null, 'membership:freeze')")
+    @Operation(summary = "Freeze a membership")
+    fun freezeMembership(
+        @PathVariable memberId: UUID,
+        @PathVariable membershipId: UUID,
+        @Valid @RequestBody request: FreezeMembershipRequest,
+        authentication: Authentication,
+    ): ResponseEntity<MembershipResponse> {
+        val claims = authentication.pulseContext()
+        val response =
+            membershipService.freeze(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                memberPublicId = memberId,
+                membershipPublicId = membershipId,
+                request = request,
+                callerUserPublicId = claims.requireUserPublicId(),
+            )
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/members/{memberId}/memberships/{membershipId}/unfreeze")
+    @PreAuthorize("hasPermission(null, 'membership:unfreeze')")
+    @Operation(summary = "Unfreeze a frozen membership")
+    fun unfreezeMembership(
+        @PathVariable memberId: UUID,
+        @PathVariable membershipId: UUID,
+        @RequestBody(required = false) request: UnfreezeMembershipRequest?,
+        authentication: Authentication,
+    ): ResponseEntity<MembershipResponse> {
+        val claims = authentication.pulseContext()
+        val response =
+            membershipService.unfreeze(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                memberPublicId = memberId,
+                membershipPublicId = membershipId,
+                request = request ?: UnfreezeMembershipRequest(),
+            )
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/members/{memberId}/memberships/{membershipId}/terminate")
+    @PreAuthorize("hasPermission(null, 'membership:update')")
+    @Operation(summary = "Terminate a membership")
+    fun terminateMembership(
+        @PathVariable memberId: UUID,
+        @PathVariable membershipId: UUID,
+        @Valid @RequestBody request: TerminateMembershipRequest,
+        authentication: Authentication,
+    ): ResponseEntity<MembershipResponse> {
+        val claims = authentication.pulseContext()
+        val response =
+            membershipService.terminate(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                memberPublicId = memberId,
+                membershipPublicId = membershipId,
+                request = request,
+            )
+        return ResponseEntity.ok(response)
+    }
+
+    @GetMapping("/memberships/expiring")
+    @PreAuthorize("hasPermission(null, 'membership:read')")
+    @Operation(summary = "Get memberships expiring within the next N days")
+    fun getExpiringMemberships(
+        @RequestParam(defaultValue = "30") days: Int,
+        @PageableDefault(size = 20) pageable: Pageable,
+        authentication: Authentication,
+    ): ResponseEntity<PageResponse<ExpiringMembershipResponse>> {
+        val claims = authentication.pulseContext()
+        val effectiveDays = days.coerceIn(1, 90)
+        return ResponseEntity.ok(
+            membershipService.getExpiringMemberships(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                days = effectiveDays,
                 pageable = pageable,
             ),
         )

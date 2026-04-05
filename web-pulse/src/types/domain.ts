@@ -242,6 +242,8 @@ export interface MembershipPlanSummaryInfo {
   priceHalalas: number
   priceSar: string
   durationDays: number
+  freezeAllowed: boolean
+  maxFreezeDays: number
 }
 
 /** Payment info embedded in membership responses */
@@ -298,6 +300,57 @@ export interface AssignMembershipRequest {
   amountHalalas: number
   referenceNumber?: string
   notes?: string
+}
+
+/** Request body for POST /api/v1/members/:id/memberships/:id/renew */
+export interface RenewMembershipRequest {
+  planId: string
+  startDate?: string
+  paymentMethod: 'cash' | 'card' | 'bank-transfer' | 'other'
+  amountHalalas: number
+  referenceNumber?: string
+  notes?: string
+}
+
+/** Request body for POST /api/v1/members/:id/memberships/:id/freeze */
+export interface FreezeMembershipRequest {
+  freezeStartDate: string
+  freezeEndDate: string
+  reason?: string
+}
+
+/** Request body for POST /api/v1/members/:id/memberships/:id/unfreeze */
+export interface UnfreezeMembershipRequest {
+  notes?: string
+}
+
+/** Request body for POST /api/v1/members/:id/memberships/:id/terminate */
+export interface TerminateMembershipRequest {
+  reason: string
+}
+
+/** Expiring membership row (from GET /api/v1/memberships/expiring) */
+export interface ExpiringMembership {
+  memberId: string
+  memberName: string
+  memberPhone: string
+  planNameAr: string
+  planNameEn: string
+  endDate: string
+  daysRemaining: number
+  membershipId: string
+  membershipStatus: string
+}
+
+/** Freeze period record */
+export interface FreezePeriod {
+  id: string
+  freezeStartDate: string
+  freezeEndDate: string
+  actualEndDate: string | null
+  durationDays: number
+  reason: string | null
+  createdAt: string
 }
 
 // ── Payment domain types ───────────────────────────────────────────────────
