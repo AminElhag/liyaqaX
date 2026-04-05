@@ -41,4 +41,8 @@ class Invoice(
     var zatcaHash: String? = null,
     @Column(name = "zatca_qr_code", columnDefinition = "TEXT")
     var zatcaQrCode: String? = null,
+    @Column(name = "previous_invoice_hash", columnDefinition = "TEXT")
+    var previousInvoiceHash: String? = null,
+    @Column(name = "invoice_counter_value")
+    var invoiceCounterValue: Long? = null,
 ) : BaseEntity()

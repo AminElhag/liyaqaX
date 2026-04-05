@@ -23,4 +23,6 @@ class Club(
     var phone: String? = null,
     @Column(name = "is_active", nullable = false)
     var isActive: Boolean = true,
+    @Column(name = "vat_number", length = 50)
+    var vatNumber: String? = null,
 ) : AuditEntity()

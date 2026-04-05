@@ -139,7 +139,7 @@ class MembershipServiceTest {
                     collectedById = user.id,
                 ),
             )
-        whenever(invoiceService.createInvoiceStub(any(), any(), any(), any()))
+        whenever(invoiceService.createInvoice(any(), any(), any(), any(), any()))
             .thenReturn(
                 Invoice(
                     organizationId = org.id,
@@ -274,7 +274,7 @@ class MembershipServiceTest {
 
         service.assignPlan(org.publicId, club.publicId, member.publicId, validRequest(plan), user.publicId)
 
-        verify(invoiceService).createInvoiceStub(any(), any(), any(), eq(15000L))
+        verify(invoiceService).createInvoice(any(), any(), any(), any(), eq(15000L))
     }
 
     // ── Rule 6: Member status update ────────────────────────────────────────

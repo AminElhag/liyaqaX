@@ -521,4 +521,11 @@ export interface Invoice {
   paymentMethod: string
   issuedAt: string
   zatcaStatus: string
+  zatcaUuid: string | null
+  zatcaHash: string | null
+  zatcaQrCode: string | null
+  previousInvoiceHash: string | null
+  invoiceCounterValue: number | null
 }
+
+export type ZatcaStatus = 'pending' | 'generated' | 'submitted' | 'accepted' | 'rejected'

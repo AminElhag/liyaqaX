@@ -11,6 +11,8 @@ import com.liyaqa.gx.GXClassInstanceRepository
 import com.liyaqa.gx.GXClassType
 import com.liyaqa.gx.GXClassTypeRepository
 import com.liyaqa.invoice.Invoice
+import com.liyaqa.invoice.InvoiceCounter
+import com.liyaqa.invoice.InvoiceCounterRepository
 import com.liyaqa.invoice.InvoiceRepository
 import com.liyaqa.member.EmergencyContact
 import com.liyaqa.member.EmergencyContactRepository
@@ -55,6 +57,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.annotation.Profile
 import org.springframework.context.event.EventListener
+import org.springframework.core.annotation.Order
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -88,6 +91,7 @@ class DevDataLoader(
     private val membershipRepository: MembershipRepository,
     private val paymentRepository: PaymentRepository,
     private val invoiceRepository: InvoiceRepository,
+    private val invoiceCounterRepository: InvoiceCounterRepository,
     private val gxClassTypeRepository: GXClassTypeRepository,
     private val gxClassInstanceRepository: GXClassInstanceRepository,
     private val gxBookingRepository: GXBookingRepository,
@@ -243,6 +247,7 @@ class DevDataLoader(
     // ── Seed orchestration ────────────────────────────────────────────────────
 
     @EventListener(ApplicationReadyEvent::class)
+    @Order(1)
     @Transactional
     fun seed() {
         if (organizationRepository.count() > 0) {
@@ -254,6 +259,7 @@ class DevDataLoader(
 
         val org = seedOrg()
         val club = seedClub(org)
+        invoiceCounterRepository.save(InvoiceCounter(clubId = club.id))
         val (riyadhBranch, jeddahBranch) = seedBranches(org, club)
         val users = seedUsers(org, club)
         val permissions = seedPermissions()
@@ -295,6 +301,7 @@ class DevDataLoader(
                 nameAr = "\u0646\u0627\u062F\u064A \u0625\u0643\u0633\u064A\u0631",
                 nameEn = "Elixir Gym",
                 email = "info@elixir.com",
+                vatNumber = "300000000000003",
             ),
         )
 

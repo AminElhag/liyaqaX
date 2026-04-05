@@ -33,6 +33,13 @@ interface InvoiceRepository : JpaRepository<Invoice, Long> {
 
     fun findByPaymentId(paymentId: Long): Optional<Invoice>
 
+    fun findTopByClubIdAndInvoiceCounterValueIsNotNullOrderByInvoiceCounterValueDesc(clubId: Long): Optional<Invoice>
+
+    fun findAllByClubIdAndZatcaStatus(
+        clubId: Long,
+        zatcaStatus: String,
+    ): List<Invoice>
+
     @Query(
         value = "SELECT COUNT(*) FROM invoices i WHERE i.club_id = :clubId AND EXTRACT(YEAR FROM i.issued_at) = :year",
         nativeQuery = true,

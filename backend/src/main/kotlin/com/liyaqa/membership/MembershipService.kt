@@ -144,10 +144,11 @@ class MembershipService(
 
         // Rule 5 — VAT calculation (server-side) + Rule 8 — Invoice total integrity
         val invoice =
-            invoiceService.createInvoiceStub(
+            invoiceService.createInvoice(
                 payment = payment,
                 member = member,
                 club = club,
+                organization = org,
                 subtotalHalalas = plan.priceHalalas,
             )
 
@@ -478,10 +479,11 @@ class MembershipService(
 
         // Generate invoice
         val invoice =
-            invoiceService.createInvoiceStub(
+            invoiceService.createInvoice(
                 payment = payment,
                 member = member,
                 club = club,
+                organization = org,
                 subtotalHalalas = newPlan.priceHalalas,
             )
 

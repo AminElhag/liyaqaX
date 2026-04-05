@@ -19,4 +19,9 @@ data class InvoiceResponse(
     val paymentMethod: String,
     val issuedAt: Instant,
     val zatcaStatus: String,
+    val zatcaUuid: String? = null,
+    val zatcaHash: String? = null,
+    val zatcaQrCode: String? = null,
+    val previousInvoiceHash: String? = null,
+    val invoiceCounterValue: Long? = null,
 )

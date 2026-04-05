@@ -443,7 +443,7 @@ class MembershipLifecycleServiceTest {
                     collectedById = user.id,
                 ),
             )
-            whenever(invoiceService.createInvoiceStub(any(), any(), any(), any()))
+            whenever(invoiceService.createInvoice(any(), any(), any(), any(), any()))
                 .thenReturn(
                     Invoice(
                         organizationId = org.id,

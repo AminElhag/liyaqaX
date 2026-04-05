@@ -383,6 +383,28 @@ class MembershipPulseController(
         return ResponseEntity.ok(page.toPageResponseWith(items))
     }
 
+    @GetMapping("/invoices/{invoiceId}/qr-code")
+    @PreAuthorize("hasPermission(null, 'invoice:read')")
+    @Operation(summary = "Get the ZATCA QR code string for an invoice")
+    fun getInvoiceQrCode(
+        @PathVariable invoiceId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<Map<String, String>> {
+        val claims = authentication.pulseContext()
+        val orgId = resolveOrgId(claims.requireOrganizationId())
+        val invoice = invoiceService.findByPublicIdAndOrgId(invoiceId, orgId)
+
+        val qrCode =
+            invoice.zatcaQrCode
+                ?: throw ArenaException(
+                    HttpStatus.NOT_FOUND,
+                    "resource-not-found",
+                    "QR code not yet generated for this invoice.",
+                )
+
+        return ResponseEntity.ok(mapOf("qrCode" to qrCode))
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private fun resolveMember(

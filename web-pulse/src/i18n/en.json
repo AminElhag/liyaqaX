@@ -205,6 +205,31 @@
       "action": "Action"
     }
   },
+  "invoice": {
+    "title": "Invoice",
+    "number": "Invoice number",
+    "date": "Invoice date and time",
+    "sellerName": "Seller name",
+    "vatNumber": "VAT registration number",
+    "buyerName": "Buyer name",
+    "description": "Description of supply",
+    "subtotal": "Subtotal (excl. VAT)",
+    "vatRate": "VAT rate",
+    "vatAmount": "VAT amount",
+    "total": "Total (incl. VAT)",
+    "paymentMethod": "Payment method",
+    "qrCode": "QR code",
+    "print": "Print invoice",
+    "noQr": "QR code not yet generated",
+    "counter": "Invoice counter",
+    "zatcaStatus": {
+      "pending": "Pending",
+      "generated": "Generated",
+      "submitted": "Submitted",
+      "accepted": "Accepted",
+      "rejected": "Rejected"
+    }
+  },
   "common": {
     "active": "Active",
     "inactive": "Inactive",
