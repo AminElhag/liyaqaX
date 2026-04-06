@@ -662,3 +662,90 @@ export interface UpdateLeadSourceRequest {
   color?: string
   displayOrder?: number
 }
+
+// ── Cash Drawer ────────────────────────────────────────────────────────────
+
+export interface MoneyValue {
+  halalas: number
+  sar: string
+}
+
+export interface CashDrawerStaffSummary {
+  id: string
+  firstName: string
+  lastName: string
+}
+
+export interface CashDrawerBranchSummary {
+  id: string
+  name: string
+}
+
+export type CashDrawerSessionStatus = 'open' | 'closed' | 'reconciled'
+export type CashDrawerEntryType = 'cash_in' | 'cash_out' | 'float_adjustment'
+export type ReconciliationStatus = 'approved' | 'flagged'
+
+export interface CashDrawerSession {
+  id: string
+  status: CashDrawerSessionStatus
+  branch: CashDrawerBranchSummary
+  openedBy: CashDrawerStaffSummary
+  closedBy: CashDrawerStaffSummary | null
+  reconciledBy: CashDrawerStaffSummary | null
+  openingFloat: MoneyValue
+  countedClosing: MoneyValue | null
+  expectedClosing: MoneyValue | null
+  difference: MoneyValue | null
+  reconciliationStatus: ReconciliationStatus | null
+  reconciliationNotes: string | null
+  openedAt: string
+  closedAt: string | null
+  reconciledAt: string | null
+  totalCashIn: MoneyValue
+  totalCashOut: MoneyValue
+  entryCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CashDrawerSessionSummary {
+  id: string
+  status: CashDrawerSessionStatus
+  branch: CashDrawerBranchSummary
+  openedBy: CashDrawerStaffSummary
+  openingFloat: MoneyValue
+  difference: MoneyValue | null
+  reconciliationStatus: ReconciliationStatus | null
+  openedAt: string
+  closedAt: string | null
+}
+
+export interface CashDrawerEntry {
+  id: string
+  entryType: CashDrawerEntryType
+  amount: MoneyValue
+  description: string
+  paymentId: string | null
+  recordedBy: CashDrawerStaffSummary
+  recordedAt: string
+}
+
+export interface OpenSessionRequest {
+  openingFloatHalalas: number
+}
+
+export interface CloseSessionRequest {
+  countedClosingHalalas: number
+}
+
+export interface ReconcileSessionRequest {
+  reconciliationStatus: ReconciliationStatus
+  reconciliationNotes?: string
+}
+
+export interface CreateEntryRequest {
+  entryType: CashDrawerEntryType
+  amountHalalas: number
+  description: string
+  paymentId?: string
+}

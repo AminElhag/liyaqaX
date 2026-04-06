@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { key: 'pt', to: '/pt', icon: '◆' },
   { key: 'gx', to: '/gx', icon: '○' },
   { key: 'leads', to: '/leads', icon: '◐' },
+  { key: 'cash_drawer', to: '/cash-drawer', icon: '◧' },
   { key: 'reports', to: '/reports', icon: '◑' },
   { key: 'settings', to: '/settings', icon: '◒' },
 ]

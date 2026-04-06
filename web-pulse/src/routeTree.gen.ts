@@ -19,6 +19,7 @@ import { Route as MembersIndexRouteImport } from './routes/members/index'
 import { Route as LeadsIndexRouteImport } from './routes/leads/index'
 import { Route as GxIndexRouteImport } from './routes/gx/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
+import { Route as CashDrawerIndexRouteImport } from './routes/cash-drawer/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
 import { Route as SettingsLeadSourcesRouteImport } from './routes/settings/lead-sources'
 import { Route as ReportsUtilizationRouteImport } from './routes/reports/utilization'
@@ -37,6 +38,8 @@ import { Route as FinanceInvoicesRouteImport } from './routes/finance/invoices'
 import { Route as FinanceExpensesRouteImport } from './routes/finance/expenses'
 import { Route as FinanceDebtsRouteImport } from './routes/finance/debts'
 import { Route as FinanceCashDrawerRouteImport } from './routes/finance/cash-drawer'
+import { Route as CashDrawerHistoryRouteImport } from './routes/cash-drawer/history'
+import { Route as CashDrawerSessionIdRouteImport } from './routes/cash-drawer/$sessionId'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as MembersMemberIdPtRouteImport } from './routes/members/$memberId.pt'
 import { Route as MembersMemberIdPaymentsRouteImport } from './routes/members/$memberId.payments'
@@ -93,6 +96,11 @@ const GxIndexRoute = GxIndexRouteImport.update({
 const FinanceIndexRoute = FinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CashDrawerIndexRoute = CashDrawerIndexRouteImport.update({
+  id: '/cash-drawer/',
+  path: '/cash-drawer/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StaffStaffIdRoute = StaffStaffIdRouteImport.update({
@@ -185,6 +193,16 @@ const FinanceCashDrawerRoute = FinanceCashDrawerRouteImport.update({
   path: '/finance/cash-drawer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CashDrawerHistoryRoute = CashDrawerHistoryRouteImport.update({
+  id: '/cash-drawer/history',
+  path: '/cash-drawer/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CashDrawerSessionIdRoute = CashDrawerSessionIdRouteImport.update({
+  id: '/cash-drawer/$sessionId',
+  path: '/cash-drawer/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
@@ -226,6 +244,8 @@ const MembersMemberIdBodyMetricsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth/login': typeof AuthLoginRoute
+  '/cash-drawer/$sessionId': typeof CashDrawerSessionIdRoute
+  '/cash-drawer/history': typeof CashDrawerHistoryRoute
   '/finance/cash-drawer': typeof FinanceCashDrawerRoute
   '/finance/debts': typeof FinanceDebtsRoute
   '/finance/expenses': typeof FinanceExpensesRoute
@@ -244,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
+  '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/gx/': typeof GxIndexRoute
   '/leads/': typeof LeadsIndexRoute
@@ -263,6 +284,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth/login': typeof AuthLoginRoute
+  '/cash-drawer/$sessionId': typeof CashDrawerSessionIdRoute
+  '/cash-drawer/history': typeof CashDrawerHistoryRoute
   '/finance/cash-drawer': typeof FinanceCashDrawerRoute
   '/finance/debts': typeof FinanceDebtsRoute
   '/finance/expenses': typeof FinanceExpensesRoute
@@ -281,6 +304,7 @@ export interface FileRoutesByTo {
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
+  '/cash-drawer': typeof CashDrawerIndexRoute
   '/finance': typeof FinanceIndexRoute
   '/gx': typeof GxIndexRoute
   '/leads': typeof LeadsIndexRoute
@@ -301,6 +325,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth/login': typeof AuthLoginRoute
+  '/cash-drawer/$sessionId': typeof CashDrawerSessionIdRoute
+  '/cash-drawer/history': typeof CashDrawerHistoryRoute
   '/finance/cash-drawer': typeof FinanceCashDrawerRoute
   '/finance/debts': typeof FinanceDebtsRoute
   '/finance/expenses': typeof FinanceExpensesRoute
@@ -319,6 +345,7 @@ export interface FileRoutesById {
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
+  '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/gx/': typeof GxIndexRoute
   '/leads/': typeof LeadsIndexRoute
@@ -340,6 +367,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth/login'
+    | '/cash-drawer/$sessionId'
+    | '/cash-drawer/history'
     | '/finance/cash-drawer'
     | '/finance/debts'
     | '/finance/expenses'
@@ -358,6 +387,7 @@ export interface FileRouteTypes {
     | '/reports/utilization'
     | '/settings/lead-sources'
     | '/staff/$staffId'
+    | '/cash-drawer/'
     | '/finance/'
     | '/gx/'
     | '/leads/'
@@ -377,6 +407,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth/login'
+    | '/cash-drawer/$sessionId'
+    | '/cash-drawer/history'
     | '/finance/cash-drawer'
     | '/finance/debts'
     | '/finance/expenses'
@@ -395,6 +427,7 @@ export interface FileRouteTypes {
     | '/reports/utilization'
     | '/settings/lead-sources'
     | '/staff/$staffId'
+    | '/cash-drawer'
     | '/finance'
     | '/gx'
     | '/leads'
@@ -414,6 +447,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth/login'
+    | '/cash-drawer/$sessionId'
+    | '/cash-drawer/history'
     | '/finance/cash-drawer'
     | '/finance/debts'
     | '/finance/expenses'
@@ -432,6 +467,7 @@ export interface FileRouteTypes {
     | '/reports/utilization'
     | '/settings/lead-sources'
     | '/staff/$staffId'
+    | '/cash-drawer/'
     | '/finance/'
     | '/gx/'
     | '/leads/'
@@ -452,6 +488,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthLoginRoute: typeof AuthLoginRoute
+  CashDrawerSessionIdRoute: typeof CashDrawerSessionIdRoute
+  CashDrawerHistoryRoute: typeof CashDrawerHistoryRoute
   FinanceCashDrawerRoute: typeof FinanceCashDrawerRoute
   FinanceDebtsRoute: typeof FinanceDebtsRoute
   FinanceExpensesRoute: typeof FinanceExpensesRoute
@@ -470,6 +508,7 @@ export interface RootRouteChildren {
   ReportsUtilizationRoute: typeof ReportsUtilizationRoute
   SettingsLeadSourcesRoute: typeof SettingsLeadSourcesRoute
   StaffStaffIdRoute: typeof StaffStaffIdRoute
+  CashDrawerIndexRoute: typeof CashDrawerIndexRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   GxIndexRoute: typeof GxIndexRoute
   LeadsIndexRoute: typeof LeadsIndexRoute
@@ -551,6 +590,13 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance/'
       preLoaderRoute: typeof FinanceIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cash-drawer/': {
+      id: '/cash-drawer/'
+      path: '/cash-drawer'
+      fullPath: '/cash-drawer/'
+      preLoaderRoute: typeof CashDrawerIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/staff/$staffId': {
@@ -679,6 +725,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceCashDrawerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cash-drawer/history': {
+      id: '/cash-drawer/history'
+      path: '/cash-drawer/history'
+      fullPath: '/cash-drawer/history'
+      preLoaderRoute: typeof CashDrawerHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cash-drawer/$sessionId': {
+      id: '/cash-drawer/$sessionId'
+      path: '/cash-drawer/$sessionId'
+      fullPath: '/cash-drawer/$sessionId'
+      preLoaderRoute: typeof CashDrawerSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/login': {
       id: '/auth/login'
       path: '/auth/login'
@@ -756,6 +816,8 @@ const MembersMemberIdRouteWithChildren = MembersMemberIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthLoginRoute: AuthLoginRoute,
+  CashDrawerSessionIdRoute: CashDrawerSessionIdRoute,
+  CashDrawerHistoryRoute: CashDrawerHistoryRoute,
   FinanceCashDrawerRoute: FinanceCashDrawerRoute,
   FinanceDebtsRoute: FinanceDebtsRoute,
   FinanceExpensesRoute: FinanceExpensesRoute,
@@ -774,6 +836,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsUtilizationRoute: ReportsUtilizationRoute,
   SettingsLeadSourcesRoute: SettingsLeadSourcesRoute,
   StaffStaffIdRoute: StaffStaffIdRoute,
+  CashDrawerIndexRoute: CashDrawerIndexRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   GxIndexRoute: GxIndexRoute,
   LeadsIndexRoute: LeadsIndexRoute,

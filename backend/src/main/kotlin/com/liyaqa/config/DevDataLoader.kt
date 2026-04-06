@@ -2,6 +2,10 @@ package com.liyaqa.config
 
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
+import com.liyaqa.cashdrawer.CashDrawerEntry
+import com.liyaqa.cashdrawer.CashDrawerEntryRepository
+import com.liyaqa.cashdrawer.CashDrawerSession
+import com.liyaqa.cashdrawer.CashDrawerSessionRepository
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.gx.GXBooking
@@ -101,6 +105,8 @@ class DevDataLoader(
     private val gxBookingRepository: GXBookingRepository,
     private val leadSourceRepository: LeadSourceRepository,
     private val leadRepository: LeadRepository,
+    private val cashDrawerSessionRepository: CashDrawerSessionRepository,
+    private val cashDrawerEntryRepository: CashDrawerEntryRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -181,7 +187,8 @@ class DevDataLoader(
             PermissionConstants.LEAD_SOURCE_CREATE, PermissionConstants.LEAD_SOURCE_READ,
             PermissionConstants.LEAD_SOURCE_UPDATE,
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
-            PermissionConstants.CASH_DRAWER_READ, PermissionConstants.BRANCH_READ,
+            PermissionConstants.CASH_DRAWER_READ, PermissionConstants.CASH_DRAWER_ENTRY_CREATE,
+            PermissionConstants.CASH_DRAWER_RECONCILE, PermissionConstants.BRANCH_READ,
         )
 
     private val clubBranchManager =
@@ -205,7 +212,8 @@ class DevDataLoader(
             PermissionConstants.LEAD_CREATE, PermissionConstants.LEAD_READ,
             PermissionConstants.LEAD_SOURCE_READ,
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
-            PermissionConstants.CASH_DRAWER_READ, PermissionConstants.BRANCH_READ,
+            PermissionConstants.CASH_DRAWER_READ, PermissionConstants.CASH_DRAWER_ENTRY_CREATE,
+            PermissionConstants.BRANCH_READ,
         )
 
     private val clubSalesAgent =
@@ -284,11 +292,12 @@ class DevDataLoader(
         seedGXClasses(org, club, riyadhBranch, users, member)
         val staffByEmail = staffMemberRepository.findAll().associateBy { userRepository.findById(it.userId).get().email }
         seedLeads(org, club, riyadhBranch, staffByEmail)
+        seedCashDrawer(org, club, riyadhBranch, staffByEmail)
 
         log.info(
             "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
                 "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, " +
-                "1 booking, 4 lead sources, 3 leads.",
+                "1 booking, 4 lead sources, 3 leads, 1 cash drawer session with 4 entries.",
             users.size,
             permissions.size,
             roles.size,
@@ -1115,6 +1124,88 @@ class DevDataLoader(
                 stage = "interested",
                 contactedAt = Instant.now(),
                 interestedAt = Instant.now(),
+            ),
+        )
+    }
+
+    // ── Cash Drawer ─────────────────────────────────────────────────────────
+
+    private fun seedCashDrawer(
+        org: Organization,
+        club: Club,
+        riyadhBranch: Branch,
+        staffByEmail: Map<String, StaffMember>,
+    ) {
+        val receptionStaff = staffByEmail["reception@elixir.com"] ?: return
+        val managerStaff = staffByEmail["manager@elixir.com"] ?: return
+
+        val yesterday8am =
+            LocalDate.now().minusDays(1)
+                .atTime(8, 0)
+                .atZone(java.time.ZoneId.of("Asia/Riyadh"))
+                .toInstant()
+        val yesterday6pm =
+            LocalDate.now().minusDays(1)
+                .atTime(18, 0)
+                .atZone(java.time.ZoneId.of("Asia/Riyadh"))
+                .toInstant()
+
+        val session =
+            cashDrawerSessionRepository.save(
+                CashDrawerSession(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = riyadhBranch.id,
+                    openedByStaffId = receptionStaff.id,
+                    closedByStaffId = receptionStaff.id,
+                    reconciledByStaffId = managerStaff.id,
+                    status = "reconciled",
+                    openingFloatHalalas = 50000,
+                    countedClosingHalalas = 87500,
+                    expectedClosingHalalas = 107000,
+                    differenceHalalas = -19500,
+                    reconciliationStatus = "approved",
+                    reconciliationNotes = "Small surplus, acceptable",
+                    openedAt = yesterday8am,
+                    closedAt = yesterday6pm,
+                    reconciledAt = yesterday6pm,
+                ),
+            )
+
+        cashDrawerEntryRepository.saveAll(
+            listOf(
+                CashDrawerEntry(
+                    sessionId = session.id,
+                    staffId = receptionStaff.id,
+                    entryType = "cash_in",
+                    amountHalalas = 15000,
+                    description = "Membership payment — Ahmed Al-Rashidi",
+                    recordedAt = yesterday8am.plusSeconds(3600),
+                ),
+                CashDrawerEntry(
+                    sessionId = session.id,
+                    staffId = receptionStaff.id,
+                    entryType = "cash_in",
+                    amountHalalas = 36000,
+                    description = "PT package payment — Ahmed Al-Rashidi",
+                    recordedAt = yesterday8am.plusSeconds(7200),
+                ),
+                CashDrawerEntry(
+                    sessionId = session.id,
+                    staffId = receptionStaff.id,
+                    entryType = "cash_out",
+                    amountHalalas = 4000,
+                    description = "Cleaning supplies",
+                    recordedAt = yesterday8am.plusSeconds(14400),
+                ),
+                CashDrawerEntry(
+                    sessionId = session.id,
+                    staffId = receptionStaff.id,
+                    entryType = "cash_in",
+                    amountHalalas = 10000,
+                    description = "Walk-in day pass",
+                    recordedAt = yesterday8am.plusSeconds(21600),
+                ),
             ),
         )
     }
