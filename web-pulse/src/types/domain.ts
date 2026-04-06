@@ -11,6 +11,37 @@ export interface RoleSummary {
   nameEn: string
 }
 
+/** Role list item returned by GET /api/v1/roles */
+export interface RoleListItem {
+  id: string
+  nameAr: string
+  nameEn: string
+  description: string | null
+  scope: string
+  isSystem: boolean
+  permissionCount: number
+  staffCount: number
+}
+
+/** Role detail returned by GET /api/v1/roles/:id */
+export interface RoleDetail {
+  id: string
+  nameAr: string
+  nameEn: string
+  description: string | null
+  scope: string
+  isSystem: boolean
+  permissions: PermissionItem[]
+  staffCount: number
+}
+
+/** Permission item */
+export interface PermissionItem {
+  id: string
+  code: string
+  description: string | null
+}
+
 /** Branch summary embedded in staff responses */
 export interface BranchSummary {
   id: string

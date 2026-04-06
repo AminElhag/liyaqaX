@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.home', to: '/', permission: Permission.PLATFORM_STATS_VIEW },
   { labelKey: 'nav.organizations', to: '/organizations', permission: Permission.ORGANIZATION_READ },
   { labelKey: 'nav.members', to: '/members', permission: Permission.MEMBER_READ },
+  { labelKey: 'nav.roles', to: '/roles', permission: Permission.ROLE_READ },
   { labelKey: 'nav.audit', to: '/audit', permission: Permission.AUDIT_READ },
 ]
 

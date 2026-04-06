@@ -28,4 +28,16 @@ interface RolePermissionRepository : JpaRepository<RolePermission, Long> {
     fun findPermissionCodesByRolePublicId(
         @Param("rolePublicId") rolePublicId: UUID,
     ): List<String>
+
+    fun countByRoleId(roleId: Long): Long
+
+    fun findByRoleIdAndPermissionId(
+        roleId: Long,
+        permissionId: Long,
+    ): RolePermission?
+
+    fun deleteByRoleIdAndPermissionId(
+        roleId: Long,
+        permissionId: Long,
+    )
 }

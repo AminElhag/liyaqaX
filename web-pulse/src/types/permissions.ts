@@ -87,7 +87,10 @@ export const Permission = {
   CASH_DRAWER_RECONCILE: 'cash-drawer:reconcile',
 
   // Role management
+  ROLE_CREATE: 'role:create',
   ROLE_READ: 'role:read',
+  ROLE_UPDATE: 'role:update',
+  ROLE_DELETE: 'role:delete',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

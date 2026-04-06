@@ -15,6 +15,10 @@ export const Permission = {
   MEMBER_READ: 'member:read',
   PLATFORM_STATS_VIEW: 'platform:stats:view',
   AUDIT_READ: 'audit:read',
+  ROLE_CREATE: 'role:create',
+  ROLE_READ: 'role:read',
+  ROLE_UPDATE: 'role:update',
+  ROLE_DELETE: 'role:delete',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

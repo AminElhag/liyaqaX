@@ -21,4 +21,15 @@ interface RoleRepository : JpaRepository<Role, Long> {
         organizationId: Long,
         clubId: Long,
     ): Optional<Role>
+
+    fun findByNameEnAndScopeAndDeletedAtIsNull(
+        nameEn: String,
+        scope: String,
+    ): Optional<Role>
+
+    fun findByNameEnAndScopeAndClubIdAndDeletedAtIsNull(
+        nameEn: String,
+        scope: String,
+        clubId: Long,
+    ): Optional<Role>
 }

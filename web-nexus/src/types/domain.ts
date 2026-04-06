@@ -131,6 +131,37 @@ export interface PlatformStats {
   generatedAt: string
 }
 
+/** Role list item returned by GET /api/v1/nexus/roles */
+export interface RoleListItem {
+  id: string
+  nameAr: string
+  nameEn: string
+  description: string | null
+  scope: string
+  isSystem: boolean
+  permissionCount: number
+  staffCount: number
+}
+
+/** Role detail returned by GET /api/v1/nexus/roles/:id */
+export interface RoleDetail {
+  id: string
+  nameAr: string
+  nameEn: string
+  description: string | null
+  scope: string
+  isSystem: boolean
+  permissions: PermissionItem[]
+  staffCount: number
+}
+
+/** Permission item */
+export interface PermissionItem {
+  id: string
+  code: string
+  description: string | null
+}
+
 /** Audit log entry */
 export interface AuditLogEntry {
   id: string

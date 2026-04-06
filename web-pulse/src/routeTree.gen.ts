@@ -43,6 +43,8 @@ import { Route as FinanceCashDrawerRouteImport } from './routes/finance/cash-dra
 import { Route as CashDrawerHistoryRouteImport } from './routes/cash-drawer/history'
 import { Route as CashDrawerSessionIdRouteImport } from './routes/cash-drawer/$sessionId'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as SettingsRolesIndexRouteImport } from './routes/settings/roles/index'
+import { Route as SettingsRolesRoleIdRouteImport } from './routes/settings/roles/$roleId'
 import { Route as MembersMemberIdPtRouteImport } from './routes/members/$memberId.pt'
 import { Route as MembersMemberIdPaymentsRouteImport } from './routes/members/$memberId.payments'
 import { Route as MembersMemberIdOverviewRouteImport } from './routes/members/$memberId.overview'
@@ -220,6 +222,16 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   path: '/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRolesIndexRoute = SettingsRolesIndexRouteImport.update({
+  id: '/settings/roles/',
+  path: '/settings/roles/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRolesRoleIdRoute = SettingsRolesRoleIdRouteImport.update({
+  id: '/settings/roles/$roleId',
+  path: '/settings/roles/$roleId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MembersMemberIdPtRoute = MembersMemberIdPtRouteImport.update({
   id: '/pt',
   path: '/pt',
@@ -294,6 +306,8 @@ export interface FileRoutesByFullPath {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/settings/roles/': typeof SettingsRolesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -336,6 +350,8 @@ export interface FileRoutesByTo {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/settings/roles': typeof SettingsRolesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -379,6 +395,8 @@ export interface FileRoutesById {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/settings/roles/': typeof SettingsRolesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -423,6 +441,8 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/settings/roles/$roleId'
+    | '/settings/roles/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -465,6 +485,8 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/settings/roles/$roleId'
+    | '/settings/roles'
   id:
     | '__root__'
     | '/'
@@ -507,6 +529,8 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/settings/roles/$roleId'
+    | '/settings/roles/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -544,6 +568,8 @@ export interface RootRouteChildren {
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   StaffIndexRoute: typeof StaffIndexRoute
+  SettingsRolesRoleIdRoute: typeof SettingsRolesRoleIdRoute
+  SettingsRolesIndexRoute: typeof SettingsRolesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -786,6 +812,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/roles/': {
+      id: '/settings/roles/'
+      path: '/settings/roles'
+      fullPath: '/settings/roles/'
+      preLoaderRoute: typeof SettingsRolesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/roles/$roleId': {
+      id: '/settings/roles/$roleId'
+      path: '/settings/roles/$roleId'
+      fullPath: '/settings/roles/$roleId'
+      preLoaderRoute: typeof SettingsRolesRoleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/members/$memberId/pt': {
       id: '/members/$memberId/pt'
       path: '/pt'
@@ -888,6 +928,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   StaffIndexRoute: StaffIndexRoute,
+  SettingsRolesRoleIdRoute: SettingsRolesRoleIdRoute,
+  SettingsRolesIndexRoute: SettingsRolesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

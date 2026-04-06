@@ -45,7 +45,12 @@
       "employmentType": "Employment type",
       "joinedAt": "Joined",
       "branches": "Branches",
-      "notFound": "Staff member not found"
+      "notFound": "Staff member not found",
+      "changeRole": "Change Role",
+      "selectRole": "Select a role...",
+      "changeRoleConfirm": "Are you sure you want to change this staff member's role?",
+      "confirmRole": "Confirm",
+      "roleUpdated": "Role updated. Staff member will see the new permissions on their next login."
     }
   },
   "members": {
@@ -435,6 +440,25 @@
       "surpluses": "Surpluses",
       "reconciliation": "Reconciliation Rate"
     }
+  },
+  "roles": {
+    "title": "Club Roles",
+    "new": "New Role",
+    "name": "Role Name",
+    "permissions": "Permissions",
+    "staff_count": "Staff",
+    "system_badge": "System",
+    "detail": "Role Detail",
+    "permissions_section": "Permissions",
+    "save_permissions": "Save All",
+    "permissions_updated": "Permissions updated. Changes take effect within 5 minutes for active sessions.",
+    "delete": "Delete Role",
+    "delete_confirm": "Are you sure you want to delete this role?",
+    "deleted": "Role deleted",
+    "created": "Role created",
+    "updated": "Role updated",
+    "name_placeholder": "Enter role name",
+    "empty": "No roles found"
   },
   "language": {
     "ar": "العربية",

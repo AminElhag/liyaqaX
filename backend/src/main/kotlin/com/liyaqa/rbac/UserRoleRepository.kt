@@ -13,4 +13,11 @@ interface UserRoleRepository : JpaRepository<UserRole, Long> {
 
     @Transactional
     fun deleteByUserId(userId: Long)
+
+    fun countByRoleId(roleId: Long): Long
+
+    fun findByUserIdAndRoleId(
+        userId: Long,
+        roleId: Long,
+    ): Optional<UserRole>
 }

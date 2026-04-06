@@ -45,7 +45,12 @@
       "employmentType": "نوع التوظيف",
       "joinedAt": "تاريخ الانضمام",
       "branches": "الفروع",
-      "notFound": "الموظف غير موجود"
+      "notFound": "الموظف غير موجود",
+      "changeRole": "تغيير الدور",
+      "selectRole": "اختر دورًا...",
+      "changeRoleConfirm": "هل أنت متأكد من تغيير دور هذا الموظف؟",
+      "confirmRole": "تأكيد",
+      "roleUpdated": "تم تحديث الدور. سيرى الموظف الصلاحيات الجديدة عند تسجيل الدخول التالي."
     }
   },
   "members": {
@@ -435,6 +440,25 @@
       "surpluses": "الفائض",
       "reconciliation": "معدل المراجعة"
     }
+  },
+  "roles": {
+    "title": "أدوار النادي",
+    "new": "دور جديد",
+    "name": "اسم الدور",
+    "permissions": "الصلاحيات",
+    "staff_count": "الموظفون",
+    "system_badge": "نظام",
+    "detail": "تفاصيل الدور",
+    "permissions_section": "الصلاحيات",
+    "save_permissions": "حفظ الكل",
+    "permissions_updated": "تم تحديث الصلاحيات. ستسري التغييرات خلال 5 دقائق للجلسات النشطة.",
+    "delete": "حذف الدور",
+    "delete_confirm": "هل أنت متأكد من حذف هذا الدور؟",
+    "deleted": "تم حذف الدور",
+    "created": "تم إنشاء الدور",
+    "updated": "تم تحديث الدور",
+    "name_placeholder": "أدخل اسم الدور",
+    "empty": "لا توجد أدوار"
   },
   "language": {
     "ar": "العربية",
