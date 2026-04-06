@@ -348,7 +348,7 @@ The data model follows: **Organization → Club → Branch**
 
 - Docker + Docker Compose
 - JDK 21+ (shared by backend and KMP mobile shared module)
-- Node.js 20+ — use **pnpm** as the package manager (not npm, not yarn)
+- Node.js 20+ — use **npm** as the package manager (not pnpm, not yarn)
 - **Mobile only**: Android Studio (latest stable) with the Kotlin Multiplatform plugin
 - **Mobile only**: Xcode 15+ (macOS only, required for iOS builds)
 - **Mobile only**: CocoaPods (`sudo gem install cocoapods`) for iOS dependency resolution
@@ -360,10 +360,10 @@ cp .env.example .env           # fill in required values
 docker compose up -d           # start PostgreSQL, Redis, and local dependencies
 cd backend && ./gradlew flywayMigrate
 cd backend && ./gradlew bootRun
-cd web-nexus  && pnpm install && pnpm dev
-cd web-pulse  && pnpm install && pnpm dev
-cd web-coach  && pnpm install && pnpm dev
-cd web-arena  && pnpm install && pnpm dev
+cd web-nexus  && npm install && npm run dev
+cd web-pulse  && npm install && npm run dev
+cd web-coach  && npm install && npm run dev
+cd web-arena  && npm install && npm run dev
 # Mobile — init submodule first if not done
 git submodule update --init --recursive
 cd mobile-arena/iosApp && pod install   # macOS only
@@ -392,11 +392,11 @@ cd mobile-arena/iosApp && pod install   # macOS only
 | `./gradlew :shared:test` | `mobile-arena/` | Run shared module unit tests |
 | `./gradlew :androidApp:assembleDebug` | `mobile-arena/` | Build Android debug APK |
 | `./gradlew :shared:iosArm64Test` | `mobile-arena/` | Run shared tests targeting iOS sim |
-| `pnpm dev` | `web-*/` | Start Vite dev server |
-| `pnpm build` | `web-*/` | Production build |
-| `pnpm test` | `web-*/` | Run Vitest |
-| `pnpm typecheck` | `web-*/` | TypeScript check (no emit) |
-| `pnpm lint` | `web-*/` | ESLint |
+| `npm run dev` | `web-*/` | Start Vite dev server |
+| `npm run build` | `web-*/` | Production build |
+| `npm test` | `web-*/` | Run Vitest |
+| `npm run typecheck` | `web-*/` | TypeScript check (no emit) |
+| `npm run lint` | `web-*/` | ESLint |
 | `docker compose up -d` | root | Start all infrastructure |
 | `docker compose down -v` | root | Stop and wipe all volumes |
 
@@ -411,7 +411,7 @@ Every push to any branch triggers this pipeline. All steps must be green before 
 2. Build                ← compile backend; typecheck all frontends
 3. Lint                 ← ESLint (frontends), ktlint (backend)
 4. Test                 ← full test suite (Gradle + Vitest)
-5. Security scan        ← OWASP dependency check, pnpm audit
+5. Security scan        ← OWASP dependency check, npm audit
 6. Build Docker images  ← only on develop and main
 7. Deploy to staging    ← only on develop (automatic)
 8. Deploy to production ← only on main (requires manual approval)
@@ -447,8 +447,8 @@ These are hard requirements — not guidelines. CI enforces them.
 - Shared module compiles for all targets: `androidTarget`, `iosArm64`, `iosSimulatorArm64`, `iosX64`.
 - No platform-specific imports (`android.*`, `UIKit`, `Foundation`) anywhere inside `shared/`. Violations break the build.
 - No business logic inside `androidApp/` or `iosApp/`. UI and DI wiring only.
-- `pnpm lint` passes with zero ESLint errors.
-- `pnpm test` passes with zero failures.
+- `npm run lint` passes with zero ESLint errors.
+- `npm test` passes with zero failures.
 - No `any` type usage (`@typescript-eslint/no-explicit-any: error`).
 
 ---
