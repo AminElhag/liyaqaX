@@ -3,6 +3,8 @@ package com.liyaqa.arena
 import com.liyaqa.arena.dto.GxBookingResponse
 import com.liyaqa.arena.dto.GxClassTypeSummary
 import com.liyaqa.arena.dto.GxScheduleItemResponse
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.gx.GXBooking
 import com.liyaqa.gx.GXBookingRepository
@@ -43,6 +45,7 @@ class GxArenaController(
     private val memberRepository: MemberRepository,
     private val trainerRepository: TrainerRepository,
     private val portalSettingsService: ClubPortalSettingsService,
+    private val auditService: AuditService,
 ) {
     @GetMapping("/schedule")
     @Operation(summary = "Get upcoming GX class schedule for the next 7 days")
@@ -145,6 +148,12 @@ class GxArenaController(
                 ),
             )
 
+        auditService.logFromContext(
+            action = AuditAction.GX_BOOKED,
+            entityType = "GXBooking",
+            entityId = booking.publicId.toString(),
+        )
+
         return ResponseEntity.status(HttpStatus.CREATED).body(toBookingResponse(booking, instance, member))
     }
 
@@ -178,6 +187,12 @@ class GxArenaController(
 
         instance.bookingsCount = (instance.bookingsCount - 1).coerceAtLeast(0)
         classInstanceRepository.save(instance)
+
+        auditService.logFromContext(
+            action = AuditAction.GX_BOOKING_CANCELLED,
+            entityType = "GXBooking",
+            entityId = booking.publicId.toString(),
+        )
 
         return ResponseEntity.noContent().build()
     }

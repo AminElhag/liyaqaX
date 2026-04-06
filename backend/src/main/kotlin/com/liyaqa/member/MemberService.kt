@@ -1,5 +1,7 @@
 package com.liyaqa.member
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
@@ -48,6 +50,7 @@ class MemberService(
     private val staffMemberRepository: StaffMemberRepository,
     private val trainerRepository: TrainerRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val auditService: AuditService,
 ) {
     @Transactional
     fun create(
@@ -145,6 +148,12 @@ class MemberService(
 
         val hasSignedWaiver = checkWaiverSigned(member.id, club.id)
 
+        auditService.logFromContext(
+            action = AuditAction.MEMBER_CREATED,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+        )
+
         return member.toResponse(
             user = user,
             branch = branch,
@@ -229,6 +238,12 @@ class MemberService(
 
         memberRepository.save(member)
 
+        auditService.logFromContext(
+            action = AuditAction.MEMBER_UPDATED,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+        )
+
         val user = findUserByIdOrThrow(member.userId)
         val branch = findBranchByIdOrThrow(member.branchId)
         val contacts = emergencyContactRepository.findAllByMemberIdAndOrganizationId(member.id, org.id)
@@ -261,6 +276,12 @@ class MemberService(
 
         member.softDelete()
         memberRepository.save(member)
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBER_DELETED,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+        )
     }
 
     // ── Emergency contact operations ─────────────────────────────────────────

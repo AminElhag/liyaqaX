@@ -1,5 +1,7 @@
 package com.liyaqa.coach
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.coach.dto.MarkPtAttendanceRequest
 import com.liyaqa.coach.dto.PtSessionCoachResponse
 import com.liyaqa.common.exception.ArenaException
@@ -38,6 +40,7 @@ class PtCoachController(
     private val ptPackageRepository: PTPackageRepository,
     private val ptPackageCatalogRepository: PTPackageCatalogRepository,
     private val memberRepository: MemberRepository,
+    private val auditService: AuditService,
 ) {
     @GetMapping("/sessions")
     @Operation(summary = "Get PT sessions for this trainer (upcoming or past)")
@@ -141,6 +144,13 @@ class PtCoachController(
 
         session.sessionStatus = request.status
         ptSessionRepository.save(session)
+
+        auditService.logFromContext(
+            action = AuditAction.PT_ATTENDANCE_MARKED,
+            entityType = "PTSession",
+            entityId = session.publicId.toString(),
+            changesJson = """{"status":"${request.status}"}""",
+        )
 
         val member = memberRepository.findById(session.memberId).orElse(null)
         val pkg = ptPackageRepository.findById(session.packageId).orElse(null)

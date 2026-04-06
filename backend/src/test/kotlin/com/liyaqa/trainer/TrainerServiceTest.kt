@@ -1,5 +1,6 @@
 package com.liyaqa.trainer
 
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
@@ -56,6 +57,8 @@ class TrainerServiceTest {
     @Mock lateinit var staffMemberRepository: StaffMemberRepository
 
     @Mock lateinit var passwordEncoder: PasswordEncoder
+
+    @Mock lateinit var auditService: AuditService
 
     @InjectMocks lateinit var service: TrainerService
 

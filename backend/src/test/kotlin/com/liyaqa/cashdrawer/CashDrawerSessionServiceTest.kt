@@ -1,5 +1,6 @@
 package com.liyaqa.cashdrawer
 
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.cashdrawer.dto.CloseSessionRequest
@@ -47,6 +48,8 @@ class CashDrawerSessionServiceTest {
     @Mock lateinit var clubRepository: ClubRepository
 
     @Mock lateinit var userRepository: UserRepository
+
+    @Mock lateinit var auditService: AuditService
 
     @InjectMocks lateinit var service: CashDrawerSessionService
 

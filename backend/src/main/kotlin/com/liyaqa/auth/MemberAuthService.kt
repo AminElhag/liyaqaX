@@ -1,5 +1,7 @@
 package com.liyaqa.auth
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.auth.dto.OtpMemberSummary
 import com.liyaqa.auth.dto.OtpRequestRequest
 import com.liyaqa.auth.dto.OtpVerifyRequest
@@ -27,6 +29,7 @@ class MemberAuthService(
     private val clubRepository: ClubRepository,
     private val branchRepository: BranchRepository,
     private val jwtService: JwtService,
+    private val auditService: AuditService,
 ) {
     private val log = LoggerFactory.getLogger(MemberAuthService::class.java)
     private val secureRandom = SecureRandom()
@@ -134,6 +137,16 @@ class MemberAuthService(
                 subject = member.publicId.toString(),
                 claims = claims,
             )
+
+        auditService.log(
+            action = AuditAction.MEMBER_LOGIN,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+            actorId = member.publicId.toString(),
+            actorScope = "member",
+            organizationId = org.publicId.toString(),
+            clubId = club.publicId.toString(),
+        )
 
         return OtpVerifyResponse(
             accessToken = token,

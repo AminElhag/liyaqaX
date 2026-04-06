@@ -1,5 +1,7 @@
 package com.liyaqa.membership
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.dto.PageResponse
@@ -48,6 +50,7 @@ class MembershipService(
     private val paymentRepository: PaymentRepository,
     private val paymentService: PaymentService,
     private val invoiceService: InvoiceService,
+    private val auditService: AuditService,
 ) {
     companion object {
         private val ACTIVE_STATUSES = listOf("active", "frozen")
@@ -157,6 +160,13 @@ class MembershipService(
         memberRepository.save(member)
 
         // Rule 7 — Atomicity is guaranteed by @Transactional
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBERSHIP_ASSIGNED,
+            entityType = "Membership",
+            entityId = membership.publicId.toString(),
+        )
+
         return toResponse(membership, member, plan, payment, invoice)
     }
 
@@ -309,6 +319,12 @@ class MembershipService(
         member.membershipStatus = "frozen"
         memberRepository.save(member)
 
+        auditService.logFromContext(
+            action = AuditAction.MEMBERSHIP_FROZEN,
+            entityType = "Membership",
+            entityId = membership.publicId.toString(),
+        )
+
         val payment = findPaymentForMembership(membership)
         val invoice = payment?.let { invoiceService.findByPaymentId(it.id) }
         return toResponse(membership, member, plan, payment, invoice)
@@ -381,6 +397,12 @@ class MembershipService(
         // Rule 11 — Member status sync
         member.membershipStatus = "active"
         memberRepository.save(member)
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBERSHIP_UNFROZEN,
+            entityType = "Membership",
+            entityId = membership.publicId.toString(),
+        )
 
         val payment = findPaymentForMembership(membership)
         val invoice = payment?.let { invoiceService.findByPaymentId(it.id) }
@@ -491,6 +513,12 @@ class MembershipService(
         member.membershipStatus = "active"
         memberRepository.save(member)
 
+        auditService.logFromContext(
+            action = AuditAction.MEMBERSHIP_RENEWED,
+            entityType = "Membership",
+            entityId = newMembership.publicId.toString(),
+        )
+
         return toResponse(newMembership, member, newPlan, payment, invoice)
     }
 
@@ -532,6 +560,12 @@ class MembershipService(
         // Rule 11 — Member status sync
         member.membershipStatus = "terminated"
         memberRepository.save(member)
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBERSHIP_TERMINATED,
+            entityType = "Membership",
+            entityId = membership.publicId.toString(),
+        )
 
         val payment = findPaymentForMembership(membership)
         val invoice = payment?.let { invoiceService.findByPaymentId(it.id) }

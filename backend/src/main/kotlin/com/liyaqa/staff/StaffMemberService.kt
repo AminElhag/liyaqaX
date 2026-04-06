@@ -1,5 +1,7 @@
 package com.liyaqa.staff
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
@@ -43,6 +45,7 @@ class StaffMemberService(
     private val clubRepository: ClubRepository,
     private val permissionService: PermissionService,
     private val passwordEncoder: PasswordEncoder,
+    private val auditService: AuditService,
 ) {
     @Transactional
     fun create(
@@ -115,6 +118,12 @@ class StaffMemberService(
                     organizationId = org.id,
                 )
             },
+        )
+
+        auditService.logFromContext(
+            action = AuditAction.STAFF_CREATED,
+            entityType = "Staff",
+            entityId = staff.publicId.toString(),
         )
 
         return staff.toResponse(user, targetRole, branches, org.publicId, club.publicId)
@@ -194,6 +203,12 @@ class StaffMemberService(
 
         staffMemberRepository.save(staff)
 
+        auditService.logFromContext(
+            action = AuditAction.STAFF_UPDATED,
+            entityType = "Staff",
+            entityId = staff.publicId.toString(),
+        )
+
         val user = findUserByIdOrThrow(staff.userId)
         val role = findRoleByIdOrThrow(staff.roleId)
         val branches = loadBranchesForStaff(staff.id)
@@ -230,6 +245,12 @@ class StaffMemberService(
 
         staff.softDelete()
         staffMemberRepository.save(staff)
+
+        auditService.logFromContext(
+            action = AuditAction.STAFF_DELETED,
+            entityType = "Staff",
+            entityId = staff.publicId.toString(),
+        )
     }
 
     @Transactional
