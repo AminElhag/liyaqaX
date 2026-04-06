@@ -1,258 +1,163 @@
-# PLAN.md — web-arena (Member Self-Service Portal)
+# PLAN.md — web-coach (Trainer Dashboard)
 
 ## Status
 Ready for implementation
 
 ## Branch
-feat/web-arena
+feat/web-coach
 
 ## Goal
-Build the member-facing self-service portal at web-arena (port 5176). Members
-log in with phone number + OTP, choose their preferred language on first login,
-then access their membership status, GX class bookings, PT session schedule,
-and invoice history. Each feature is individually toggled per club via
-ClubPortalSettings — the club decides what members can see and do.
+Build the trainer-facing dashboard at web-coach (port 5175). Trainers log in
+with email + password (existing auth, scope = "trainer"), then see their daily
+schedule, manage PT sessions (view, mark attendance), manage GX classes they
+instruct (view bookings, mark attendance), and view their own profile and
+certifications. Two trainer types exist: PT trainers and GX instructors — a
+trainer can be both. The app surfaces only what is relevant to their
+trainerTypes claim in the JWT.
 
 ## Context
-- `Member`, `Membership`, `MembershipPlan`, `GXClassInstance`, `GXBooking`,
-  `PTSession`, `PTPackage`, `Invoice`, `Club`, `Organization` all exist.
-- `User` entity exists — members already have a linked `User` record
-  (created by staff during member registration). This plan reuses that
-  User for auth, adding phone-based OTP login alongside the existing
-  email/password flow.
-- Redis 7 is already running — used here for OTP TTL storage.
-- web-pulse already exists as the reference implementation for app structure,
-  routing, i18n, and Tailwind usage. web-arena follows the same patterns
-  but is a fully separate Vite app in `web-arena/`.
-- JWT `scope = "member"` already defined in the auth system.
-- `ddl-auto: create-drop` in dev — no Flyway migration needed for dev.
-  New tables: `club_portal_settings`, `member_otps` (V10).
+- `Trainer`, `TrainerBranchAssignment`, `TrainerCertification` already exist.
+- `PTSession`, `PTPackage`, `PTPackageCatalog` already exist.
+- `GXClassType`, `GXClassInstance`, `GXBooking`, `GXAttendance` already exist.
+- JWT `scope = "trainer"` is already defined. Claims include `trainerId`,
+  `trainerTypes` (array: `["pt"]`, `["gx"]`, or `["pt","gx"]`), `clubId`,
+  `organizationId`, `branchIds`.
+- web-pulse is the reference implementation for app structure.
+- web-arena was just built — web-coach follows the same bootstrap pattern
+  but uses email/password login (not phone OTP) and a sidebar layout
+  (tablet/desktop-friendly) instead of a bottom nav.
+- `ddl-auto: create-drop` in dev — no Flyway migration needed.
+- No new entities required — this plan is pure read + targeted writes
+  (mark attendance only).
 
 ---
 
 ## Scope — what this plan covers
 
 ### Backend
-- [ ] `ClubPortalSettings.kt` + `ClubPortalSettingsRepository.kt`
-- [ ] `ClubPortalSettingsService.kt` — CRUD for portal feature flags
-- [ ] `MemberOtp.kt` + `MemberOtpRepository.kt` — OTP request tracking
-- [ ] `MemberAuthService.kt` — phone OTP request + verify + JWT issue
-- [ ] `MemberArenaController.kt` — member-facing auth endpoints
-- [ ] `ClubPortalSettingsPulseController.kt` — staff manage portal settings
-- [ ] `MemberProfileArenaController.kt` — profile + membership view
-- [ ] `GxArenaController.kt` — GX schedule view + booking
-- [ ] `PtArenaController.kt` — PT sessions view
-- [ ] `InvoiceArenaController.kt` — invoice list + detail
-- [ ] DTOs: request/response shapes for all arena endpoints
-- [ ] Update `DevDataLoader.kt` — seed ClubPortalSettings + member phone
-- [ ] Unit tests for `MemberAuthService`, `ClubPortalSettingsService`
-- [ ] Integration tests for all arena controllers
-- [ ] Next Flyway migration: V10
+- [ ] `TrainerAuthCoachController.kt` — login reusing existing auth, scope check
+- [ ] `TrainerProfileCoachController.kt` — trainer profile + certifications
+- [ ] `ScheduleCoachController.kt` — today's + upcoming schedule (PT + GX combined)
+- [ ] `PtCoachController.kt` — PT sessions for this trainer, mark attendance
+- [ ] `GxCoachController.kt` — GX class instances for this trainer, bookings list, mark attendance
+- [ ] `CoachAuthHelper.kt` — JWT scope/claim extraction for coach endpoints
+- [ ] DTOs for all coach endpoints
+- [ ] Unit tests: `PtCoachServiceTest`, `GxCoachServiceTest`
+- [ ] Integration tests: `ScheduleCoachControllerTest`, `PtCoachControllerTest`, `GxCoachControllerTest`
 
-### Frontend (web-arena — NEW app)
-- [ ] Bootstrap `web-arena/` Vite + React 18 + TypeScript app
-  (copy structure from web-pulse: TanStack Router, TanStack Query,
-  Zustand, React Hook Form, Zod, i18next, Tailwind)
-- [ ] Phone OTP login flow (2 screens: phone entry → OTP entry)
-- [ ] Language selection screen (shown once after first login)
-- [ ] App shell: bottom nav bar (mobile-first), header with name + avatar
-- [ ] Home / dashboard screen
-- [ ] Membership screen — current plan, expiry, freeze status
-- [ ] GX schedule screen — weekly view, book/cancel
-- [ ] PT sessions screen — upcoming + past sessions
-- [ ] Invoices screen — list + detail with QR code
-- [ ] Profile screen — view/edit name, phone, language preference
-- [ ] i18n: Arabic (default after language choice) + English
+### Frontend (web-coach — NEW app)
+- [ ] Bootstrap `web-coach/` Vite + React 18 + TypeScript app
+  (same stack as web-pulse and web-arena: TanStack Router, TanStack Query,
+  Zustand, React Hook Form, Zod, i18next, Tailwind — port 5175)
+- [ ] Email + password login (scope check: rejects non-`trainer` tokens)
+- [ ] App shell: collapsible sidebar (desktop) + top header, mobile-responsive
+- [ ] Today's schedule screen — combined PT + GX timeline view
+- [ ] PT sessions screen — list with filters (upcoming/past), mark attendance
+- [ ] GX classes screen — weekly grid, class detail with bookings list, mark attendance
+- [ ] Profile screen — trainer info, certifications list
+- [ ] i18n: Arabic (default) + English
 
 ---
 
 ## Out of scope — do not implement in this plan
-- Online payment / membership renewal (no payment gateway — club flag
-  `onlinePaymentEnabled` stored but always false until Plan 21)
-- Push notifications (no notification system yet)
-- File upload / profile photo (no file upload in this project yet)
-- Member registration self-signup (staff registers members — not self-service)
-- Password reset or email-based login for members (phone OTP only)
-- GX waitlist (separate plan)
-- PT package purchase online (separate plan)
+- Creating or editing PT sessions (staff-only in web-pulse)
+- Creating or editing GX class instances (staff-only in web-pulse)
+- Viewing member profiles or payment data (trainer has no access)
+- Trainer availability / scheduling management (future plan)
+- Push notifications
+- File upload / profile photo
+- PT package management (staff-only)
 
 ---
 
 ## Decisions already made
 
-- **Phone OTP, no SMS gateway yet**: OTP is a 6-digit code, SHA-256 hashed
-  and stored in `member_otps` table with a 10-minute expiry. In dev, the OTP
-  is logged to the console (`log.info("DEV OTP for {}: {}", phone, otp)`).
-  A `// TODO: replace with SMS gateway (Twilio/Unifonic)` comment marks the
-  send point. Max 3 active OTP requests per phone per 10 minutes (rate limit).
+- **Email + password login, not OTP**: Trainers are internal users set up by
+  staff — they already have email/password credentials created in web-pulse.
+  Reuses the existing `POST /api/v1/auth/login` endpoint. Coach app just
+  checks that the returned JWT has `scope = "trainer"` and rejects anything
+  else with "This app is for trainers only".
 
-- **OTP stored in DB, not Redis**: Redis is used for RBAC permission caching.
-  OTPs are stored in a `member_otps` table with `expires_at` — simpler,
-  auditable, and consistent with the project's DB-first approach.
+- **No new backend auth endpoint**: `/api/v1/auth/login` already issues
+  trainer-scoped JWTs. The coach app uses it directly, same as web-pulse uses
+  it for club scope.
 
-- **Language stored on Member**: `preferredLanguage VARCHAR(10)` added to
-  `members` table (`"ar"` or `"en"`). Language selection screen shown when
-  `preferredLanguage` is null. After selection, `PATCH /api/v1/arena/profile`
-  saves it. Frontend reads it from `GET /api/v1/arena/me` on app init.
+- **Coach controllers are separate from Pulse controllers**: naming convention
+  `[Domain]CoachController`. They use `CoachAuthHelper` to extract `trainerId`
+  and `trainerTypes` from JWT claims and enforce that trainers can only see
+  their own data.
 
-- **ClubPortalSettings per club**: one row per club, created with defaults
-  when a club is created (or lazily on first access). Feature flags:
-  `gxBookingEnabled`, `ptViewEnabled`, `invoiceViewEnabled`,
-  `onlinePaymentEnabled` (always false for now). Backend enforces these
-  flags — if `gxBookingEnabled = false`, the GX endpoints return 403.
-  Frontend hides the nav item entirely.
+- **trainerTypes gates UI sections**: if `trainerTypes = ["pt"]`, GX nav item
+  is hidden. If `trainerTypes = ["gx"]`, PT nav item is hidden. If both, both
+  shown. Enforced on frontend via Zustand auth store + on backend via 403 if
+  trainer type doesn't match the resource.
 
-- **Arena controllers are separate from Pulse controllers**: naming convention
-  `[Domain]ArenaController` for all member-facing endpoints. They use
-  `@PreAuthorize` with `scope = 'member'` JWT claim check, not the staff
-  RBAC permission system.
+- **Mark attendance is the only write operation**: trainers can mark a
+  `PTSession` as `attended` or `missed`, and mark individual `GXBooking`
+  records as attended. No other writes. Both already have status/attendance
+  fields on the existing entities.
 
-- **Member scope JWT**: the existing JWT for members has
-  `scope = "member"`, `memberId`, `clubId`, `organizationId`, `branchId`.
-  Arena controllers extract tenant context from these claims directly.
+- **Schedule = combined view**: `GET /api/v1/coach/schedule` returns today's
+  PT sessions + GX class instances for this trainer, sorted by time, as a
+  unified list with a `type` discriminator (`"pt"` or `"gx"`).
 
-- **Mobile-first UI**: web-arena is designed for phones. Bottom navigation
-  bar (5 items max), large touch targets, full-width cards. Uses the same
-  Tailwind + logical CSS properties as web-pulse.
+- **Sidebar layout, not bottom nav**: Trainers use tablets or laptops at the
+  gym. web-coach uses a left sidebar (collapsible) like web-pulse, not a
+  mobile bottom nav like web-arena. Still responsive down to 375px.
 
-- **web-arena is a fresh Vite app**: created from scratch in `web-arena/`
-  with its own `package.json`, `package-lock.json`, and `node_modules`.
-  Do NOT run npm from the project root.
+- **JWT in memory only**: same rule as all frontend apps — never
+  localStorage, never sessionStorage.
 
 ---
 
 ## Entity design
 
-### ClubPortalSettings
-
-Fields beyond standard AuditEntity columns:
-
-```
-club_id                  BIGINT NOT NULL UNIQUE    FK → clubs(id)
-gx_booking_enabled       BOOLEAN NOT NULL DEFAULT true
-pt_view_enabled          BOOLEAN NOT NULL DEFAULT true
-invoice_view_enabled     BOOLEAN NOT NULL DEFAULT true
-online_payment_enabled   BOOLEAN NOT NULL DEFAULT false
-portal_message           VARCHAR(500)              nullable
-                         (optional welcome message shown on member home)
-```
-
-### MemberOtp
-
-Fields beyond standard AuditEntity columns:
-
-```
-phone                VARCHAR(20) NOT NULL
-otp_hash             VARCHAR(255) NOT NULL   (SHA-256 of the 6-digit code)
-expires_at           TIMESTAMPTZ NOT NULL    (NOW() + 10 minutes)
-used                 BOOLEAN NOT NULL DEFAULT false
-member_id            BIGINT                  FK → members(id), nullable
-                     (null until phone is matched to a member on verify)
-```
-
-No soft delete — OTPs are short-lived and cleaned up by expiry.
-
-### Member (modify existing)
-
-Add one field:
-```
-preferred_language   VARCHAR(10)   nullable   ('ar' or 'en')
-```
+No new entities. This plan only adds coach-facing read endpoints + two
+targeted write endpoints (mark PT attendance, mark GX attendance) over
+existing entities.
 
 ---
 
 ## API endpoints
 
-### MemberArenaController — `/api/v1/arena/auth`
+### TrainerProfileCoachController — `/api/v1/coach`
 
 ```
-POST   /api/v1/arena/auth/otp/request    request OTP for phone number
-POST   /api/v1/arena/auth/otp/verify     verify OTP → returns JWT
-POST   /api/v1/arena/auth/logout         invalidate refresh token
+GET    /api/v1/coach/me          trainer profile + certifications + branch assignments
 ```
 
-No `@PreAuthorize` on request/verify — they are public endpoints.
-Logout requires valid member JWT.
-
-### MemberProfileArenaController — `/api/v1/arena`
+### ScheduleCoachController — `/api/v1/coach/schedule`
 
 ```
-GET    /api/v1/arena/me                  member profile + membership summary
-PATCH  /api/v1/arena/profile             update name fields + preferredLanguage
-GET    /api/v1/arena/membership          active membership detail
-GET    /api/v1/arena/portal-settings     club portal feature flags (for nav)
+GET    /api/v1/coach/schedule    today's PT sessions + GX instances for this trainer
+                                 query param: ?date=yyyy-MM-dd (default: today)
 ```
 
-### GxArenaController — `/api/v1/arena/gx`
+### PtCoachController — `/api/v1/coach/pt`
 
 ```
-GET    /api/v1/arena/gx/schedule         upcoming GX class instances (7 days)
-POST   /api/v1/arena/gx/{instanceId}/book    book a spot
-DELETE /api/v1/arena/gx/{instanceId}/book    cancel booking
-GET    /api/v1/arena/gx/bookings         member's booking history
+GET    /api/v1/coach/pt/sessions             upcoming + past PT sessions for this trainer
+                                              query params: ?status=upcoming|past&page=0&size=20
+PATCH  /api/v1/coach/pt/sessions/{id}/attendance   mark session attended or missed
 ```
 
-Gated by `ClubPortalSettings.gxBookingEnabled`.
-
-### PtArenaController — `/api/v1/arena/pt`
+### GxCoachController — `/api/v1/coach/gx`
 
 ```
-GET    /api/v1/arena/pt/sessions         upcoming + past PT sessions
-GET    /api/v1/arena/pt/packages         member's PT packages with session counts
+GET    /api/v1/coach/gx/classes              GX class instances for this trainer
+                                              query params: ?from=yyyy-MM-dd&to=yyyy-MM-dd
+GET    /api/v1/coach/gx/classes/{id}/bookings   bookings list for a specific class instance
+PATCH  /api/v1/coach/gx/classes/{id}/attendance  bulk mark attendance for a class
 ```
 
-Gated by `ClubPortalSettings.ptViewEnabled`.
-
-### InvoiceArenaController — `/api/v1/arena/invoices`
-
-```
-GET    /api/v1/arena/invoices            invoice list (paginated)
-GET    /api/v1/arena/invoices/{id}       invoice detail with QR code
-```
-
-Gated by `ClubPortalSettings.invoiceViewEnabled`.
-
-### ClubPortalSettingsPulseController — `/api/v1/portal-settings`
-
-```
-GET    /api/v1/portal-settings           get settings for club
-PATCH  /api/v1/portal-settings           update feature flags + portal message
-```
-
-Required permission: `portal-settings:update` (Owner, Branch Manager).
+All coach endpoints require a valid JWT with `scope = "trainer"`.
+No staff RBAC permission system — trainer identity comes from JWT claims only.
 
 ---
 
 ## Request / Response shapes
 
-### OtpRequestRequest
-```json
-{ "phone": "+966501234567 (required)" }
-```
-
-### OtpVerifyRequest
-```json
-{
-  "phone": "+966501234567 (required)",
-  "otp": "123456 (required, 6 digits)"
-}
-```
-
-### OtpVerifyResponse
-```json
-{
-  "accessToken": "string",
-  "refreshToken": "string",
-  "member": {
-    "id": "uuid",
-    "firstName": "string",
-    "lastName": "string",
-    "preferredLanguage": "ar | en | null"
-  }
-}
-```
-
-### MemberMeResponse
+### TrainerMeResponse
 ```json
 {
   "id": "uuid",
@@ -260,66 +165,92 @@ Required permission: `portal-settings:update` (Owner, Branch Manager).
   "lastName": "string",
   "firstNameAr": "string | null",
   "lastNameAr": "string | null",
-  "phone": "string",
-  "email": "string | null",
-  "preferredLanguage": "ar | en | null",
+  "email": "string",
+  "phone": "string | null",
+  "trainerTypes": ["pt", "gx"],
   "club": { "id": "uuid", "name": "string", "nameAr": "string" },
-  "membership": {
-    "planName": "string",
-    "planNameAr": "string",
-    "status": "active | expired | frozen",
-    "startDate": "yyyy-MM-dd",
-    "expiresAt": "yyyy-MM-dd",
-    "daysRemaining": 14
-  }
+  "branches": [{ "id": "uuid", "name": "string" }],
+  "certifications": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "issuingOrganization": "string",
+      "issueDate": "yyyy-MM-dd",
+      "expiryDate": "yyyy-MM-dd | null"
+    }
+  ]
 }
 ```
 
-### UpdateProfileRequest
+### ScheduleItemResponse
 ```json
 {
-  "firstNameAr": "string (optional)",
-  "lastNameAr": "string (optional)",
-  "preferredLanguage": "ar | en (optional)"
-}
-```
-
-### PortalSettingsResponse
-```json
-{
-  "gxBookingEnabled": true,
-  "ptViewEnabled": true,
-  "invoiceViewEnabled": true,
-  "onlinePaymentEnabled": false,
-  "portalMessage": "string | null"
-}
-```
-
-### GxScheduleItemResponse
-```json
-{
+  "type": "pt | gx",
   "id": "uuid",
-  "classType": { "name": "string", "nameAr": "string", "color": "string" },
-  "instructorName": "string",
   "startTime": "ISO 8601",
-  "endTime": "ISO 8601",
-  "capacity": 20,
-  "bookedCount": 14,
-  "spotsRemaining": 6,
-  "isBooked": true
+  "endTime": "ISO 8601 | null",
+  "title": "string",
+  "memberOrClassName": "string",
+  "status": "string",
+  "bookedCount": 12,
+  "capacity": 20
 }
 ```
+`bookedCount` and `capacity` only present when `type = "gx"`.
+`memberOrClassName` = member name for PT, class type name for GX.
 
-### PtSessionArenaResponse
+### PtSessionCoachResponse
 ```json
 {
   "id": "uuid",
   "scheduledAt": "ISO 8601",
   "status": "scheduled | attended | missed | cancelled",
-  "trainerName": "string",
+  "memberName": "string",
   "packageName": "string",
-  "sessionsUsed": 3,
-  "sessionsTotal": 10
+  "notes": "string | null"
+}
+```
+
+### MarkPtAttendanceRequest
+```json
+{ "status": "attended | missed" }
+```
+
+### GxClassCoachResponse
+```json
+{
+  "id": "uuid",
+  "classType": { "name": "string", "nameAr": "string", "color": "string" },
+  "startTime": "ISO 8601",
+  "endTime": "ISO 8601",
+  "capacity": 20,
+  "bookedCount": 14,
+  "attendedCount": 0
+}
+```
+
+### GxBookingAttendanceItem
+```json
+{ "bookingId": "uuid", "attended": true }
+```
+
+### MarkGxAttendanceRequest
+```json
+{
+  "attendances": [
+    { "bookingId": "uuid", "attended": true },
+    { "bookingId": "uuid", "attended": false }
+  ]
+}
+```
+
+### GxBookingCoachResponse
+```json
+{
+  "id": "uuid",
+  "memberName": "string",
+  "bookedAt": "ISO 8601",
+  "attended": "boolean | null"
 }
 ```
 
@@ -327,139 +258,116 @@ Required permission: `portal-settings:update` (Owner, Branch Manager).
 
 ## Business rules — enforce in service layer
 
-1. **Phone must match a member in the club** — `OtpRequestRequest.phone`
-   must match exactly one `Member` record. Return 200 regardless (never
-   reveal whether phone exists — security). Log OTP to console in dev.
+1. **Trainer scope only** — all coach endpoints extract `trainerId` from JWT.
+   Any request where the JWT `scope ≠ "trainer"` is rejected with 403.
 
-2. **OTP rate limit** — max 3 unused, unexpired OTPs per phone in the last
-   10 minutes. Return 429 "Too many OTP requests. Please wait." if exceeded.
+2. **Trainer owns the PT session** — `PATCH /coach/pt/sessions/{id}/attendance`
+   checks that `ptSession.trainerId = JWT trainerId`. Return 403 if not.
 
-3. **OTP expires in 10 minutes** — `verifyOtp` checks `expires_at > NOW()`
-   and `used = false`. Return 401 "OTP expired or invalid" if check fails.
-   Do not distinguish expired vs wrong code in error message.
+3. **Trainer instructs the GX class** — `GET` and `PATCH` on
+   `/coach/gx/classes/{id}` check that `gxClassInstance.trainerId = JWT trainerId`.
+   Return 403 if not.
 
-4. **OTP single-use** — mark `used = true` immediately on successful verify.
-   Return 401 if already used.
+4. **PT attendance: only scheduled sessions** — can only mark `attended` or
+   `missed` on sessions with current status `scheduled`. Return 422
+   "Session is already {status}" if already attended/missed/cancelled.
 
-5. **Portal feature gate** — before executing any GX, PT, or invoice
-   operation, `ClubPortalSettingsService.getSettings(clubId)` is checked.
-   Return 403 "This feature is not enabled for your club" if the relevant
-   flag is false.
+5. **GX attendance: class must be in the past or ongoing** — cannot mark
+   attendance for a class whose `startTime` is more than 30 minutes in the
+   future. Return 422 "Class has not started yet".
 
-6. **GX booking: capacity check** — `bookedCount` must be < `capacity`
-   before creating a `GXBooking`. Return 422 "Class is fully booked".
+6. **trainerType gate** — if `trainerTypes` in JWT does not include `"pt"`,
+   all `/coach/pt/*` endpoints return 403 "Not a PT trainer".
+   If `trainerTypes` does not include `"gx"`, all `/coach/gx/*` endpoints
+   return 403 "Not a GX instructor".
 
-7. **GX booking: no duplicate** — a member cannot book the same
-   `GXClassInstance` twice. Return 409 "Already booked".
+7. **Tenant isolation** — all queries filter by `clubId` and `trainerId`
+   from JWT. A trainer can never see another trainer's sessions or classes.
 
-8. **GX booking: future only** — cannot book a class whose `startTime` is
-   in the past. Return 422 "Cannot book a past class".
-
-9. **GX cancel: own booking only** — member can only cancel their own
-   `GXBooking`. Return 403 if `booking.memberId ≠ JWT memberId`.
-
-10. **Tenant isolation** — all arena queries filter by `memberId` and
-    `clubId` from JWT claims. A member can never see another member's data.
-
-11. **preferredLanguage valid values** — only `"ar"` or `"en"` accepted.
-    Return 422 for any other value.
+8. **Schedule date range** — `GET /coach/schedule` only returns items for the
+   requested date (default today). Maximum look-ahead: 30 days. Return 422
+   if `?date` is more than 30 days in the future.
 
 ---
 
 ## Seed data updates
 
-Add to `DevDataLoader.kt`:
+No new seed data needed. Existing seed already has:
+- `pt@elixir.com` / `Trainer1234!` → PT Trainer (Khalid Al-Otaibi), `trainerTypes = ["pt"]`
+- `gx@elixir.com` / `Trainer1234!` → GX Instructor (Noura Al-Harbi), `trainerTypes = ["gx"]`
+- Ahmed's PT sessions assigned to Khalid
+- GX class instances assigned to Noura
 
-```
-ClubPortalSettings for Elixir Gym:
-  gxBookingEnabled = true
-  ptViewEnabled = true
-  invoiceViewEnabled = true
-  onlinePaymentEnabled = false
-  portalMessage = "Welcome to Elixir Gym! 💪" / "مرحباً بك في نادي إكسير!"
-
-Update Ahmed Al-Rashidi (member@elixir.com) member record:
-  phone = "+966501234099"   (so OTP login works in dev)
-  preferredLanguage = null  (so language selection screen appears on first login)
-
-Add portal-settings:update permission to Owner and Branch Manager seed roles.
-```
+No DevDataLoader changes required.
 
 ---
 
-## Frontend additions (web-arena)
+## Frontend additions (web-coach)
 
-### Bootstrap web-arena app
-New Vite app at `web-arena/` with same stack as web-pulse:
+### Bootstrap web-coach app
+New Vite app at `web-coach/` with same stack as web-pulse:
 React 18, TypeScript strict, TanStack Router (file-based), TanStack Query,
-Zustand (auth state only), React Hook Form + Zod, Tailwind CSS, i18next.
-Port: 5176. JWT scope check: rejects non-`member` tokens with
-"This app is for gym members only".
+Zustand (auth state), React Hook Form + Zod, Tailwind CSS, i18next.
+Port: 5175. JWT scope check: rejects non-`trainer` tokens with
+"This app is for trainers only".
 
-### Phone OTP Login — /auth/login
-Step 1: Phone number input (Saudi format, +966 prefix selector).
-"Send Code" button → `POST /api/v1/arena/auth/otp/request`.
-Step 2: 6-digit OTP input (auto-advance between boxes).
-60-second countdown before "Resend Code" is enabled.
-On verify success → save JWT in memory → check `preferredLanguage`.
-
-### Language Selection — /auth/language
-Full-screen language choice shown when `preferredLanguage` is null after login.
-Two large cards: Arabic (العربية) and English. Tapping one calls
-`PATCH /api/v1/arena/profile` then redirects to home.
-Cannot be skipped — auth guard redirects here if language not set.
-
-### Home / Dashboard — /
-Member's name greeting, membership status card (plan name, days remaining,
-expiry date, status badge). Quick action buttons for enabled features
-(Book a Class, My PT Sessions, My Invoices). `portalMessage` banner if set.
-
-### Membership — /membership
-Full membership detail card: plan name, start date, expiry date, status,
-freeze periods if any. Renewal reminder banner if < 7 days remaining.
-
-### GX Schedule — /gx
-Weekly view (today + 6 days). Each class card: type name, time, instructor,
-spots remaining. Booked classes shown with green checkmark.
-Tap to book (if spots available) or cancel (if already booked).
-Confirmation bottom sheet before booking/cancel.
-
-### PT Sessions — /pt
-Two tabs: Upcoming / Past. Each session card: date/time, trainer name,
-package name, status badge (scheduled/attended/missed).
-Package summary at top: sessions used / total.
-
-### Invoices — /invoices
-List of invoices: invoice number, date, amount, status.
-Tap → invoice detail with all ZATCA fields and QR code image.
-QR rendered with `qrcode.react` (already used in web-pulse — add to web-arena too).
-
-### Profile — /profile
-Shows member name, phone, language preference.
-Edit button → inline form for Arabic name fields + language toggle.
-Save calls `PATCH /api/v1/arena/profile`.
+### Login — /auth/login
+Standard email + password form. Calls `POST /api/v1/auth/login`.
+On success: checks `scope === "trainer"`, stores JWT in memory + trainer
+profile in Zustand. Redirects to `/`.
 
 ### App shell
-Bottom navigation bar: Home, GX, PT, Invoices, Profile.
-Items hidden via `portalSettings` flags fetched on app init.
-Header: club name/logo (left), member name (right).
+Left collapsible sidebar (same pattern as web-pulse). Top header with
+trainer name and language toggle. Nav items:
+- Schedule (always shown)
+- PT Sessions (shown only if `trainerTypes` includes `"pt"`)
+- GX Classes (shown only if `trainerTypes` includes `"gx"`)
+- Profile (always shown)
 
-### i18n (key sample)
+### Today's Schedule — /
+Timeline view of today's PT sessions + GX classes sorted by time.
+Date picker to navigate to other days (max 30 days ahead).
+Each item shows type badge (PT/GX), time, title, member/class name, status.
+Tap a PT item → PT session detail. Tap a GX item → GX class detail.
+
+### PT Sessions — /pt
+List view with two tabs: Upcoming / Past.
+Each card: date/time, member name, package name, status badge.
+Tap → PT session detail modal: full info + mark attended/missed buttons
+(only shown when status = scheduled).
+
+### GX Classes — /gx
+Weekly grid view (same concept as web-pulse /gx but trainer-scoped).
+Each class card: type color, time, capacity/booked count, attended count.
+Tap → GX class detail page:
+  - Class info (type, time, instructor — themselves)
+  - Bookings list: member name, booked at, attended checkbox
+  - "Save Attendance" button → `PATCH /coach/gx/classes/{id}/attendance`
+  - Button disabled if class is more than 30 min in the future
+
+### Profile — /profile
+Trainer info: name (AR + EN), email, phone, trainer types badges.
+Certifications list: name, issuing org, issue date, expiry (with
+"Expires soon" warning badge if < 30 days to expiry).
+Read-only — trainers cannot edit their own profile (staff manages this).
+
+### i18n key sample
 ```json
 {
-  "auth.phone.title": "Enter your phone number",
-  "auth.otp.title": "Enter verification code",
-  "auth.otp.resend": "Resend code",
-  "auth.language.title": "Choose your language",
-  "home.greeting": "Welcome back, {{name}}",
-  "membership.expires_in": "Expires in {{days}} days",
-  "gx.book": "Book",
-  "gx.cancel_booking": "Cancel Booking",
-  "gx.full": "Class Full",
+  "login.scope_error": "This app is for trainers only",
+  "schedule.title": "Today's Schedule",
+  "schedule.empty": "No sessions or classes today",
   "pt.upcoming": "Upcoming",
   "pt.past": "Past",
-  "invoices.title": "My Invoices",
-  "profile.language": "Language"
+  "pt.mark_attended": "Mark Attended",
+  "pt.mark_missed": "Mark Missed",
+  "gx.bookings": "Bookings",
+  "gx.save_attendance": "Save Attendance",
+  "gx.class_not_started": "Class hasn't started yet",
+  "profile.certifications": "Certifications",
+  "profile.expires_soon": "Expires soon",
+  "profile.trainer_type.pt": "Personal Trainer",
+  "profile.trainer_type.gx": "Group Exercise Instructor"
 }
 ```
 
@@ -469,107 +377,83 @@ Header: club name/logo (left), member name (right).
 
 ### Backend — new files
 ```
-portal/
-  ClubPortalSettings.kt
-  ClubPortalSettingsRepository.kt
-  ClubPortalSettingsService.kt
-  ClubPortalSettingsPulseController.kt
+coach/
+  CoachAuthHelper.kt
+  TrainerProfileCoachController.kt
+  ScheduleCoachController.kt
+  PtCoachController.kt
+  GxCoachController.kt
   dto/
-    ClubPortalSettingsResponse.kt
-    UpdatePortalSettingsRequest.kt
-
-auth/
-  MemberOtp.kt
-  MemberOtpRepository.kt
-  MemberAuthService.kt
-  MemberArenaController.kt
-  dto/
-    OtpRequestRequest.kt
-    OtpVerifyRequest.kt
-    OtpVerifyResponse.kt
-
-arena/
-  MemberProfileArenaController.kt
-  GxArenaController.kt
-  PtArenaController.kt
-  InvoiceArenaController.kt
-  dto/
-    MemberMeResponse.kt
-    UpdateProfileRequest.kt
-    GxScheduleItemResponse.kt
-    GxBookingResponse.kt
-    PtSessionArenaResponse.kt
-    PtPackageArenaResponse.kt
-    InvoiceArenaResponse.kt
-    InvoiceArenaDetailResponse.kt
+    TrainerMeResponse.kt
+    ScheduleItemResponse.kt
+    PtSessionCoachResponse.kt
+    MarkPtAttendanceRequest.kt
+    GxClassCoachResponse.kt
+    GxBookingCoachResponse.kt
+    MarkGxAttendanceRequest.kt
+    GxBookingAttendanceItem.kt
 ```
 
 ### Backend — modified files
 ```
-member/Member.kt               add preferredLanguage field
-config/DevDataLoader.kt        add ClubPortalSettings + Ahmed's phone + permission
+(none — no entity changes, no new permissions, no DevDataLoader changes)
 ```
 
 ### Frontend — new app
 ```
-web-arena/
+web-coach/
   package.json                 (React 18, TypeScript, Vite, TanStack Router/Query,
-                                Zustand, RHF, Zod, i18next, Tailwind, qrcode.react)
-  vite.config.ts               (port 5176)
+                                Zustand, RHF, Zod, i18next, Tailwind)
+  vite.config.ts               (port 5175)
   tsconfig.json
   index.html
   src/
     main.tsx
-    router.tsx                 (TanStack Router file-based)
-    store/authStore.ts         (Zustand — JWT in memory, member profile)
+    router.tsx
+    store/authStore.ts         (JWT in memory, trainer profile + trainerTypes)
     lib/
-      api.ts                   (axios instance, arena base URL)
-      permissions.ts           (portal settings helper: isFeatureEnabled)
+      api.ts                   (axios instance → backend port 8080)
       formatCurrency.ts        (copy from web-pulse)
     types/
-      domain.ts                (arena-specific types)
+      domain.ts
     i18n/
       index.ts
       en.json
       ar.json
     api/
       auth.ts
-      profile.ts
-      gx.ts
+      schedule.ts
       pt.ts
-      invoices.ts
+      gx.ts
+      profile.ts
     routes/
-      __root.tsx               (auth guard + language guard + portal settings fetch)
+      __root.tsx               (auth guard)
       auth/
-        login.tsx              (phone OTP step 1 + step 2)
-        language.tsx           (language selection)
-      index.tsx                (home/dashboard)
-      membership.tsx
-      gx.tsx
+        login.tsx
+      index.tsx                (today's schedule)
       pt.tsx
-      invoices/
+      gx/
         index.tsx
-        $invoiceId.tsx
+        $classId.tsx           (class detail + attendance)
       profile.tsx
     components/
       shell/
-        BottomNav.tsx
+        Sidebar.tsx
         AppHeader.tsx
-      auth/
-        PhoneInput.tsx
-        OtpInput.tsx           (6-box auto-advance)
-      membership/
-        MembershipCard.tsx
-      gx/
-        GxClassCard.tsx
-        BookingConfirmSheet.tsx
+      schedule/
+        ScheduleItem.tsx
+        DatePicker.tsx
       pt/
         PtSessionCard.tsx
-      invoices/
-        InvoiceListItem.tsx
-        InvoiceQrCode.tsx      (uses qrcode.react)
+        AttendanceModal.tsx
+      gx/
+        GxClassCard.tsx
+        BookingAttendanceRow.tsx
+      profile/
+        CertificationCard.tsx
       common/
         StatusBadge.tsx
+        TrainerTypeBadge.tsx
         EmptyState.tsx
         LoadingSpinner.tsx
 ```
@@ -579,160 +463,150 @@ web-arena/
 ## Implementation order
 
 ```
-Step 1 — ClubPortalSettings entity + service + Pulse controller
-  ClubPortalSettings.kt, ClubPortalSettingsRepository.kt
-  ClubPortalSettingsService.kt — get (lazy create with defaults), update
-  ClubPortalSettingsPulseController.kt — GET + PATCH
-  DTOs: ClubPortalSettingsResponse, UpdatePortalSettingsRequest
+Step 1 — CoachAuthHelper + TrainerProfileCoachController
+  coach/CoachAuthHelper.kt:
+    extractTrainerId(jwt), extractTrainerTypes(jwt), requireTrainerType(jwt, "pt"|"gx")
+    All coach endpoints call requireScope("trainer") first
+  coach/TrainerProfileCoachController.kt:
+    GET /api/v1/coach/me — fetch Trainer + TrainerCertification + TrainerBranchAssignment
+    Map to TrainerMeResponse
+  DTOs: TrainerMeResponse
   Verify: ./gradlew build -x test
 
-Step 2 — MemberOtp entity + MemberAuthService
-  MemberOtp.kt, MemberOtpRepository.kt
-  Add preferredLanguage to Member.kt
-  MemberAuthService.kt:
-    requestOtp: find member by phone, enforce rate limit (rule 2),
-      generate 6-digit OTP, SHA-256 hash, store in member_otps,
-      log to console in dev (TODO: SMS gateway comment)
-    verifyOtp: find unexpired unused OTP hash match (rules 3, 4),
-      mark used, issue JWT with scope=member claims
-  MemberArenaController.kt — POST /otp/request, POST /otp/verify, POST /logout
-  DTOs: OtpRequestRequest, OtpVerifyRequest, OtpVerifyResponse
+Step 2 — ScheduleCoachController
+  coach/ScheduleCoachController.kt:
+    GET /api/v1/coach/schedule?date=yyyy-MM-dd
+    Fetch PTSessions where trainerId = JWT trainerId AND scheduledAt = requested date
+    Fetch GXClassInstances where trainerId = JWT trainerId AND startTime = requested date
+    Merge, sort by time, map to ScheduleItemResponse list
+    Rule 8: reject ?date > today + 30 days (422)
+  DTOs: ScheduleItemResponse
   Verify: ./gradlew build -x test
 
-Step 3 — MemberProfileArenaController
-  GET /arena/me — member profile + active membership summary
-  PATCH /arena/profile — update name fields + preferredLanguage (rule 11)
-  GET /arena/membership — full membership detail
-  GET /arena/portal-settings — club feature flags
-  DTOs: MemberMeResponse, UpdateProfileRequest, PortalSettingsResponse
-  All queries tenant-scoped via JWT memberId/clubId (rule 10)
+Step 3 — PtCoachController
+  coach/PtCoachController.kt:
+    GET /api/v1/coach/pt/sessions?status=upcoming|past&page&size
+    PATCH /api/v1/coach/pt/sessions/{id}/attendance
+  Rules 2 (trainer owns session), 4 (only scheduled), 6 (trainerType gate: pt)
+  All native @Query for any date filtering (no JPQL date arithmetic)
+  DTOs: PtSessionCoachResponse, MarkPtAttendanceRequest
   Verify: ./gradlew build -x test
 
-Step 4 — GxArenaController
-  GET /arena/gx/schedule — upcoming 7 days, isBooked per instance
-  POST /arena/gx/{id}/book — rules 5 (portal gate), 6 (capacity),
-    7 (no duplicate), 8 (future only)
-  DELETE /arena/gx/{id}/book — rule 9 (own booking only)
-  GET /arena/gx/bookings — member's booking history
-  DTOs: GxScheduleItemResponse, GxBookingResponse
+Step 4 — GxCoachController
+  coach/GxCoachController.kt:
+    GET /api/v1/coach/gx/classes?from=yyyy-MM-dd&to=yyyy-MM-dd
+    GET /api/v1/coach/gx/classes/{id}/bookings
+    PATCH /api/v1/coach/gx/classes/{id}/attendance
+  Rules 3 (trainer instructs class), 5 (class not too far in future), 6 (trainerType gate: gx)
+  Bulk attendance: iterate bookingIds, set GXBooking.attended, save all
+  DTOs: GxClassCoachResponse, GxBookingCoachResponse, MarkGxAttendanceRequest, GxBookingAttendanceItem
   Verify: ./gradlew build -x test
 
-Step 5 — PtArenaController + InvoiceArenaController
-  GET /arena/pt/sessions — upcoming + past, ordered by scheduledAt
-  GET /arena/pt/packages — member's packages with session counts
-  GET /arena/invoices — paginated invoice list
-  GET /arena/invoices/{id} — invoice detail with zatcaQrCode
-  All gated by portal settings (rule 5)
-  Verify: ./gradlew build -x test
-
-Step 6 — Seed data + permissions
-  Update DevDataLoader.kt:
-    ClubPortalSettings for Elixir Gym
-    Ahmed's phone = "+966501234099"
-    portal-settings:update permission to Owner + Branch Manager
-  Verify: ./gradlew bootRun --args='--spring.profiles.active=dev'
-  Manual verify: POST /api/v1/arena/auth/otp/request {"phone":"+966501234099"}
-    → console shows OTP
-  Manual verify: POST /api/v1/arena/auth/otp/verify → returns JWT
-  Manual verify: GET /api/v1/arena/me with member JWT → returns Ahmed's profile
-
-Step 7 — Backend tests
-  MemberAuthServiceTest.kt:
-    - requestOtp: happy path, unknown phone returns 200 (no info leak),
-      rate limit exceeded (429)
-    - verifyOtp: correct OTP returns JWT, wrong code (401),
-      expired OTP (401), already used (401)
-  ClubPortalSettingsServiceTest.kt:
-    - lazy create with defaults, update flags, portal gate enforcement
-  GxArenaControllerTest.kt:
-    - book class: happy path, full class (422), duplicate booking (409),
-      past class (422), feature disabled (403)
-    - cancel: own booking, other member's booking (403)
-  MemberProfileArenaControllerTest.kt:
-    - me endpoint, update preferredLanguage, invalid language value (422)
-    - tenant isolation: member cannot see another member's data
+Step 5 — Backend tests
+  PtCoachServiceTest.kt (unit):
+    - mark attendance: happy path (scheduled → attended), already attended (422),
+      wrong trainer (403), not a PT trainer (403)
+  GxCoachServiceTest.kt (unit):
+    - bulk mark attendance: happy path, class in future (422),
+      wrong trainer (403), not a GX instructor (403)
+  ScheduleCoachControllerTest.kt (integration):
+    - today's schedule for PT trainer (only PT items), for GX instructor (only GX items),
+      for dual trainer (both), date > 30 days (422)
+  PtCoachControllerTest.kt (integration):
+    - session list upcoming/past, mark attended, mark missed,
+      other trainer's session (403)
+  GxCoachControllerTest.kt (integration):
+    - class list, bookings list, mark attendance, future class (422),
+      other trainer's class (403)
   Verify: ./gradlew test --no-daemon
 
-Step 8 — Backend final checks
+Step 6 — Backend final checks
   ./gradlew ktlintFormat --no-daemon
   ./gradlew ktlintCheck --no-daemon
   ./gradlew build --no-daemon
 
-Step 9 — Bootstrap web-arena app
-  Create web-arena/ with package.json (port 5176)
+Step 7 — Bootstrap web-coach app
+  Create web-coach/ with package.json (port 5175)
   Install: react, react-dom, typescript, vite, @tanstack/react-router,
     @tanstack/react-query, zustand, react-hook-form, zod, i18next,
-    react-i18next, tailwindcss, qrcode.react
+    react-i18next, tailwindcss, axios
   Setup: vite.config.ts, tsconfig.json, tailwind.config.js, index.html,
     src/main.tsx, src/router.tsx
-  src/store/authStore.ts — JWT in memory, member profile, portalSettings
-  src/lib/api.ts — axios instance pointing to backend at port 8080
-  Verify: cd web-arena && npm run dev → blank app loads at localhost:5176
+  src/store/authStore.ts — JWT in memory, trainer profile, trainerTypes array
+  src/lib/api.ts — axios instance → backend at port 8080
+  Verify: cd web-coach && npm run dev → blank app loads at localhost:5175
 
-Step 10 — Auth flow
-  src/api/auth.ts — requestOtp, verifyOtp, logout
+Step 8 — Auth flow
+  src/api/auth.ts — login (POST /api/v1/auth/login), logout, refresh
   src/routes/auth/login.tsx:
-    Step 1: PhoneInput.tsx with +966 prefix, submit → requestOtp
-    Step 2: OtpInput.tsx (6 auto-advance boxes), 60s countdown,
-      resend button, submit → verifyOtp → save JWT → redirect
-  src/routes/auth/language.tsx:
-    Two large language cards, tap → PATCH /arena/profile → redirect home
+    Email + password form, submit → login → check scope === "trainer"
+    If scope wrong → show "This app is for trainers only" error, clear token
+    On success → save JWT in Zustand → redirect to /
   src/routes/__root.tsx:
     Auth guard: no JWT → /auth/login
-    Language guard: JWT + preferredLanguage null → /auth/language
-    Fetch portal settings on mount → store in Zustand
-  Verify: npm run dev → login with Ahmed's phone, get OTP from console,
-    enter it, land on language selection, pick Arabic
+    On mount: GET /api/v1/coach/me → populate trainer profile + trainerTypes
+    On 401 → clear auth store + redirect to login
+  Verify: npm run dev → login with pt@elixir.com / Trainer1234! → lands on schedule
 
-Step 11 — App shell + home screen
-  src/components/shell/AppHeader.tsx — club name, member name
-  src/components/shell/BottomNav.tsx — 5 items, hidden by portalSettings
-  src/routes/index.tsx — greeting, MembershipCard summary,
-    quick action buttons, portalMessage banner
-  Verify: npm run dev → home screen with Ahmed's membership shown
+Step 9 — App shell
+  src/components/shell/Sidebar.tsx:
+    Logo, nav items (Schedule always, PT if trainerTypes includes "pt",
+    GX if trainerTypes includes "gx", Profile always)
+    Collapsible on mobile
+  src/components/shell/AppHeader.tsx:
+    Trainer name, language toggle, logout button
+  Verify: npm run dev → sidebar shows correct items for PT-only trainer
 
-Step 12 — Membership screen
-  src/routes/membership.tsx
-  MembershipCard.tsx — plan name, dates, status badge, freeze info
-  Renewal reminder banner if daysRemaining < 7
-  Verify: npm run dev → /membership shows Ahmed's Basic Monthly plan
+Step 10 — Today's schedule screen
+  src/api/schedule.ts — getSchedule(date)
+  src/routes/index.tsx:
+    DatePicker to select date (default today, max today+30)
+    ScheduleItem list sorted by time, type badge (PT/GX), tap to navigate
+  src/components/schedule/ScheduleItem.tsx
+  src/components/schedule/DatePicker.tsx
+  Verify: npm run dev → Khalid's PT sessions appear for today
 
-Step 13 — GX screen
-  src/api/gx.ts
-  src/routes/gx.tsx — weekly class list
-  GxClassCard.tsx — type color, time, instructor, spots, booked state
-  BookingConfirmSheet.tsx — bottom sheet: "Book this class?" confirm/cancel
-  Verify: npm run dev → book a class, card shows green checkmark,
-    cancel it, spots count updates
+Step 11 — PT sessions screen
+  src/api/pt.ts — getPtSessions(status, page), markPtAttendance(id, status)
+  src/routes/pt.tsx:
+    Upcoming / Past tabs, paginated list
+    Tap → AttendanceModal: session detail + mark attended/missed buttons
+    Buttons disabled when status ≠ scheduled
+  src/components/pt/PtSessionCard.tsx
+  src/components/pt/AttendanceModal.tsx
+  Verify: npm run dev → mark Ahmed's session as attended → status updates
 
-Step 14 — PT screen
-  src/api/pt.ts
-  src/routes/pt.tsx — Upcoming/Past tabs
-  PtSessionCard.tsx — date, trainer, status badge
-  Package summary bar at top
-  Verify: npm run dev → Ahmed's PT sessions shown in upcoming tab
+Step 12 — GX classes screen
+  src/api/gx.ts — getGxClasses(from, to), getClassBookings(id), markGxAttendance(id, attendances)
+  src/routes/gx/index.tsx — weekly grid of class cards
+  src/routes/gx/$classId.tsx:
+    Class detail: info + bookings list
+    BookingAttendanceRow per booking (checkbox for attended)
+    "Save Attendance" button → PATCH, disabled if class > 30 min in future
+  src/components/gx/GxClassCard.tsx
+  src/components/gx/BookingAttendanceRow.tsx
+  Verify: npm run dev → Noura's Yoga class → check off attendees → save
 
-Step 15 — Invoices screens
-  src/api/invoices.ts
-  src/routes/invoices/index.tsx — paginated list
-  src/routes/invoices/$invoiceId.tsx — detail with QR code
-  InvoiceListItem.tsx, InvoiceQrCode.tsx (qrcode.react)
-  Verify: npm run dev → Ahmed's invoice shown, tap to see QR code
+Step 13 — Profile screen
+  src/api/profile.ts — getMe()
+  src/routes/profile.tsx:
+    Trainer info card, TrainerTypeBadge per type
+    Certifications list with CertificationCard
+    "Expires soon" warning badge if expiry < 30 days away
+  src/components/profile/CertificationCard.tsx
+  src/components/common/TrainerTypeBadge.tsx
+  Verify: npm run dev → Khalid's profile shows PT badge + certifications
 
-Step 16 — Profile screen
-  src/routes/profile.tsx
-  Edit name fields (Arabic), language toggle
-  Verify: npm run dev → change language → app switches to English/Arabic
-
-Step 17 — Frontend tests
-  PhoneInput.test.tsx — validates Saudi phone format
-  OtpInput.test.tsx — auto-advance between boxes
-  MembershipCard.test.tsx — shows correct status badge
-  GxClassCard.test.tsx — booked/available/full states
-  BottomNav.test.tsx — hides items when portal feature disabled
+Step 14 — Frontend tests
+  Login.test.tsx — rejects non-trainer scope JWT
+  Sidebar.test.tsx — PT-only trainer: no GX nav item; GX-only: no PT nav item
+  ScheduleItem.test.tsx — renders correct type badge and time
+  PtSessionCard.test.tsx — shows mark-attendance buttons only when scheduled
+  BookingAttendanceRow.test.tsx — checkbox state, save button disabled for future class
+  CertificationCard.test.tsx — "Expires soon" badge when < 30 days
   Verify: npm test
 
-Step 18 — Frontend final checks
+Step 15 — Frontend final checks
   npm run typecheck
   npm run lint
   npm run build
@@ -743,60 +617,51 @@ Step 18 — Frontend final checks
 ## Acceptance criteria
 
 ### Backend
-- [ ] `POST /otp/request` with known phone returns 200 and logs OTP to console
-- [ ] `POST /otp/request` with unknown phone also returns 200 (no info leak)
-- [ ] More than 3 OTP requests in 10 minutes returns 429
-- [ ] Correct OTP returns JWT with `scope = "member"`
-- [ ] Expired OTP returns 401
-- [ ] Already-used OTP returns 401
-- [ ] `GET /arena/me` returns member profile + membership summary
-- [ ] `preferredLanguage` saved on `PATCH /arena/profile`
-- [ ] Invalid `preferredLanguage` value returns 422
-- [ ] GX booking on full class returns 422
-- [ ] Duplicate GX booking returns 409
-- [ ] GX booking on past class returns 422
-- [ ] Cancelling another member's booking returns 403
-- [ ] Disabled portal feature returns 403
-- [ ] Member cannot access another member's invoices or PT sessions
-- [ ] All 296+ existing tests still pass
+- [ ] `GET /coach/me` returns Khalid's profile with PT type and certifications
+- [ ] `GET /coach/schedule` returns only PT sessions for a PT-only trainer
+- [ ] `GET /coach/schedule` returns only GX classes for a GX-only trainer
+- [ ] `GET /coach/schedule?date=` more than 30 days ahead returns 422
+- [ ] `PATCH /coach/pt/sessions/{id}/attendance` marks session attended → status changes
+- [ ] Marking already-attended session returns 422
+- [ ] Marking another trainer's PT session returns 403
+- [ ] PT endpoint called by non-PT trainer (gx-only) returns 403
+- [ ] `GET /coach/gx/classes/{id}/bookings` returns Noura's class bookings
+- [ ] `PATCH /coach/gx/classes/{id}/attendance` bulk-marks bookings
+- [ ] Marking attendance on a future class (>30min) returns 422
+- [ ] GX endpoint called by non-GX trainer (pt-only) returns 403
+- [ ] Another trainer's GX class returns 403
+- [ ] All 305+ existing tests still pass
 
-### Frontend (web-arena)
-- [ ] Phone OTP login flow works end-to-end with seeded Ahmed account
-- [ ] Language selection screen appears on first login (null preferredLanguage)
-- [ ] Language selection persists after app refresh (re-login)
-- [ ] Bottom nav hides GX/PT/Invoices links when portal flags are false
-- [ ] Home screen shows membership card with correct days remaining
-- [ ] GX booking updates card state immediately
-- [ ] PT sessions show correct upcoming/past split
-- [ ] Invoice QR code is visible and scannable
+### Frontend (web-coach)
+- [ ] Login with `pt@elixir.com` → lands on schedule, no GX nav item visible
+- [ ] Login with `gx@elixir.com` → lands on schedule, no PT nav item visible
+- [ ] Login with club staff token → rejected with "This app is for trainers only"
+- [ ] Today's schedule shows Khalid's PT sessions on the correct date
+- [ ] Mark PT session attended → card status updates immediately
+- [ ] GX class detail shows Noura's bookings list with attendance checkboxes
+- [ ] Save Attendance button disabled for a class that hasn't started
+- [ ] Profile shows correct trainer type badges and certifications
 - [ ] Arabic RTL layout correct throughout
-- [ ] npm run typecheck, lint, test, build all pass
+- [ ] `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` all pass
 
 ---
 
-## RBAC matrix rows added by this plan
+## RBAC matrix
 
-| Permission | Owner | Branch Manager | Receptionist | Sales Agent | PT Trainer | GX Instructor | Member |
-|---|---|---|---|---|---|---|---|
-| portal-settings:update | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-
-Note: Arena endpoints use JWT scope check (`scope = "member"`), not the
-staff RBAC permission system. No additional permission codes needed for
-member-facing endpoints.
+No new permissions added by this plan. Coach endpoints use JWT scope check
+(`scope = "trainer"`) and trainerType claims — not the staff RBAC system.
 
 ---
 
 ## Definition of done
 
 - All acceptance criteria checked
-- All 11 business rules covered by unit tests
-- OTP flow tested end-to-end with console OTP in dev
-- Tenant isolation: member A cannot see member B's data
-- Portal settings gate tested: disabled feature returns 403 on backend
-  AND nav item hidden on frontend
-- web-arena runs independently on port 5176 (`cd web-arena && npm run dev`)
+- All 8 business rules covered by unit or integration tests
+- Login scope rejection tested (non-trainer token shows error message)
+- trainerType gate tested: PT-only trainer cannot call GX endpoints (403)
+- Tenant isolation: trainer A cannot see trainer B's sessions or classes
+- web-coach runs independently on port 5175 (`cd web-coach && npm run dev`)
 - All CI checks pass on PR
-- No TODOs without a linked issue (SMS gateway TODO is intentional — keep it)
 - PLAN.md deleted before merging
-- PR title: `feat(arena): implement member self-service portal with phone OTP auth`
+- PR title: `feat(coach): implement trainer dashboard with schedule and attendance`
 - Target branch: `develop`
