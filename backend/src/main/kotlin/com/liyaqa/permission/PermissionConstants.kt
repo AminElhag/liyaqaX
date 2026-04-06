@@ -102,6 +102,13 @@ object PermissionConstants {
     const val LEAD_READ = "lead:read"
     const val LEAD_UPDATE = "lead:update"
     const val LEAD_CONVERT = "lead:convert"
+    const val LEAD_DELETE = "lead:delete"
+    const val LEAD_ASSIGN = "lead:assign"
+
+    // ── Lead Source ───────────────────────────────────────────────────────────
+    const val LEAD_SOURCE_CREATE = "lead-source:create"
+    const val LEAD_SOURCE_READ = "lead-source:read"
+    const val LEAD_SOURCE_UPDATE = "lead-source:update"
 
     // ── Cash Drawer ───────────────────────────────────────────────────────────
     const val CASH_DRAWER_OPEN = "cash-drawer:open"

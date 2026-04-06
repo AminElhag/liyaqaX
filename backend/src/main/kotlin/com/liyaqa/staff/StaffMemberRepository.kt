@@ -24,4 +24,11 @@ interface StaffMemberRepository : JpaRepository<StaffMember, Long> {
     fun findByUserIdAndDeletedAtIsNull(userId: Long): Optional<StaffMember>
 
     fun existsByUserIdAndDeletedAtIsNull(userId: Long): Boolean
+
+    fun findByPublicIdAndDeletedAtIsNull(publicId: UUID): Optional<StaffMember>
+
+    fun findByUserIdAndClubIdAndDeletedAtIsNull(
+        userId: Long,
+        clubId: Long,
+    ): Optional<StaffMember>
 }
