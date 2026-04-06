@@ -139,6 +139,7 @@ class DevDataLoader(
             PermissionConstants.ROLE_UPDATE, PermissionConstants.ROLE_DELETE,
             PermissionConstants.INTEGRATION_CONFIGURE, PermissionConstants.INTEGRATION_READ,
             PermissionConstants.SYSTEM_IMPERSONATE, PermissionConstants.AUDIT_READ,
+            PermissionConstants.MEMBER_READ, PermissionConstants.PLATFORM_STATS_VIEW,
         )
 
     private val platformReadPlusImpersonate =
@@ -149,25 +150,23 @@ class DevDataLoader(
             PermissionConstants.STAFF_READ,
             PermissionConstants.ROLE_READ,
             PermissionConstants.INTEGRATION_READ,
-            PermissionConstants.AUDIT_READ,
             PermissionConstants.SYSTEM_IMPERSONATE,
+            PermissionConstants.MEMBER_READ,
         )
 
     private val platformIntegration =
         setOf(
+            PermissionConstants.ORGANIZATION_READ,
+            PermissionConstants.CLUB_READ,
+            PermissionConstants.BRANCH_READ,
             PermissionConstants.INTEGRATION_CONFIGURE,
             PermissionConstants.INTEGRATION_READ,
         )
 
     private val platformReadOnly =
         setOf(
-            PermissionConstants.ORGANIZATION_READ,
-            PermissionConstants.CLUB_READ,
-            PermissionConstants.BRANCH_READ,
-            PermissionConstants.STAFF_READ,
-            PermissionConstants.ROLE_READ,
-            PermissionConstants.INTEGRATION_READ,
             PermissionConstants.AUDIT_READ,
+            PermissionConstants.PLATFORM_STATS_VIEW,
         )
 
     private val clubAll =

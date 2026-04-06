@@ -140,4 +140,7 @@ object PermissionConstants {
 
     // ── Portal Settings ──────────────────────────────────────────────────────
     const val PORTAL_SETTINGS_UPDATE = "portal-settings:update"
+
+    // ── Platform ──────────────────────────────────────────────────────────────
+    const val PLATFORM_STATS_VIEW = "platform:stats:view"
 }

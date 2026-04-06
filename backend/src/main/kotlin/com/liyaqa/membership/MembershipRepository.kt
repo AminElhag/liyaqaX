@@ -22,6 +22,8 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
         pageable: Pageable,
     ): Page<Membership>
 
+    fun countByMembershipStatusAndDeletedAtIsNull(membershipStatus: String): Long
+
     fun findByMemberIdAndMembershipStatusInAndDeletedAtIsNull(
         memberId: Long,
         statuses: List<String>,
@@ -53,6 +55,47 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
         @Param("statuses") statuses: List<String>,
         @Param("today") today: LocalDate,
     ): List<Membership>
+
+    @Query(
+        value = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN mp.duration_days <= 31 THEN mp.price_halalas
+                    WHEN mp.duration_days <= 93 THEN mp.price_halalas / 3
+                    ELSE mp.price_halalas / 12
+                END
+            ), 0)
+            FROM memberships m
+            JOIN membership_plans mp ON m.plan_id = mp.id
+            WHERE m.club_id = :clubId
+              AND m.membership_status = 'active'
+              AND m.deleted_at IS NULL
+              AND mp.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun estimateMrrHalalasForClub(
+        @Param("clubId") clubId: Long,
+    ): Long
+
+    @Query(
+        value = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN mp.duration_days <= 31 THEN mp.price_halalas
+                    WHEN mp.duration_days <= 93 THEN mp.price_halalas / 3
+                    ELSE mp.price_halalas / 12
+                END
+            ), 0)
+            FROM memberships m
+            JOIN membership_plans mp ON m.plan_id = mp.id
+            WHERE m.membership_status = 'active'
+              AND m.deleted_at IS NULL
+              AND mp.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun estimateTotalMrrHalalas(): Long
 
     @Query(
         value = """

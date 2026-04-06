@@ -28,4 +28,6 @@ interface StaffBranchAssignmentRepository : JpaRepository<StaffBranchAssignment,
     fun deleteAllByStaffMemberId(staffMemberId: Long)
 
     fun countByStaffMemberId(staffMemberId: Long): Long
+
+    fun countByBranchId(branchId: Long): Long
 }

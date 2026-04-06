@@ -31,4 +31,6 @@ interface StaffMemberRepository : JpaRepository<StaffMember, Long> {
         userId: Long,
         clubId: Long,
     ): Optional<StaffMember>
+
+    fun countByClubIdAndDeletedAtIsNull(clubId: Long): Long
 }

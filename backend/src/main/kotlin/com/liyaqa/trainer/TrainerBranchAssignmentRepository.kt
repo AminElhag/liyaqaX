@@ -28,4 +28,6 @@ interface TrainerBranchAssignmentRepository : JpaRepository<TrainerBranchAssignm
     fun deleteAllByTrainerId(trainerId: Long)
 
     fun countByTrainerId(trainerId: Long): Long
+
+    fun countByBranchId(branchId: Long): Long
 }

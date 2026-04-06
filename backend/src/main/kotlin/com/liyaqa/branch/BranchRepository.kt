@@ -25,4 +25,24 @@ interface BranchRepository : JpaRepository<Branch, Long> {
         publicId: UUID,
         organizationId: Long,
     ): Optional<Branch>
+
+    fun countByDeletedAtIsNull(): Long
+
+    fun countByClubIdAndDeletedAtIsNull(clubId: Long): Long
+
+    fun existsByClubIdAndNameEnAndDeletedAtIsNull(
+        clubId: Long,
+        nameEn: String,
+    ): Boolean
+
+    fun existsByClubIdAndNameEnAndDeletedAtIsNullAndIdNot(
+        clubId: Long,
+        nameEn: String,
+        id: Long,
+    ): Boolean
+
+    fun findByPublicIdAndClubIdAndDeletedAtIsNull(
+        publicId: UUID,
+        clubId: Long,
+    ): Optional<Branch>
 }
