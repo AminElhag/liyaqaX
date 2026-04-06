@@ -44,4 +44,6 @@ class Member(
     var notes: String? = null,
     @Column(name = "joined_at", nullable = false)
     var joinedAt: LocalDate = LocalDate.now(),
+    @Column(name = "preferred_language", length = 10)
+    var preferredLanguage: String? = null,
 ) : AuditEntity()

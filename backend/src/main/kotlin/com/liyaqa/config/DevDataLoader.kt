@@ -41,6 +41,8 @@ import com.liyaqa.payment.PaymentRepository
 import com.liyaqa.permission.Permission
 import com.liyaqa.permission.PermissionConstants
 import com.liyaqa.permission.PermissionRepository
+import com.liyaqa.portal.ClubPortalSettings
+import com.liyaqa.portal.ClubPortalSettingsRepository
 import com.liyaqa.rbac.RolePermission
 import com.liyaqa.rbac.RolePermissionRepository
 import com.liyaqa.rbac.UserRole
@@ -107,6 +109,7 @@ class DevDataLoader(
     private val leadRepository: LeadRepository,
     private val cashDrawerSessionRepository: CashDrawerSessionRepository,
     private val cashDrawerEntryRepository: CashDrawerEntryRepository,
+    private val portalSettingsRepository: ClubPortalSettingsRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -190,6 +193,7 @@ class DevDataLoader(
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
             PermissionConstants.CASH_DRAWER_READ, PermissionConstants.CASH_DRAWER_ENTRY_CREATE,
             PermissionConstants.CASH_DRAWER_RECONCILE, PermissionConstants.BRANCH_READ,
+            PermissionConstants.PORTAL_SETTINGS_UPDATE,
         )
 
     private val clubBranchManager =
@@ -292,6 +296,7 @@ class DevDataLoader(
         val plans = seedMembershipPlans(org, club)
         seedMemberMembership(org, club, riyadhBranch, member, plans, users)
         seedGXClasses(org, club, riyadhBranch, users, member)
+        seedPortalSettings(club)
         val staffByEmail = staffMemberRepository.findAll().associateBy { userRepository.findById(it.userId).get().email }
         seedLeads(org, club, riyadhBranch, staffByEmail)
         seedCashDrawer(org, club, riyadhBranch, staffByEmail)
@@ -773,7 +778,7 @@ class DevDataLoader(
                     firstNameEn = "Ahmed",
                     lastNameAr = "الرشيدي",
                     lastNameEn = "Al-Rashidi",
-                    phone = "+966501234567",
+                    phone = "+966501234099",
                     membershipStatus = "pending",
                 ),
             )
@@ -1208,6 +1213,21 @@ class DevDataLoader(
                     description = "Walk-in day pass",
                     recordedAt = yesterday8am.plusSeconds(21600),
                 ),
+            ),
+        )
+    }
+
+    // ── Portal settings ──────────────────────────────────────────────────────
+
+    private fun seedPortalSettings(club: Club) {
+        portalSettingsRepository.save(
+            ClubPortalSettings(
+                clubId = club.id,
+                gxBookingEnabled = true,
+                ptViewEnabled = true,
+                invoiceViewEnabled = true,
+                onlinePaymentEnabled = false,
+                portalMessage = "Welcome to Elixir Gym!",
             ),
         )
     }

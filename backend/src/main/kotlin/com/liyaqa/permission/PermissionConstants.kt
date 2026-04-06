@@ -137,4 +137,7 @@ object PermissionConstants {
 
     // ── Notification ──────────────────────────────────────────────────────────
     const val NOTIFICATION_READ = "notification:read"
+
+    // ── Portal Settings ──────────────────────────────────────────────────────
+    const val PORTAL_SETTINGS_UPDATE = "portal-settings:update"
 }
