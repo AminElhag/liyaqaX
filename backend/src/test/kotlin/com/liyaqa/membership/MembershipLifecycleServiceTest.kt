@@ -1,5 +1,6 @@
 package com.liyaqa.membership
 
+import com.liyaqa.audit.AuditService
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
@@ -56,6 +57,8 @@ class MembershipLifecycleServiceTest {
     @Mock lateinit var paymentService: PaymentService
 
     @Mock lateinit var invoiceService: InvoiceService
+
+    @Mock lateinit var auditService: AuditService
 
     @InjectMocks lateinit var service: MembershipService
 

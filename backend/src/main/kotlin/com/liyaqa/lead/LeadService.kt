@@ -1,5 +1,7 @@
 package com.liyaqa.lead
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
@@ -53,6 +55,7 @@ class LeadService(
     private val passwordEncoder: PasswordEncoder,
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
+    private val auditService: AuditService,
 ) {
     companion object {
         private val STAGE_ORDER =
@@ -151,6 +154,12 @@ class LeadService(
                 ),
             )
         }
+
+        auditService.logFromContext(
+            action = AuditAction.LEAD_CREATED,
+            entityType = "Lead",
+            entityId = lead.publicId.toString(),
+        )
 
         return hydrateLeadResponse(lead, club.id)
     }
@@ -257,6 +266,13 @@ class LeadService(
         }
 
         leadRepository.save(lead)
+
+        auditService.logFromContext(
+            action = AuditAction.LEAD_UPDATED,
+            entityType = "Lead",
+            entityId = lead.publicId.toString(),
+        )
+
         return hydrateLeadResponse(lead, club.id)
     }
 
@@ -315,6 +331,16 @@ class LeadService(
         }
 
         leadRepository.save(lead)
+
+        if (request.stage == "lost") {
+            auditService.logFromContext(
+                action = AuditAction.LEAD_LOST,
+                entityType = "Lead",
+                entityId = lead.publicId.toString(),
+                changesJson = """{"lostReason":"${request.lostReason ?: ""}"}""",
+            )
+        }
+
         return hydrateLeadResponse(lead, club.id)
     }
 
@@ -398,6 +424,13 @@ class LeadService(
         lead.convertedMemberId = member.id
         lead.convertedAt = Instant.now()
         leadRepository.save(lead)
+
+        auditService.logFromContext(
+            action = AuditAction.LEAD_CONVERTED,
+            entityType = "Lead",
+            entityId = lead.publicId.toString(),
+            changesJson = """{"convertedMemberId":"${member.publicId}"}""",
+        )
 
         return hydrateLeadResponse(lead, club.id)
     }

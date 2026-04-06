@@ -1,5 +1,7 @@
 package com.liyaqa.payment
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.member.Member
 import com.liyaqa.payment.dto.PaymentResponse
@@ -14,6 +16,7 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class PaymentService(
     private val paymentRepository: PaymentRepository,
+    private val auditService: AuditService,
 ) {
     // TODO(#future): Future plan will support refunds via separate refund entity
 
@@ -26,22 +29,33 @@ class PaymentService(
         referenceNumber: String?,
         collectedBy: User,
         notes: String?,
-    ): Payment =
-        paymentRepository.save(
-            Payment(
-                organizationId = member.organizationId,
-                clubId = member.clubId,
-                branchId = member.branchId,
-                memberId = member.id,
-                membershipId = membershipId,
-                amountHalalas = amountHalalas,
-                paymentMethod = paymentMethod,
-                referenceNumber = referenceNumber,
-                collectedById = collectedBy.id,
-                paidAt = Instant.now(),
-                notes = notes,
-            ),
+    ): Payment {
+        val payment =
+            paymentRepository.save(
+                Payment(
+                    organizationId = member.organizationId,
+                    clubId = member.clubId,
+                    branchId = member.branchId,
+                    memberId = member.id,
+                    membershipId = membershipId,
+                    amountHalalas = amountHalalas,
+                    paymentMethod = paymentMethod,
+                    referenceNumber = referenceNumber,
+                    collectedById = collectedBy.id,
+                    paidAt = Instant.now(),
+                    notes = notes,
+                ),
+            )
+
+        auditService.logFromContext(
+            action = AuditAction.PAYMENT_COLLECTED,
+            entityType = "Payment",
+            entityId = payment.publicId.toString(),
+            changesJson = """{"amountHalalas":$amountHalalas,"paymentMethod":"$paymentMethod"}""",
         )
+
+        return payment
+    }
 
     fun toResponse(
         payment: Payment,

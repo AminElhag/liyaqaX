@@ -1,5 +1,7 @@
 package com.liyaqa.cashdrawer
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.cashdrawer.dto.BranchSummary
@@ -41,6 +43,7 @@ class CashDrawerSessionService(
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
     private val userRepository: UserRepository,
+    private val auditService: AuditService,
 ) {
     // ── Open session ────���────────────────────────────────────────────────────
 
@@ -87,6 +90,12 @@ class CashDrawerSessionService(
                     openingFloatHalalas = request.openingFloatHalalas,
                 ),
             )
+
+        auditService.logFromContext(
+            action = AuditAction.CASH_DRAWER_SESSION_OPENED,
+            entityType = "CashDrawerSession",
+            entityId = session.publicId.toString(),
+        )
 
         return toFullResponse(session, club)
     }
@@ -159,6 +168,12 @@ class CashDrawerSessionService(
                 ),
             )
 
+        auditService.logFromContext(
+            action = AuditAction.CASH_DRAWER_ENTRY_ADDED,
+            entityType = "CashDrawerEntry",
+            entityId = entry.publicId.toString(),
+        )
+
         return toEntryResponse(entry, staff)
     }
 
@@ -202,6 +217,12 @@ class CashDrawerSessionService(
         session.closedAt = Instant.now()
 
         sessionRepository.save(session)
+
+        auditService.logFromContext(
+            action = AuditAction.CASH_DRAWER_SESSION_CLOSED,
+            entityType = "CashDrawerSession",
+            entityId = session.publicId.toString(),
+        )
 
         return toFullResponse(session, club)
     }

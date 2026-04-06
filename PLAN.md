@@ -1,313 +1,217 @@
-# PLAN.md — web-nexus (Internal Platform Dashboard)
+# PLAN.md — Audit Logging
 
 ## Status
 Ready for implementation
 
 ## Branch
-feat/web-nexus
+feat/audit-logging
 
 ## Goal
-Build the Liyaqa internal platform dashboard at web-nexus (port 5173). This
-is the tool used exclusively by the Liyaqa team (super admins, support agents,
-integration specialists, read-only auditors). It provides full visibility and
-control over the multi-tenant hierarchy: organizations, clubs, branches, staff,
-and platform-wide metrics. Four platform roles with different permission scopes
-are already seeded. No new entities are required — this plan wires up the
-existing backend to a new frontend and adds a small set of platform-scoped
-read endpoints.
+Add a persistent, tamper-evident audit trail to the Liyaqa platform. Every
+significant write operation across all domains (members, memberships, payments,
+invoices, staff, trainers, GX bookings, PT sessions, leads, cash drawer) is
+recorded in an `AuditLog` entity with actor, action, entity type, entity ID,
+old/new value snapshot, IP address, and timestamp. The web-nexus audit screen
+(already built and returning a graceful empty list) lights up automatically
+once this plan ships.
 
 ## Context
-- `Organization`, `Club`, `Branch`, `StaffMember`, `Trainer`, `Member`,
-  `Membership`, `Invoice`, `Lead`, `PTSession`, `GXClassInstance` all exist.
-- Four platform roles already seeded: Super Admin, Support Agent,
-  Integration Specialist, Read-Only Auditor.
-- JWT `scope = "platform"` already defined. Claims include `roleId`.
-  Permission resolution uses the same Redis-cached RBAC system as web-pulse.
-- `GET /api/v1/auth/me` already returns permissions for the logged-in user.
-- web-pulse is the reference implementation for sidebar layout, TanStack
-  Router, i18n, Tailwind patterns.
-- `ddl-auto: create-drop` in dev — no Flyway migration needed.
-- No new entities required — pure read + a handful of targeted platform writes.
+- All major entities and services are built and in production use.
+- `AuditNexusController` already exists and returns an empty page with
+  `meta.note = "Audit logging will be available in a future release"`.
+  Once `AuditLog` exists, it will serve real data with no frontend changes needed.
+- `audit:read` permission already exists on Super Admin and Read-Only Auditor roles.
+- The backend uses Spring's `@Transactional` services — audit records are written
+  within the same transaction as the business operation (same DB write, guaranteed
+  consistency). If the transaction rolls back, the audit record rolls back too.
+- `ddl-auto: create-drop` in dev — no Flyway migration needed for dev.
+  Production uses Flyway — this plan introduces V10.
+- JWT claims carry `sub` (userId UUID) and `scope` — sufficient to identify actor.
 
 ---
 
 ## Scope — what this plan covers
 
 ### Backend
-- [ ] `OrganizationNexusController.kt` — list + detail + create + update orgs
-- [ ] `ClubNexusController.kt` — list + detail + create + update clubs per org
-- [ ] `BranchNexusController.kt` — list + detail + create + update branches per club
-- [ ] `MemberNexusController.kt` — cross-org member search + detail (read-only)
-- [ ] `PlatformStatsNexusController.kt` — platform-wide KPIs
-- [ ] `AuditNexusController.kt` — platform audit log viewer
-- [ ] `NexusAuthHelper.kt` — JWT scope check for platform endpoints
-- [ ] DTOs for all nexus endpoints
-- [ ] Unit tests: `OrganizationNexusServiceTest`, `PlatformStatsNexusServiceTest`
-- [ ] Integration tests: all nexus controllers
+- [ ] `AuditLog.kt` entity + `AuditLogRepository.kt`
+- [ ] `AuditService.kt` — single `log()` method called from all service layers
+- [ ] `AuditAction.kt` — sealed enum of all auditable action codes
+- [ ] Wire audit calls into existing services:
+  - MemberService — created, updated, deleted
+  - MembershipService — assigned, renewed, frozen, unfrozen, terminated
+  - PaymentService — collected, refunded
+  - StaffService — created, updated, deleted
+  - TrainerService — created, updated, deleted
+  - GXBookingService (arena) — booked, cancelled
+  - PTSession (coach) — attendance marked
+  - LeadService — created, updated, converted, lost
+  - CashDrawerService — session opened, session closed, entry added
+  - MemberOtpService (arena auth) — member login
+- [ ] Update `AuditNexusController` to serve real data (remove meta.note)
+- [ ] `AuditNexusController` filters: date range, actorId, action, entityType
+- [ ] Flyway V10 migration: `audit_logs` table
+- [ ] Unit tests: `AuditServiceTest`
+- [ ] Integration tests: `AuditNexusControllerTest` + spot-check that key
+  services write audit records (MemberServiceAuditTest, MembershipServiceAuditTest)
 
-### Frontend (web-nexus — NEW app)
-- [ ] Bootstrap `web-nexus/` Vite + React 18 + TypeScript app
-  (same stack as web-pulse: TanStack Router, TanStack Query, Zustand,
-  React Hook Form, Zod, i18next, Tailwind — port 5173)
-- [ ] Email + password login (scope check: rejects non-`platform` tokens)
-- [ ] App shell: collapsible sidebar + topbar (same pattern as web-pulse)
-- [ ] Platform home — KPI cards (total orgs, clubs, branches, active members,
-  MRR estimate, active memberships)
-- [ ] Organizations list + detail (clubs inside, key metrics)
-- [ ] Clubs list + detail (branches, staff count, member count, revenue)
-- [ ] Branches list + detail (staff, trainers, members)
-- [ ] Members search — cross-org global member lookup
-- [ ] Audit log viewer — paginated, filterable
-- [ ] i18n: Arabic (default) + English
+### Frontend
+- No frontend changes required. web-nexus audit screen already built.
+  The `meta.note` banner will disappear automatically once the backend
+  returns real records.
 
 ---
 
 ## Out of scope — do not implement in this plan
-- System impersonation (`system:impersonate` permission — future plan,
-  needs careful security design)
-- Deleting organizations, clubs, or branches (destructive — future plan)
-- Platform billing / subscription management (not built yet)
-- Role + permission management UI (seeded roles only — future plan)
-- ZATCA certificate management (Phase 2 — blocked)
-- Email / SMS notifications
-- File upload
+- Audit log viewer in web-pulse (staff-facing) — future plan
+- Audit log export to CSV — future plan
+- Real-time audit streaming / webhooks — future plan
+- Login failures / security events audit — separate security event log
+- Read operation logging (only writes are audited)
+- GDPR right-to-erasure for audit logs — future legal plan
 
 ---
 
 ## Decisions already made
 
-- **Email + password login, scope = "platform"**: reuses `POST /api/v1/auth/login`.
-  web-nexus checks `scope === "platform"` on the returned JWT. Any other scope
-  shows "This app is for Liyaqa platform staff only".
+- **Same-transaction write**: `AuditService.log()` is called from within
+  `@Transactional` service methods, BEFORE the service method returns.
+  This means the audit record and the business record commit or roll back
+  together. No eventual consistency, no async queue needed at this scale.
 
-- **Four platform roles, different nav visibility**:
-  - Super Admin — all screens
-  - Support Agent — orgs/clubs/branches (read-only), members search, no audit log
-  - Integration Specialist — orgs/clubs/branches (read-only), no members, no audit
-  - Read-Only Auditor — audit log only + platform stats
-  Enforced via `PermissionGate` on frontend + `@PreAuthorize` on backend.
+- **Actor from SecurityContext**: `AuditService` calls
+  `SecurityContextHolder.getContext().authentication` to get the current
+  JWT principal. Extracts `userId` (sub claim) and `scope`. Works for all
+  JWT types (platform, club, trainer, member). For system-initiated operations
+  (DevDataLoader, scheduled tasks) actor is set to `"system"`.
 
-- **Platform permission codes** (new — added to seeded roles):
+- **Old/new value as JSON snapshot**: `changesJson` stores a compact JSON
+  string of what changed: `{"field": ["oldValue", "newValue"], ...}`.
+  Only changed fields are included — not the full entity. Max 4000 chars.
+  Truncated with `"...(truncated)"` if over limit. Never store passwords,
+  OTP hashes, or JWT tokens in changesJson.
+
+- **No soft delete on AuditLog**: audit records are immutable. No
+  `deleted_at`, no update after insert. The table is append-only.
+  `AuditLog` does NOT extend `AuditEntity` (which adds `deleted_at`) —
+  it extends a minimal `BaseAuditLog` with only `id` (Long PK) and
+  `publicId` (UUID). No `createdBy` / `updatedBy` fields on the audit
+  log itself (that would be recursive).
+
+- **Flyway V10**: this is the first plan since V9 (cash drawer). V7 was
+  skipped. Next available version is V10.
+
+- **AuditAction enum** — string codes stored in DB as VARCHAR(100):
   ```
-  organization:create, organization:read, organization:update
-  club:create, club:read, club:update
-  branch:create, branch:read, branch:update
-  member:read (cross-org search — platform-only)
-  platform:stats:view
-  audit:read
+  MEMBER_CREATED, MEMBER_UPDATED, MEMBER_DELETED
+  MEMBERSHIP_ASSIGNED, MEMBERSHIP_RENEWED, MEMBERSHIP_FROZEN,
+    MEMBERSHIP_UNFROZEN, MEMBERSHIP_TERMINATED
+  PAYMENT_COLLECTED, PAYMENT_REFUNDED
+  STAFF_CREATED, STAFF_UPDATED, STAFF_DELETED
+  TRAINER_CREATED, TRAINER_UPDATED, TRAINER_DELETED
+  GX_BOOKED, GX_BOOKING_CANCELLED
+  PT_ATTENDANCE_MARKED
+  LEAD_CREATED, LEAD_UPDATED, LEAD_CONVERTED, LEAD_LOST
+  CASH_DRAWER_SESSION_OPENED, CASH_DRAWER_SESSION_CLOSED, CASH_DRAWER_ENTRY_ADDED
+  MEMBER_LOGIN
   ```
-  Most of these already exist on the seeded roles. `platform:stats:view` is new.
 
-- **Nexus controllers are separate from Pulse controllers**: naming convention
-  `[Domain]NexusController`. They check `scope = "platform"` via
-  `NexusAuthHelper` and then check the specific permission via `@PreAuthorize`.
+- **IP address best-effort**: extracted from `X-Forwarded-For` header if
+  present, else `HttpServletRequest.remoteAddr`. Nullable — not available
+  for internal/system operations. Stored as VARCHAR(45) (supports IPv6).
 
-- **Cross-org member search**: Support Agents need to look up a member by
-  phone/email/name across all organizations. `GET /api/v1/nexus/members?q=`
-  searches across all tenants. This is a platform-only endpoint — not exposed
-  in web-pulse or web-arena.
-
-- **Platform stats are computed on request**: no caching layer yet. Simple
-  aggregate queries over existing tables. Numbers are approximate (best-effort,
-  not financial-grade). All native `@Query` with `nativeQuery = true` to avoid
-  JPQL date arithmetic bugs.
-
-- **Audit log already exists**: `AuditLog` entity (if present) or we expose
-  the existing audit trail. If no AuditLog entity exists, the audit screen
-  shows a placeholder "Audit logging coming in a future plan" — do not create
-  the entity speculatively.
-
-- **No branch selector in topbar**: web-pulse has a branch selector because
-  staff are scoped to branches. Platform staff see everything — no branch
-  selector needed.
-
-- **MRR estimate**: sum of active membership `priceHalalas` / plan duration
-  normalized to monthly. Displayed as SAR. Labeled "Estimated MRR" with a
-  tooltip explaining it's approximate. Never treated as financial truth.
+- **entityType + entityId**: `entityType` is the domain name as a string
+  (e.g., `"Member"`, `"Membership"`, `"Payment"`). `entityId` is the
+  `publicId` UUID of the affected record. Both are VARCHAR — no FK constraint
+  (avoids cascade delete issues; audit log must survive entity deletion).
 
 ---
 
 ## Entity design
 
-No new entities. One new permission code:
+### AuditLog
+
+Does NOT extend `AuditEntity`. Minimal custom base only.
 
 ```
-platform:stats:view   → assigned to Super Admin and Read-Only Auditor
+id                BIGINT PK auto-increment       (internal, never exposed)
+public_id         UUID NOT NULL UNIQUE DEFAULT gen_random_uuid()
+actor_id          VARCHAR(100) NOT NULL           (userId UUID or "system")
+actor_scope       VARCHAR(20) NOT NULL            ("platform"|"club"|"trainer"|"member"|"system")
+action            VARCHAR(100) NOT NULL           (AuditAction enum value)
+entity_type       VARCHAR(100) NOT NULL           ("Member", "Membership", etc.)
+entity_id         VARCHAR(100) NOT NULL           (publicId UUID of affected record)
+organization_id   VARCHAR(100)                    nullable (UUID, for tenant filtering)
+club_id           VARCHAR(100)                    nullable (UUID)
+changes_json      TEXT                            nullable (compact JSON of changes)
+ip_address        VARCHAR(45)                     nullable
+created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 ```
 
-All other permission codes already exist in the RBAC seed data.
+No `updated_at`, no `deleted_at`, no `created_by`. Append-only.
+
+### Flyway V10 migration
+
+```sql
+CREATE TABLE audit_logs (
+    id                BIGSERIAL PRIMARY KEY,
+    public_id         UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    actor_id          VARCHAR(100) NOT NULL,
+    actor_scope       VARCHAR(20) NOT NULL,
+    action            VARCHAR(100) NOT NULL,
+    entity_type       VARCHAR(100) NOT NULL,
+    entity_id         VARCHAR(100) NOT NULL,
+    organization_id   VARCHAR(100),
+    club_id           VARCHAR(100),
+    changes_json      TEXT,
+    ip_address        VARCHAR(45),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_actor_id    ON audit_logs(actor_id);
+CREATE INDEX idx_audit_logs_action      ON audit_logs(action);
+CREATE INDEX idx_audit_logs_entity      ON audit_logs(entity_type, entity_id);
+CREATE INDEX idx_audit_logs_org_id      ON audit_logs(organization_id);
+CREATE INDEX idx_audit_logs_created_at  ON audit_logs(created_at DESC);
+```
 
 ---
 
 ## API endpoints
 
-### NexusAuthHelper — used by all nexus controllers
-Extracts and validates `scope = "platform"` from JWT. Returns 403 if scope
-is not `platform`.
-
-### OrganizationNexusController — `/api/v1/nexus/organizations`
+### AuditNexusController — `/api/v1/nexus/audit` (UPDATE existing)
 
 ```
-GET    /api/v1/nexus/organizations              paginated list with search
-GET    /api/v1/nexus/organizations/{id}         org detail with club summary
-POST   /api/v1/nexus/organizations              create new org
-PATCH  /api/v1/nexus/organizations/{id}         update org
+GET /api/v1/nexus/audit
+  ?page=0&size=20
+  &actorId=uuid           (optional — filter by actor)
+  &action=MEMBER_CREATED  (optional — filter by action code)
+  &entityType=Member      (optional — filter by entity type)
+  &organizationId=uuid    (optional — filter by org)
+  &from=yyyy-MM-dd        (optional — created_at >= from)
+  &to=yyyy-MM-dd          (optional — created_at <= to + end of day)
 ```
 
-Required permissions: `organization:read` (GET), `organization:create` (POST),
-`organization:update` (PATCH).
-
-### ClubNexusController — `/api/v1/nexus/organizations/{orgId}/clubs`
-
-```
-GET    /api/v1/nexus/organizations/{orgId}/clubs          list clubs for org
-GET    /api/v1/nexus/organizations/{orgId}/clubs/{id}     club detail with metrics
-POST   /api/v1/nexus/organizations/{orgId}/clubs          create club
-PATCH  /api/v1/nexus/organizations/{orgId}/clubs/{id}     update club
-```
-
-Required permissions: `club:read` (GET), `club:create` (POST),
-`club:update` (PATCH).
-
-### BranchNexusController — `/api/v1/nexus/organizations/{orgId}/clubs/{clubId}/branches`
-
-```
-GET    .../branches          list branches for club
-GET    .../branches/{id}     branch detail (staff count, trainer count, member count)
-POST   .../branches          create branch
-PATCH  .../branches/{id}     update branch
-```
-
-Required permissions: `branch:read` (GET), `branch:create` (POST),
-`branch:update` (PATCH).
-
-### MemberNexusController — `/api/v1/nexus/members`
-
-```
-GET    /api/v1/nexus/members?q=&page=&size=   cross-org member search
-GET    /api/v1/nexus/members/{id}             member detail (read-only)
-```
-
-Required permission: `member:read`.
-
-### PlatformStatsNexusController — `/api/v1/nexus/stats`
-
-```
-GET    /api/v1/nexus/stats    platform-wide KPIs
-```
-
-Required permission: `platform:stats:view`.
-
-### AuditNexusController — `/api/v1/nexus/audit`
-
-```
-GET    /api/v1/nexus/audit?page=&size=&actorId=&action=&from=&to=   audit log
-```
-
+Returns standard Spring `Page<AuditLogResponse>`. No more `meta.note`.
 Required permission: `audit:read`.
-If no `AuditLog` entity exists, returns empty list with a `meta.note` field:
-`"Audit logging will be available in a future release"`.
 
 ---
 
 ## Request / Response shapes
 
-### OrgListItemResponse
+### AuditLogResponse
 ```json
 {
   "id": "uuid",
-  "name": "string",
-  "nameAr": "string",
-  "vatNumber": "string | null",
-  "clubCount": 3,
-  "activeMemberCount": 420,
+  "actorId": "uuid | system",
+  "actorScope": "platform | club | trainer | member | system",
+  "action": "MEMBER_CREATED",
+  "entityType": "Member",
+  "entityId": "uuid",
+  "organizationId": "uuid | null",
+  "clubId": "uuid | null",
+  "changesJson": "{\"firstName\": [\"Ali\", \"Ahmed\"]}",
+  "ipAddress": "192.168.1.1 | null",
   "createdAt": "ISO 8601"
-}
-```
-
-### OrgDetailResponse
-```json
-{
-  "id": "uuid",
-  "name": "string",
-  "nameAr": "string",
-  "vatNumber": "string | null",
-  "createdAt": "ISO 8601",
-  "clubs": [
-    {
-      "id": "uuid",
-      "name": "string",
-      "nameAr": "string",
-      "branchCount": 2,
-      "activeMemberCount": 210
-    }
-  ]
-}
-```
-
-### CreateOrganizationRequest
-```json
-{
-  "name": "string (required)",
-  "nameAr": "string (required)",
-  "vatNumber": "string (optional)"
-}
-```
-
-### ClubDetailResponse
-```json
-{
-  "id": "uuid",
-  "name": "string",
-  "nameAr": "string",
-  "vatNumber": "string | null",
-  "branchCount": 2,
-  "staffCount": 8,
-  "activeMemberCount": 210,
-  "activeMembers": 210,
-  "estimatedMrrHalalas": 31500000,
-  "estimatedMrrSar": "315000.00"
-}
-```
-
-### BranchDetailResponse
-```json
-{
-  "id": "uuid",
-  "name": "string",
-  "nameAr": "string",
-  "staffCount": 4,
-  "trainerCount": 2,
-  "activeMemberCount": 105
-}
-```
-
-### MemberSearchItemResponse
-```json
-{
-  "id": "uuid",
-  "firstName": "string",
-  "lastName": "string",
-  "phone": "string",
-  "email": "string | null",
-  "clubName": "string",
-  "organizationName": "string",
-  "membershipStatus": "active | expired | frozen | none"
-}
-```
-
-### PlatformStatsResponse
-```json
-{
-  "totalOrganizations": 12,
-  "totalClubs": 34,
-  "totalBranches": 78,
-  "totalActiveMembers": 8420,
-  "totalActiveMemberships": 7910,
-  "estimatedMrrHalalas": 1188000000,
-  "estimatedMrrSar": "11880000.00",
-  "newMembersLast30Days": 312,
-  "generatedAt": "ISO 8601"
 }
 ```
 
@@ -315,149 +219,44 @@ If no `AuditLog` entity exists, returns empty list with a `meta.note` field:
 
 ## Business rules — enforce in service layer
 
-1. **Platform scope only** — all nexus endpoints check `scope = "platform"`
-   via `NexusAuthHelper`. Return 403 for any other scope.
+1. **Audit is fire-and-forget within transaction**: `AuditService.log()` never
+   throws. If building the audit record fails for any reason (e.g., missing
+   claim), it logs a WARN and returns — it must never cause the business
+   operation to fail.
 
-2. **Permission gates per endpoint** — each endpoint uses `@PreAuthorize`
-   with the specific permission code. Read-Only Auditor cannot call POST/PATCH.
-   Support Agent cannot call audit endpoints. Integration Specialist cannot
-   search members.
+2. **Never audit reads**: only write operations (create, update, delete,
+   state transitions) are audited. No GET endpoint triggers an audit record.
 
-3. **Cross-org member search requires `q` param** — minimum 2 characters.
-   Return 422 "Search query must be at least 2 characters" if shorter.
-   Searches across `firstName`, `lastName`, `phone`, `email` (case-insensitive,
-   partial match). Max 50 results per page.
+3. **Never store sensitive data in changesJson**: passwords, OTP hashes,
+   JWT tokens, and full payment card numbers must never appear. For Payment
+   records, log `amountHalalas` and `paymentMethod` only — never raw card data.
 
-4. **Org/Club/Branch create: unique name per parent** — organization `name`
-   must be unique across all orgs. Club `name` must be unique within the org.
-   Branch `name` must be unique within the club. Return 409 "Name already
-   exists" on violation.
+4. **Truncate changesJson at 4000 chars**: if the serialized changes JSON
+   exceeds 4000 characters, truncate and append `"...(truncated)"`.
 
-5. **MRR estimate calculation**: for each active membership, take the plan's
-   `priceHalalas` and normalize to monthly:
-   - Monthly plan: `priceHalalas × 1`
-   - Quarterly plan: `priceHalalas / 3`
-   - Annual plan: `priceHalalas / 12`
-   Sum all values. Round to nearest halala. Always labeled "estimated" in
-   both API response field name and UI tooltip.
+5. **System actor**: DevDataLoader and any background job calls `AuditService`
+   with `actorId = "system"`, `actorScope = "system"`. Never null actor.
 
-6. **Stats are best-effort**: `GET /nexus/stats` runs aggregate queries
-   directly — no caching. All date queries use `nativeQuery = true`.
-   Response always includes `generatedAt` timestamp so caller knows when
-   numbers were computed.
+6. **Filters use nativeQuery = true**: all date-range and multi-field filter
+   queries use `nativeQuery = true` with a `countQuery` for pagination.
+   No JPQL date arithmetic.
 
-7. **Audit log returns empty if no entity**: if `AuditLog` entity/table does
-   not exist, `GET /nexus/audit` returns `{ "content": [], "totalElements": 0,
-   "meta": { "note": "Audit logging will be available in a future release" } }`.
-   Do not throw an exception or 500.
+7. **organizationId / clubId on audit record**: extracted from the JWT claims
+   when available (`organizationId`, `clubId`). Null for platform-scope actors
+   acting outside a specific org. Used for tenant-scoped filtering in the
+   nexus audit screen.
 
-8. **Soft-deleted records excluded**: all list endpoints exclude records where
-   `deleted_at IS NOT NULL`.
+8. **Member login audited**: `MemberAuthService.verifyOtp()` success path
+   calls `AuditService.log(MEMBER_LOGIN, "Member", memberId, ...)`.
+   Failed OTP attempts are NOT audited (avoid polluting log with noise).
 
 ---
 
 ## Seed data updates
 
-Add to `DevDataLoader.kt`:
-
-```
-Add platform:stats:view permission to:
-  - Super Admin role
-  - Read-Only Auditor role
-
-(All other platform permission codes should already be on the seeded roles —
-verify and add any missing ones during Step 6.)
-```
-
----
-
-## Frontend additions (web-nexus)
-
-### Bootstrap web-nexus app
-New Vite app at `web-nexus/` with same stack as web-pulse:
-React 18, TypeScript strict, TanStack Router (file-based), TanStack Query,
-Zustand (auth state + permissions), React Hook Form + Zod, Tailwind CSS, i18next.
-Port: 5173. JWT scope check: rejects non-`platform` tokens with
-"This app is for Liyaqa platform staff only".
-
-### Login — /auth/login
-Standard email + password. On success: checks `scope === "platform"`.
-Non-platform token shows error. On success → store JWT + permissions in
-Zustand → redirect to `/`.
-
-### App shell
-Collapsible left sidebar (same pattern as web-pulse).
-Nav items and their required permissions:
-- Home / Stats (`platform:stats:view`)
-- Organizations (`organization:read`)
-- Members Search (`member:read`)
-- Audit Log (`audit:read`)
-
-Header: "Liyaqa Platform" logo, logged-in user name, language toggle, logout.
-No branch selector (platform users see everything).
-
-### Home / Stats — /
-Six KPI cards: Total Organizations, Total Clubs, Total Branches,
-Active Members, Active Memberships, Estimated MRR (SAR).
-Two supporting numbers below: New Members (last 30 days), Generated At timestamp.
-"Refresh" button to re-fetch stats on demand.
-Gated by `platform:stats:view` — auditors and super admins only.
-
-### Organizations — /organizations
-Paginated table: org name (AR + EN), VAT number, club count, active member count,
-created date. Search input. "New Organization" button (Super Admin only,
-gated by `organization:create`).
-Tap row → org detail page.
-
-### Org Detail — /organizations/$orgId
-Org name, VAT number, created date.
-Clubs table: club name, branch count, active members. Tap → club detail.
-"Edit" button (gated by `organization:update`) → inline edit form.
-"Add Club" button (gated by `club:create`) → create club modal.
-
-### Club Detail — /organizations/$orgId/clubs/$clubId
-Club name, VAT number, branch count, staff count, active member count,
-Estimated MRR card.
-Branches table: branch name, staff count, trainer count, member count.
-Tap → branch detail.
-"Edit" and "Add Branch" buttons (gated by respective permissions).
-
-### Branch Detail — /organizations/$orgId/clubs/$clubId/branches/$branchId
-Branch name, staff count, trainer count, active member count.
-Read-only — no edit for branches in this plan (create/update exists but
-branch detail editing is staff-ops, not platform-ops).
-
-### Members Search — /members
-Search input (min 2 chars, debounced 300ms).
-Results table: member name, phone, email, club, org, membership status badge.
-Tap row → member detail (read-only profile: name, contact, active membership summary).
-Gated by `member:read`.
-
-### Audit Log — /audit
-Paginated table: timestamp, actor (name + email), action, entity type, entity ID.
-Filters: date range, action type.
-If backend returns empty with meta note → show info banner instead of empty state.
-Gated by `audit:read`.
-
-### i18n key sample
-```json
-{
-  "login.scope_error": "This app is for Liyaqa platform staff only",
-  "stats.title": "Platform Overview",
-  "stats.total_orgs": "Organizations",
-  "stats.total_clubs": "Clubs",
-  "stats.total_branches": "Branches",
-  "stats.active_members": "Active Members",
-  "stats.estimated_mrr": "Estimated MRR",
-  "stats.mrr_tooltip": "Approximate monthly recurring revenue based on active memberships. Not a financial statement.",
-  "stats.generated_at": "As of {{time}}",
-  "orgs.new": "New Organization",
-  "orgs.vat": "VAT Number",
-  "members.search_placeholder": "Search by name, phone, or email...",
-  "members.min_chars": "Enter at least 2 characters to search",
-  "audit.empty_note": "Audit logging will be available in a future release"
-}
-```
+No new seed data. DevDataLoader already creates all entities — once the audit
+table exists, the seeded operations will write audit records automatically
+(since `AuditService.log()` is called from within the service methods).
 
 ---
 
@@ -465,103 +264,30 @@ Gated by `audit:read`.
 
 ### Backend — new files
 ```
-nexus/
-  NexusAuthHelper.kt
-  OrganizationNexusController.kt
-  ClubNexusController.kt
-  BranchNexusController.kt
-  MemberNexusController.kt
-  PlatformStatsNexusController.kt
-  AuditNexusController.kt
+audit/
+  AuditLog.kt
+  AuditLogRepository.kt
+  AuditService.kt
+  AuditAction.kt              (enum/sealed class with all action codes)
   dto/
-    OrgListItemResponse.kt
-    OrgDetailResponse.kt
-    CreateOrganizationRequest.kt
-    UpdateOrganizationRequest.kt
-    ClubDetailResponse.kt
-    CreateClubNexusRequest.kt
-    UpdateClubNexusRequest.kt
-    BranchDetailResponse.kt
-    CreateBranchNexusRequest.kt
-    MemberSearchItemResponse.kt
-    MemberDetailNexusResponse.kt
-    PlatformStatsResponse.kt
     AuditLogResponse.kt
 ```
 
 ### Backend — modified files
 ```
-config/DevDataLoader.kt    add platform:stats:view permission to Super Admin + Auditor
-config/SecurityConfig.kt   no changes needed (nexus routes use @PreAuthorize)
-```
-
-### Frontend — new app
-```
-web-nexus/
-  package.json                 (React 18, TypeScript, Vite, TanStack Router/Query,
-                                Zustand, RHF, Zod, i18next, Tailwind)
-  vite.config.ts               (port 5173)
-  tsconfig.json
-  index.html
-  src/
-    main.tsx
-    router.tsx
-    store/authStore.ts         (JWT in memory, user profile, permissions set)
-    lib/
-      api.ts
-      permissions.ts           (hasPermission helper)
-      formatCurrency.ts
-    types/
-      domain.ts
-    i18n/
-      index.ts
-      en.json
-      ar.json
-    api/
-      auth.ts
-      organizations.ts
-      clubs.ts
-      branches.ts
-      members.ts
-      stats.ts
-      audit.ts
-    routes/
-      __root.tsx               (auth guard + permissions fetch)
-      auth/
-        login.tsx
-      index.tsx                (platform stats / home)
-      organizations/
-        index.tsx
-        $orgId.tsx
-        $orgId.clubs.$clubId.tsx
-        $orgId.clubs.$clubId.branches.$branchId.tsx
-      members/
-        index.tsx
-        $memberId.tsx
-      audit.tsx
-    components/
-      shell/
-        Sidebar.tsx
-        AppHeader.tsx
-      stats/
-        KpiCard.tsx
-      organizations/
-        OrgTable.tsx
-        OrgForm.tsx
-        ClubTable.tsx
-        ClubForm.tsx
-      members/
-        MemberSearchResult.tsx
-        MembershipStatusBadge.tsx
-      audit/
-        AuditTable.tsx
-        AuditFilters.tsx
-      common/
-        PermissionGate.tsx
-        StatusBadge.tsx
-        EmptyState.tsx
-        LoadingSpinner.tsx
-        Pagination.tsx
+nexus/AuditNexusController.kt         replace empty stub with real paginated query
+nexus/dto/AuditLogResponse.kt         (already exists — verify fields match, update if needed)
+member/MemberService.kt               add audit calls: MEMBER_CREATED/UPDATED/DELETED
+membership/MembershipService.kt       add audit calls: 5 membership actions
+payment/PaymentService.kt             add audit calls: PAYMENT_COLLECTED/REFUNDED
+staff/StaffService.kt                 add audit calls: STAFF_CREATED/UPDATED/DELETED
+trainer/TrainerService.kt             add audit calls: TRAINER_CREATED/UPDATED/DELETED
+arena/GxArenaService.kt               add audit calls: GX_BOOKED/GX_BOOKING_CANCELLED
+coach/PtCoachService.kt               add audit call: PT_ATTENDANCE_MARKED
+lead/LeadService.kt                   add audit calls: LEAD_CREATED/UPDATED/CONVERTED/LOST
+cashdrawer/CashDrawerService.kt       add audit calls: 3 cash drawer actions
+auth/MemberAuthService.kt             add audit call: MEMBER_LOGIN on successful verify
+resources/db/migration/V10__audit_logs.sql
 ```
 
 ---
@@ -569,169 +295,98 @@ web-nexus/
 ## Implementation order
 
 ```
-Step 1 — NexusAuthHelper + OrganizationNexusController
-  nexus/NexusAuthHelper.kt — requirePlatformScope(), extract roleId from JWT
-  nexus/OrganizationNexusController.kt:
-    GET /nexus/organizations?q=&page=&size= — list with search, excludes deleted
-    GET /nexus/organizations/{id} — org detail with clubs summary
-    POST /nexus/organizations — create (rule 4: unique name)
-    PATCH /nexus/organizations/{id} — update
-  DTOs: OrgListItemResponse, OrgDetailResponse, CreateOrganizationRequest, UpdateOrganizationRequest
-  All list queries use nativeQuery=true if any date or aggregate involved
+Step 1 — AuditLog entity + AuditAction enum + AuditService
+  audit/AuditAction.kt — enum with all 24 action codes as strings
+  audit/AuditLog.kt — append-only entity, no AuditEntity extension,
+    custom base with id (Long) + publicId (UUID) + createdAt only
+  audit/AuditLogRepository.kt — save() + paginated filtered query
+    (nativeQuery=true with countQuery, all filter params nullable)
+  audit/AuditService.kt:
+    fun log(action, entityType, entityId, actorId, actorScope,
+            organizationId?, clubId?, changesJson?, ipAddress?)
+    Never throws — catches all exceptions, logs WARN (rule 1)
+    Truncates changesJson > 4000 chars (rule 4)
   Verify: ./gradlew build -x test
 
-Step 2 — ClubNexusController + BranchNexusController
-  nexus/ClubNexusController.kt:
-    GET /nexus/organizations/{orgId}/clubs — list
-    GET /nexus/organizations/{orgId}/clubs/{id} — detail with MRR estimate (rule 5)
-    POST + PATCH — create/update (rule 4: unique name within org)
-  nexus/BranchNexusController.kt:
-    GET .../branches — list
-    GET .../branches/{id} — detail with counts
-    POST + PATCH — create/update (rule 4: unique name within club)
-  DTOs: ClubDetailResponse, BranchDetailResponse, Create/Update requests
+Step 2 — Flyway V10 migration
+  resources/db/migration/V10__audit_logs.sql
+  CREATE TABLE audit_logs with all columns + 5 indexes
+  Verify: ./gradlew flywayMigrate (staging/test DB)
+  Dev uses ddl-auto: create-drop — no manual migration needed in dev
+
+Step 3 — Wire audit into member + membership + payment services
+  MemberService.kt:
+    createMember() → log(MEMBER_CREATED, "Member", member.publicId, ...)
+    updateMember() → log(MEMBER_UPDATED, changes snapshot)
+    deleteMember() → log(MEMBER_DELETED)
+  MembershipService.kt:
+    assignMembership() → MEMBERSHIP_ASSIGNED
+    renewMembership() → MEMBERSHIP_RENEWED
+    freezeMembership() → MEMBERSHIP_FROZEN
+    unfreezeMembership() → MEMBERSHIP_UNFROZEN
+    terminateMembership() → MEMBERSHIP_TERMINATED
+  PaymentService.kt:
+    collectPayment() → PAYMENT_COLLECTED (log amountHalalas + paymentMethod only)
+    refundPayment() → PAYMENT_REFUNDED
   Verify: ./gradlew build -x test
 
-Step 3 — MemberNexusController
-  nexus/MemberNexusController.kt:
-    GET /nexus/members?q=&page=&size= — cross-org search (rule 3: min 2 chars)
-    GET /nexus/members/{id} — member detail (read-only)
-  Search: ILIKE across firstName, lastName, phone, email using nativeQuery=true
-  DTOs: MemberSearchItemResponse, MemberDetailNexusResponse
+Step 4 — Wire audit into staff + trainer + lead + cash drawer services
+  StaffService.kt → STAFF_CREATED/UPDATED/DELETED
+  TrainerService.kt → TRAINER_CREATED/UPDATED/DELETED
+  LeadService.kt → LEAD_CREATED/UPDATED/CONVERTED/LOST
+  CashDrawerService.kt:
+    openSession() → CASH_DRAWER_SESSION_OPENED
+    closeSession() → CASH_DRAWER_SESSION_CLOSED
+    addEntry() → CASH_DRAWER_ENTRY_ADDED
   Verify: ./gradlew build -x test
 
-Step 4 — PlatformStatsNexusController
-  nexus/PlatformStatsNexusController.kt:
-    GET /nexus/stats — platform KPIs (rule 6: best-effort, nativeQuery=true)
-    MRR estimate: SUM with plan duration normalization (rule 5)
-  DTO: PlatformStatsResponse (includes generatedAt)
-  All aggregate queries: nativeQuery=true
+Step 5 — Wire audit into arena + coach services
+  GxArenaService.kt (arena booking):
+    bookClass() → GX_BOOKED
+    cancelBooking() → GX_BOOKING_CANCELLED
+  PtCoachService.kt:
+    markAttendance() → PT_ATTENDANCE_MARKED (log sessionId + new status)
+  MemberAuthService.kt:
+    verifyOtp() success path → MEMBER_LOGIN (rule 8)
+    Failed OTP → NOT audited
   Verify: ./gradlew build -x test
 
-Step 5 — AuditNexusController
-  nexus/AuditNexusController.kt:
-    GET /nexus/audit?page=&size=&from=&to= — paginated audit log
-    If AuditLog entity doesn't exist → return empty page + meta note (rule 7)
-  DTO: AuditLogResponse
+Step 6 — Update AuditNexusController
+  Replace the graceful-empty stub with real implementation:
+    GET /nexus/audit with all filter params (actorId, action, entityType,
+    organizationId, from, to, page, size)
+  All filtering via nativeQuery=true with countQuery (rule 6)
+  Remove meta.note from response — return standard Page<AuditLogResponse>
   Verify: ./gradlew build -x test
-
-Step 6 — Seed data + permissions
-  Update DevDataLoader.kt:
-    Add platform:stats:view permission to Super Admin + Read-Only Auditor
-    Verify all existing platform permission codes are present on correct roles
-  Verify: ./gradlew bootRun --args='--spring.profiles.active=dev'
-  Manual: POST /api/v1/auth/login {email: "admin@liyaqa.com", password: "Admin1234!"}
-    → JWT has scope=platform
-  Manual: GET /api/v1/nexus/stats with admin JWT → returns counts
+  Manual: ./gradlew bootRun → POST login as admin → GET /nexus/audit
+    → should see MEMBER_LOGIN + DevDataLoader seed audit records
 
 Step 7 — Backend tests
-  OrganizationNexusControllerTest.kt (integration):
-    - list orgs, search, create (happy path + duplicate name 409),
-      update, non-platform scope (403)
-  ClubNexusControllerTest.kt (integration):
-    - list clubs, club detail with MRR, create, duplicate name (409)
-  MemberNexusControllerTest.kt (integration):
-    - cross-org search happy path, q < 2 chars (422), integration specialist (403)
-  PlatformStatsNexusControllerTest.kt (integration):
-    - stats returned with correct structure, auditor can access, support agent (403)
-  OrganizationNexusServiceTest.kt (unit):
-    - MRR estimate: monthly/quarterly/annual normalization, mixed plan types
-    - Unique name enforcement
+  AuditServiceTest.kt (unit):
+    - log() persists record with correct fields
+    - log() never throws even when AuditLogRepository throws (rule 1)
+    - changesJson truncated at 4000 chars (rule 4)
+    - system actor accepted (rule 5)
+  MemberServiceAuditTest.kt (integration):
+    - createMember() produces MEMBER_CREATED audit record
+    - updateMember() produces MEMBER_UPDATED with changes snapshot
+    - deleteMember() produces MEMBER_DELETED
+  MembershipServiceAuditTest.kt (integration):
+    - assignMembership() → MEMBERSHIP_ASSIGNED record exists
+    - terminateMembership() → MEMBERSHIP_TERMINATED record exists
+  AuditNexusControllerTest.kt (integration):
+    - GET /nexus/audit returns paginated records
+    - filter by action=MEMBER_CREATED returns only that action
+    - filter by from/to returns correct date range
+    - filter by organizationId scopes correctly
+    - non-audit:read user returns 403
+    - pagination: page=0&size=5 returns correct slice
   Verify: ./gradlew test --no-daemon
 
 Step 8 — Backend final checks
   ./gradlew ktlintFormat --no-daemon
   ./gradlew ktlintCheck --no-daemon
   ./gradlew build --no-daemon
-
-Step 9 — Bootstrap web-nexus app
-  Create web-nexus/ with package.json (port 5173)
-  Install: react, react-dom, typescript, vite, @tanstack/react-router,
-    @tanstack/react-query, zustand, react-hook-form, zod, i18next,
-    react-i18next, tailwindcss, axios
-  Setup: vite.config.ts, tsconfig.json, tailwind.config.js, index.html,
-    src/main.tsx, src/router.tsx
-  src/store/authStore.ts — JWT in memory, user profile, permissions Set<string>
-  src/lib/permissions.ts — hasPermission(permission: string): boolean
-  src/lib/api.ts — axios instance → backend port 8080
-  Verify: cd web-nexus && npm run dev → blank app at localhost:5173
-
-Step 10 — Auth flow + app shell
-  src/api/auth.ts — login, logout, refresh
-  src/routes/auth/login.tsx:
-    Email + password, check scope === "platform"
-    Non-platform → "This app is for Liyaqa platform staff only"
-  src/routes/__root.tsx:
-    Auth guard: no JWT → /auth/login
-    On mount: GET /api/v1/auth/me → populate permissions in Zustand
-    On 401 → clear + redirect to login
-  src/components/shell/Sidebar.tsx:
-    Nav items with PermissionGate wrapping each section
-  src/components/shell/AppHeader.tsx:
-    "Liyaqa Platform" + user name + language toggle + logout
-  src/components/common/PermissionGate.tsx
-  Verify: npm run dev → login with admin@liyaqa.com → sidebar visible
-    Login with owner@elixir.com → rejected with scope error
-
-Step 11 — Platform stats home
-  src/api/stats.ts — getStats()
-  src/routes/index.tsx:
-    6 KpiCard components in 3×2 grid
-    MRR card with tooltip explaining "estimated"
-    Refresh button, generatedAt timestamp
-    PermissionGate: platform:stats:view (auditor + super admin see this)
-  src/components/stats/KpiCard.tsx
-  Verify: npm run dev → home shows counts for Liyaqa Demo Org data
-
-Step 12 — Organizations screens
-  src/api/organizations.ts — listOrgs, getOrg, createOrg, updateOrg
-  src/routes/organizations/index.tsx:
-    Searchable paginated table (OrgTable)
-    "New Organization" button (PermissionGate: organization:create)
-    OrgForm modal for create
-  src/routes/organizations/$orgId.tsx:
-    Org detail: name, VAT, ClubTable with metrics
-    "Edit" button (PermissionGate: organization:update) → inline OrgForm
-    "Add Club" button (PermissionGate: club:create) → ClubForm modal
-  src/routes/organizations/$orgId.clubs.$clubId.tsx:
-    Club detail: metrics, MRR card, BranchTable
-    "Edit" and "Add Branch" (gated)
-  src/routes/organizations/$orgId.clubs.$clubId.branches.$branchId.tsx:
-    Branch detail: name + counts (read-only)
-  Verify: npm run dev → create a new org, navigate into it, see club table
-
-Step 13 — Members search
-  src/api/members.ts — searchMembers(q, page), getMember(id)
-  src/routes/members/index.tsx:
-    Search input (debounced 300ms, min 2 chars, show helper text below)
-    MemberSearchResult table with status badge
-  src/routes/members/$memberId.tsx:
-    Read-only member detail: name, phone, email, club, org, membership status
-  src/components/members/MemberSearchResult.tsx
-  Verify: npm run dev → search "Ahmed" → Ahmed Al-Rashidi appears
-
-Step 14 — Audit log
-  src/api/audit.ts — getAuditLog(params)
-  src/routes/audit.tsx:
-    Date range filter + action filter + paginated AuditTable
-    If response has meta.note → show InfoBanner instead of empty state
-  src/components/audit/AuditTable.tsx
-  src/components/audit/AuditFilters.tsx
-  Verify: npm run dev → audit screen shows info banner (no AuditLog entity yet)
-
-Step 15 — Frontend tests
-  Login.test.tsx — rejects non-platform scope
-  PermissionGate.test.tsx — hides children when permission absent
-  KpiCard.test.tsx — renders value and label correctly
-  OrgTable.test.tsx — renders org list, search input visible
-  MemberSearchResult.test.tsx — shows correct membership status badge
-  Sidebar.test.tsx — support agent: no audit log item; auditor: no org create button
-  Verify: npm test
-
-Step 16 — Frontend final checks
-  npm run typecheck
-  npm run lint
-  npm run build
 ```
 
 ---
@@ -739,65 +394,44 @@ Step 16 — Frontend final checks
 ## Acceptance criteria
 
 ### Backend
-- [ ] `GET /nexus/organizations` returns Liyaqa Demo Org with correct club count
-- [ ] `POST /nexus/organizations` with duplicate name returns 409
-- [ ] `GET /nexus/organizations/{id}` returns org detail with clubs
-- [ ] `GET /nexus/stats` returns all 7 KPI fields including estimatedMrrSar
-- [ ] MRR estimate correctly normalizes quarterly (÷3) and annual (÷12) plans
-- [ ] `GET /nexus/members?q=ah` returns Ahmed Al-Rashidi
-- [ ] `GET /nexus/members?q=a` (1 char) returns 422
-- [ ] `GET /nexus/audit` returns empty page + meta.note (no AuditLog entity)
-- [ ] Support Agent calling `GET /nexus/audit` returns 403
-- [ ] Integration Specialist calling `GET /nexus/members` returns 403
-- [ ] Non-platform JWT calling any nexus endpoint returns 403
-- [ ] All 325+ existing tests still pass
+- [ ] `audit_logs` table created by V10 migration with all 5 indexes
+- [ ] Creating a member writes a `MEMBER_CREATED` audit record
+- [ ] Assigning a membership writes a `MEMBERSHIP_ASSIGNED` audit record
+- [ ] Collecting a payment writes a `PAYMENT_COLLECTED` record with amount only (no card data)
+- [ ] GX booking writes `GX_BOOKED`, cancellation writes `GX_BOOKING_CANCELLED`
+- [ ] Member OTP login success writes `MEMBER_LOGIN`
+- [ ] Failed OTP does NOT write any audit record
+- [ ] `AuditService.log()` never causes a business operation to fail (exception swallowed)
+- [ ] changesJson over 4000 chars is truncated with `...(truncated)`
+- [ ] `GET /nexus/audit` returns real paginated records (no meta.note)
+- [ ] `GET /nexus/audit?action=MEMBER_CREATED` filters correctly
+- [ ] `GET /nexus/audit?from=2026-01-01&to=2026-01-31` filters by date range
+- [ ] Support Agent calling `GET /nexus/audit` returns 403 (no audit:read)
+- [ ] All 344+ existing tests still pass
 
-### Frontend (web-nexus)
-- [ ] Login with `admin@liyaqa.com` → all nav items visible
-- [ ] Login with support agent account → no Audit Log nav item
-- [ ] Login with club staff token → rejected with platform scope error
-- [ ] Home stats screen shows correct KPI values
-- [ ] MRR card shows tooltip with "estimated" explanation
-- [ ] Org list is searchable and paginated
-- [ ] "New Organization" button absent for Support Agent (no create permission)
-- [ ] Members search requires 2+ chars, shows helper text below
-- [ ] Search "Ahmed" returns Ahmed Al-Rashidi with correct club
-- [ ] Audit screen shows info banner (not empty state or error)
-- [ ] Arabic RTL layout correct throughout
-- [ ] `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` all pass
+### Frontend
+- No new acceptance criteria — web-nexus audit screen already built.
+  Verify manually: audit screen in web-nexus shows real records after login
+  and a few operations. The `meta.note` info banner no longer appears.
 
 ---
 
-## RBAC matrix rows added by this plan
+## RBAC matrix
 
-| Permission | Super Admin | Support Agent | Integration Specialist | Read-Only Auditor |
-|---|---|---|---|---|
-| platform:stats:view | ✅ | ❌ | ❌ | ✅ |
-| organization:read | ✅ | ✅ | ✅ | ❌ |
-| organization:create | ✅ | ❌ | ❌ | ❌ |
-| organization:update | ✅ | ❌ | ❌ | ❌ |
-| club:read | ✅ | ✅ | ✅ | ❌ |
-| club:create | ✅ | ❌ | ❌ | ❌ |
-| club:update | ✅ | ❌ | ❌ | ❌ |
-| branch:read | ✅ | ✅ | ✅ | ❌ |
-| branch:create | ✅ | ❌ | ❌ | ❌ |
-| branch:update | ✅ | ❌ | ❌ | ❌ |
-| member:read (cross-org) | ✅ | ✅ | ❌ | ❌ |
-| audit:read | ✅ | ❌ | ❌ | ✅ |
+No new permissions. `audit:read` already exists on Super Admin and
+Read-Only Auditor from the web-nexus plan.
 
 ---
 
 ## Definition of done
 
 - All acceptance criteria checked
-- All 8 business rules covered by unit or integration tests
-- Platform scope rejection tested (non-platform token → error message)
-- MRR normalization tested for monthly, quarterly, and annual plan types
-- Cross-org member search tested with min-chars validation
-- Audit screen gracefully handles missing AuditLog entity
-- web-nexus runs independently on port 5173 (`cd web-nexus && npm run dev`)
+- AuditService.log() verified to never throw (unit test with mock that throws)
+- At least 10 action types covered by audit wiring
+- changesJson truncation tested at exactly 4000 and 4001 chars
+- web-nexus audit screen shows real data end-to-end (manual verify)
 - All CI checks pass on PR
 - PLAN.md deleted before merging
-- PR title: `feat(nexus): implement internal platform dashboard with org management and stats`
+- PR title: `feat(audit): add persistent audit trail across all write operations`
 - Target branch: `develop`
 

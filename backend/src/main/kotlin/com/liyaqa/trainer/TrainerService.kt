@@ -1,5 +1,7 @@
 package com.liyaqa.trainer
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.club.Club
@@ -46,6 +48,7 @@ class TrainerService(
     private val clubRepository: ClubRepository,
     private val staffMemberRepository: StaffMemberRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val auditService: AuditService,
 ) {
     @Transactional
     fun create(
@@ -135,6 +138,12 @@ class TrainerService(
             },
         )
 
+        auditService.logFromContext(
+            action = AuditAction.TRAINER_CREATED,
+            entityType = "Trainer",
+            entityId = trainer.publicId.toString(),
+        )
+
         return trainer.toResponse(
             user = user,
             trainerTypes = request.trainerTypes,
@@ -200,6 +209,13 @@ class TrainerService(
         request.isActive?.let { trainer.isActive = it }
 
         trainerRepository.save(trainer)
+
+        auditService.logFromContext(
+            action = AuditAction.TRAINER_UPDATED,
+            entityType = "Trainer",
+            entityId = trainer.publicId.toString(),
+        )
+
         return buildFullResponse(trainer, org, club)
     }
 
@@ -233,6 +249,12 @@ class TrainerService(
 
         trainer.softDelete()
         trainerRepository.save(trainer)
+
+        auditService.logFromContext(
+            action = AuditAction.TRAINER_DELETED,
+            entityType = "Trainer",
+            entityId = trainer.publicId.toString(),
+        )
     }
 
     // ── Branch assignment ────────────────────────────────────────────────────
