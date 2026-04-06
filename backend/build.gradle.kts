@@ -4,7 +4,7 @@ plugins {
     kotlin("plugin.jpa") version "2.0.21"
     id("org.springframework.boot") version "3.4.4"
     id("io.spring.dependency-management") version "1.1.7"
-    id("org.flywaydb.flyway") version "10.15.0"
+    id("org.flywaydb.flyway") version "12.3.0"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
