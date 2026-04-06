@@ -14,6 +14,10 @@ import com.liyaqa.invoice.Invoice
 import com.liyaqa.invoice.InvoiceCounter
 import com.liyaqa.invoice.InvoiceCounterRepository
 import com.liyaqa.invoice.InvoiceRepository
+import com.liyaqa.lead.Lead
+import com.liyaqa.lead.LeadRepository
+import com.liyaqa.lead.LeadSource
+import com.liyaqa.lead.LeadSourceRepository
 import com.liyaqa.member.EmergencyContact
 import com.liyaqa.member.EmergencyContactRepository
 import com.liyaqa.member.HealthWaiver
@@ -95,6 +99,8 @@ class DevDataLoader(
     private val gxClassTypeRepository: GXClassTypeRepository,
     private val gxClassInstanceRepository: GXClassInstanceRepository,
     private val gxBookingRepository: GXBookingRepository,
+    private val leadSourceRepository: LeadSourceRepository,
+    private val leadRepository: LeadRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -171,6 +177,9 @@ class DevDataLoader(
             PermissionConstants.GX_CLASS_UPDATE, PermissionConstants.GX_CLASS_MANAGE_BOOKINGS,
             PermissionConstants.LEAD_CREATE, PermissionConstants.LEAD_READ,
             PermissionConstants.LEAD_UPDATE, PermissionConstants.LEAD_CONVERT,
+            PermissionConstants.LEAD_DELETE, PermissionConstants.LEAD_ASSIGN,
+            PermissionConstants.LEAD_SOURCE_CREATE, PermissionConstants.LEAD_SOURCE_READ,
+            PermissionConstants.LEAD_SOURCE_UPDATE,
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
             PermissionConstants.CASH_DRAWER_READ, PermissionConstants.BRANCH_READ,
         )
@@ -193,7 +202,8 @@ class DevDataLoader(
             PermissionConstants.MEMBERSHIP_UNFREEZE, PermissionConstants.MEMBERSHIP_TRANSFER,
             PermissionConstants.PAYMENT_COLLECT, PermissionConstants.PAYMENT_READ,
             PermissionConstants.INVOICE_READ, PermissionConstants.INVOICE_GENERATE,
-            PermissionConstants.LEAD_READ,
+            PermissionConstants.LEAD_CREATE, PermissionConstants.LEAD_READ,
+            PermissionConstants.LEAD_SOURCE_READ,
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
             PermissionConstants.CASH_DRAWER_READ, PermissionConstants.BRANCH_READ,
         )
@@ -204,6 +214,7 @@ class DevDataLoader(
             PermissionConstants.LEAD_READ,
             PermissionConstants.LEAD_UPDATE,
             PermissionConstants.LEAD_CONVERT,
+            PermissionConstants.LEAD_SOURCE_READ,
             PermissionConstants.MEMBER_CREATE,
             PermissionConstants.MEMBER_READ,
             PermissionConstants.MEMBERSHIP_PLAN_READ,
@@ -271,10 +282,13 @@ class DevDataLoader(
         val plans = seedMembershipPlans(org, club)
         seedMemberMembership(org, club, riyadhBranch, member, plans, users)
         seedGXClasses(org, club, riyadhBranch, users, member)
+        val staffByEmail = staffMemberRepository.findAll().associateBy { userRepository.findById(it.userId).get().email }
+        seedLeads(org, club, riyadhBranch, staffByEmail)
 
         log.info(
             "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
-                "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, 1 booking.",
+                "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, " +
+                "1 booking, 4 lead sources, 3 leads.",
             users.size,
             permissions.size,
             roles.size,
@@ -1011,5 +1025,97 @@ class DevDataLoader(
             date = date.plusDays(1)
         }
         return date
+    }
+
+    // ── Lead sources & leads ─────────────────────────────────────────────────
+
+    private fun seedLeads(
+        org: Organization,
+        club: Club,
+        riyadhBranch: Branch,
+        staffByEmail: Map<String, StaffMember>,
+    ) {
+        val walkIn =
+            leadSourceRepository.save(
+                LeadSource(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    name = "Walk-in",
+                    nameAr = "حضور مباشر",
+                    color = "#10B981",
+                    displayOrder = 1,
+                ),
+            )
+        val phoneWhatsapp =
+            leadSourceRepository.save(
+                LeadSource(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    name = "Phone/WhatsApp",
+                    nameAr = "هاتف/واتساب",
+                    color = "#3B82F6",
+                    displayOrder = 2,
+                ),
+            )
+        val socialMedia =
+            leadSourceRepository.save(
+                LeadSource(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    name = "Social Media",
+                    nameAr = "وسائل التواصل",
+                    color = "#8B5CF6",
+                    displayOrder = 3,
+                ),
+            )
+        val referral =
+            leadSourceRepository.save(
+                LeadSource(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    name = "Referral",
+                    nameAr = "إحالة",
+                    color = "#F59E0B",
+                    displayOrder = 4,
+                ),
+            )
+
+        val salesAgent = staffByEmail["sales@elixir.com"]
+
+        leadRepository.save(
+            Lead(
+                organizationId = org.id, clubId = club.id, branchId = riyadhBranch.id,
+                leadSourceId = walkIn.id,
+                assignedStaffId = salesAgent?.id,
+                firstName = "Sara", lastName = "Al-Ghamdi",
+                firstNameAr = "سارة", lastNameAr = "الغامدي",
+                phone = "+966501234001",
+                stage = "new",
+            ),
+        )
+        leadRepository.save(
+            Lead(
+                organizationId = org.id, clubId = club.id, branchId = riyadhBranch.id,
+                leadSourceId = socialMedia.id,
+                assignedStaffId = salesAgent?.id,
+                firstName = "Fatima", lastName = "Al-Zahrani",
+                firstNameAr = "فاطمة", lastNameAr = "الزهراني",
+                phone = "+966501234002",
+                stage = "contacted",
+                contactedAt = Instant.now(),
+            ),
+        )
+        leadRepository.save(
+            Lead(
+                organizationId = org.id, clubId = club.id, branchId = riyadhBranch.id,
+                leadSourceId = referral.id,
+                firstName = "Reem", lastName = "Al-Dosari",
+                firstNameAr = "ريم", lastNameAr = "الدوسري",
+                phone = "+966501234003",
+                stage = "interested",
+                contactedAt = Instant.now(),
+                interestedAt = Instant.now(),
+            ),
+        )
     }
 }

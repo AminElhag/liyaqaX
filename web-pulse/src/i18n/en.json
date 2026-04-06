@@ -246,7 +246,67 @@
     "previous": "Previous",
     "next": "Next",
     "cancel": "Cancel",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "all": "All",
+    "actions": "Actions"
+  },
+  "leads": {
+    "title": "Leads",
+    "new": "New Lead",
+    "detail": "Lead Detail",
+    "name": "Name",
+    "phone": "Phone",
+    "email": "Email",
+    "source": "Source",
+    "assignedStaff": "Assigned Staff",
+    "info": "Lead Information",
+    "empty": "No leads found",
+    "notFound": "Lead not found",
+    "searchPlaceholder": "Search by name or phone",
+    "allSources": "All sources",
+    "convertedBanner": "This lead has been converted to a member.",
+    "viewMember": "View member profile",
+    "stage": {
+      "label": "Stage",
+      "new": "New",
+      "contacted": "Contacted",
+      "interested": "Interested",
+      "converted": "Converted",
+      "lost": "Lost"
+    },
+    "action": {
+      "markContacted": "Mark Contacted",
+      "markInterested": "Mark Interested",
+      "markLost": "Mark Lost",
+      "reopen": "Re-open"
+    },
+    "lost": {
+      "reason": "Please enter a reason for losing this lead:"
+    },
+    "convert": {
+      "title": "Convert to Member",
+      "selectBranch": "Select branch",
+      "chooseBranch": "Choose a branch...",
+      "confirm": "Convert",
+      "success": "Lead converted successfully"
+    },
+    "notes": {
+      "title": "Notes",
+      "empty": "No notes yet",
+      "placeholder": "Add a note...",
+      "add": "Add Note"
+    }
+  },
+  "lead_sources": {
+    "title": "Lead Sources",
+    "nameEn": "Name (English)",
+    "nameAr": "Name (Arabic)",
+    "color": "Color",
+    "leads": "Leads",
+    "status": "Status",
+    "add": "Add Source",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
   },
   "language": {
     "ar": "العربية",

@@ -529,3 +529,136 @@ export interface Invoice {
 }
 
 export type ZatcaStatus = 'pending' | 'generated' | 'submitted' | 'accepted' | 'rejected'
+
+// ── Lead Pipeline ───────────────────────────────────────────────────────────
+
+export type LeadStage = 'new' | 'contacted' | 'interested' | 'converted' | 'lost'
+
+export interface LeadSourceSummary {
+  id: string
+  name: string
+  nameAr: string
+  color: string
+}
+
+export interface LeadStaffSummary {
+  id: string
+  firstName: string
+  lastName: string
+}
+
+export interface LeadBranchSummary {
+  id: string
+  nameAr: string
+  nameEn: string
+}
+
+export interface LeadSummary {
+  id: string
+  firstName: string
+  lastName: string
+  phone: string | null
+  stage: LeadStage
+  leadSource: LeadSourceSummary | null
+  assignedStaff: LeadStaffSummary | null
+  createdAt: string
+}
+
+export interface Lead {
+  id: string
+  firstName: string
+  lastName: string
+  firstNameAr: string | null
+  lastNameAr: string | null
+  phone: string | null
+  email: string | null
+  gender: string | null
+  stage: LeadStage
+  lostReason: string | null
+  leadSource: LeadSourceSummary | null
+  assignedStaff: LeadStaffSummary | null
+  branch: LeadBranchSummary | null
+  convertedMemberId: string | null
+  contactedAt: string | null
+  interestedAt: string | null
+  convertedAt: string | null
+  lostAt: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LeadNote {
+  id: string
+  body: string
+  staff: LeadStaffSummary
+  createdAt: string
+}
+
+export interface LeadSource {
+  id: string
+  name: string
+  nameAr: string
+  color: string
+  isActive: boolean
+  displayOrder: number
+  leadCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateLeadRequest {
+  firstName: string
+  lastName: string
+  firstNameAr?: string
+  lastNameAr?: string
+  phone?: string
+  email?: string
+  gender?: string
+  leadSourceId?: string
+  assignedStaffId?: string
+  branchId?: string
+  notes?: string
+}
+
+export interface UpdateLeadRequest {
+  firstName?: string
+  lastName?: string
+  firstNameAr?: string
+  lastNameAr?: string
+  phone?: string
+  email?: string
+  gender?: string
+  leadSourceId?: string
+  assignedStaffId?: string
+  branchId?: string
+  notes?: string
+}
+
+export interface StageTransitionRequest {
+  stage: 'new' | 'contacted' | 'interested' | 'lost'
+  lostReason?: string
+}
+
+export interface ConvertLeadRequest {
+  branchId: string
+  membershipPlanId?: string
+}
+
+export interface CreateLeadNoteRequest {
+  body: string
+}
+
+export interface CreateLeadSourceRequest {
+  name: string
+  nameAr: string
+  color?: string
+  displayOrder?: number
+}
+
+export interface UpdateLeadSourceRequest {
+  name?: string
+  nameAr?: string
+  color?: string
+  displayOrder?: number
+}

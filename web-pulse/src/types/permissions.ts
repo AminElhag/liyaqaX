@@ -69,6 +69,13 @@ export const Permission = {
   LEAD_READ: 'lead:read',
   LEAD_UPDATE: 'lead:update',
   LEAD_CONVERT: 'lead:convert',
+  LEAD_DELETE: 'lead:delete',
+  LEAD_ASSIGN: 'lead:assign',
+
+  // Lead Source
+  LEAD_SOURCE_CREATE: 'lead-source:create',
+  LEAD_SOURCE_READ: 'lead-source:read',
+  LEAD_SOURCE_UPDATE: 'lead-source:update',
 
   // Cash drawer
   CASH_DRAWER_OPEN: 'cash-drawer:open',

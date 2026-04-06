@@ -20,6 +20,7 @@ import { Route as LeadsIndexRouteImport } from './routes/leads/index'
 import { Route as GxIndexRouteImport } from './routes/gx/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
+import { Route as SettingsLeadSourcesRouteImport } from './routes/settings/lead-sources'
 import { Route as ReportsUtilizationRouteImport } from './routes/reports/utilization'
 import { Route as ReportsRevenueRouteImport } from './routes/reports/revenue'
 import { Route as ReportsRetentionRouteImport } from './routes/reports/retention'
@@ -97,6 +98,11 @@ const FinanceIndexRoute = FinanceIndexRouteImport.update({
 const StaffStaffIdRoute = StaffStaffIdRouteImport.update({
   id: '/staff/$staffId',
   path: '/staff/$staffId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsLeadSourcesRoute = SettingsLeadSourcesRouteImport.update({
+  id: '/settings/lead-sources',
+  path: '/settings/lead-sources',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsUtilizationRoute = ReportsUtilizationRouteImport.update({
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
+  '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/finance/': typeof FinanceIndexRoute
   '/gx/': typeof GxIndexRoute
@@ -272,6 +279,7 @@ export interface FileRoutesByTo {
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
+  '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/finance': typeof FinanceIndexRoute
   '/gx': typeof GxIndexRoute
@@ -309,6 +317,7 @@ export interface FileRoutesById {
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
+  '/settings/lead-sources': typeof SettingsLeadSourcesRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/finance/': typeof FinanceIndexRoute
   '/gx/': typeof GxIndexRoute
@@ -347,6 +356,7 @@ export interface FileRouteTypes {
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
+    | '/settings/lead-sources'
     | '/staff/$staffId'
     | '/finance/'
     | '/gx/'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
+    | '/settings/lead-sources'
     | '/staff/$staffId'
     | '/finance'
     | '/gx'
@@ -419,6 +430,7 @@ export interface FileRouteTypes {
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
+    | '/settings/lead-sources'
     | '/staff/$staffId'
     | '/finance/'
     | '/gx/'
@@ -456,6 +468,7 @@ export interface RootRouteChildren {
   ReportsRetentionRoute: typeof ReportsRetentionRoute
   ReportsRevenueRoute: typeof ReportsRevenueRoute
   ReportsUtilizationRoute: typeof ReportsUtilizationRoute
+  SettingsLeadSourcesRoute: typeof SettingsLeadSourcesRoute
   StaffStaffIdRoute: typeof StaffStaffIdRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   GxIndexRoute: typeof GxIndexRoute
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       path: '/staff/$staffId'
       fullPath: '/staff/$staffId'
       preLoaderRoute: typeof StaffStaffIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/lead-sources': {
+      id: '/settings/lead-sources'
+      path: '/settings/lead-sources'
+      fullPath: '/settings/lead-sources'
+      preLoaderRoute: typeof SettingsLeadSourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/utilization': {
@@ -752,6 +772,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRetentionRoute: ReportsRetentionRoute,
   ReportsRevenueRoute: ReportsRevenueRoute,
   ReportsUtilizationRoute: ReportsUtilizationRoute,
+  SettingsLeadSourcesRoute: SettingsLeadSourcesRoute,
   StaffStaffIdRoute: StaffStaffIdRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   GxIndexRoute: GxIndexRoute,
