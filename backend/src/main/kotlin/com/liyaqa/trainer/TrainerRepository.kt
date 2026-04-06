@@ -24,4 +24,6 @@ interface TrainerRepository : JpaRepository<Trainer, Long> {
     fun findByUserIdAndDeletedAtIsNull(userId: Long): Optional<Trainer>
 
     fun existsByUserIdAndDeletedAtIsNull(userId: Long): Boolean
+
+    fun findByPublicIdAndDeletedAtIsNull(publicId: UUID): Optional<Trainer>
 }

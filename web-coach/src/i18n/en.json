@@ -1,1 +1,53 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to Coach",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "error": "Invalid email or password",
+      "scopeError": "This app is for trainers only"
+    },
+    "logout": "Logout"
+  },
+  "nav": {
+    "schedule": "Schedule",
+    "pt": "PT Sessions",
+    "gx": "GX Classes",
+    "profile": "Profile"
+  },
+  "schedule": {
+    "title": "Today's Schedule",
+    "empty": "No sessions or classes today",
+    "pt_session": "PT Session"
+  },
+  "pt": {
+    "title": "PT Sessions",
+    "upcoming": "Upcoming",
+    "past": "Past",
+    "mark_attended": "Mark Attended",
+    "mark_missed": "Mark Missed",
+    "empty": "No sessions found"
+  },
+  "gx": {
+    "title": "GX Classes",
+    "bookings": "Bookings",
+    "save_attendance": "Save Attendance",
+    "class_not_started": "Class hasn't started yet",
+    "empty": "No classes found"
+  },
+  "profile": {
+    "title": "Profile",
+    "certifications": "Certifications",
+    "expires_soon": "Expires soon",
+    "trainer_type": {
+      "pt": "Personal Trainer",
+      "gx": "Group Exercise Instructor"
+    }
+  },
+  "common": {
+    "forbidden": "Access Denied",
+    "loading": "Loading...",
+    "error": "An error occurred"
+  }
+}

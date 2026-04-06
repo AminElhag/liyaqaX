@@ -30,6 +30,24 @@ interface GXClassInstanceRepository : JpaRepository<GXClassInstance, Long> {
         pageable: Pageable,
     ): Page<GXClassInstance>
 
+    fun findAllByInstructorIdAndScheduledAtBetweenAndDeletedAtIsNull(
+        instructorId: Long,
+        from: Instant,
+        to: Instant,
+    ): List<GXClassInstance>
+
+    fun findByPublicIdAndInstructorIdAndDeletedAtIsNull(
+        publicId: UUID,
+        instructorId: Long,
+    ): Optional<GXClassInstance>
+
+    fun findAllByInstructorIdAndScheduledAtBetweenAndDeletedAtIsNull(
+        instructorId: Long,
+        from: Instant,
+        to: Instant,
+        pageable: Pageable,
+    ): Page<GXClassInstance>
+
     @Query(
         value = """
             SELECT COUNT(i.id) > 0

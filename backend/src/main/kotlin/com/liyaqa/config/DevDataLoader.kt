@@ -43,6 +43,12 @@ import com.liyaqa.permission.PermissionConstants
 import com.liyaqa.permission.PermissionRepository
 import com.liyaqa.portal.ClubPortalSettings
 import com.liyaqa.portal.ClubPortalSettingsRepository
+import com.liyaqa.pt.PTPackage
+import com.liyaqa.pt.PTPackageCatalog
+import com.liyaqa.pt.PTPackageCatalogRepository
+import com.liyaqa.pt.PTPackageRepository
+import com.liyaqa.pt.PTSession
+import com.liyaqa.pt.PTSessionRepository
 import com.liyaqa.rbac.RolePermission
 import com.liyaqa.rbac.RolePermissionRepository
 import com.liyaqa.rbac.UserRole
@@ -110,6 +116,9 @@ class DevDataLoader(
     private val cashDrawerSessionRepository: CashDrawerSessionRepository,
     private val cashDrawerEntryRepository: CashDrawerEntryRepository,
     private val portalSettingsRepository: ClubPortalSettingsRepository,
+    private val ptPackageCatalogRepository: PTPackageCatalogRepository,
+    private val ptPackageRepository: PTPackageRepository,
+    private val ptSessionRepository: PTSessionRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     private val log = LoggerFactory.getLogger(DevDataLoader::class.java)
@@ -296,6 +305,7 @@ class DevDataLoader(
         val plans = seedMembershipPlans(org, club)
         seedMemberMembership(org, club, riyadhBranch, member, plans, users)
         seedGXClasses(org, club, riyadhBranch, users, member)
+        seedPTSessions(org, club, riyadhBranch, users, member)
         seedPortalSettings(club)
         val staffByEmail = staffMemberRepository.findAll().associateBy { userRepository.findById(it.userId).get().email }
         seedLeads(org, club, riyadhBranch, staffByEmail)
@@ -304,7 +314,8 @@ class DevDataLoader(
         log.info(
             "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
                 "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, " +
-                "1 booking, 4 lead sources, 3 leads, 1 cash drawer session with 4 entries.",
+                "1 booking, 1 PT catalog, 1 PT package, 3 PT sessions, " +
+                "4 lead sources, 3 leads, 1 cash drawer session with 4 entries.",
             users.size,
             permissions.size,
             roles.size,
@@ -889,6 +900,99 @@ class DevDataLoader(
 
         member.membershipStatus = "active"
         memberRepository.save(member)
+    }
+
+    // ── PT Sessions ──────────────────────────────────────────────────────
+
+    private fun seedPTSessions(
+        org: Organization,
+        club: Club,
+        riyadhBranch: Branch,
+        users: List<User>,
+        member: Member,
+    ) {
+        val ptUser = users.first { it.email == "pt@elixir.com" }
+        val trainer =
+            trainerRepository.findByUserIdAndDeletedAtIsNull(ptUser.id)
+                .orElseThrow()
+
+        val catalog =
+            ptPackageCatalogRepository.save(
+                PTPackageCatalog(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    nameAr = "باقة تدريب شخصي - 10 جلسات",
+                    nameEn = "PT Package - 10 Sessions",
+                    sessionCount = 10,
+                    priceHalalas = 200_000,
+                    validityDays = 90,
+                ),
+            )
+
+        val today = LocalDate.now()
+        val ptPackage =
+            ptPackageRepository.save(
+                PTPackage(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = riyadhBranch.id,
+                    memberId = member.id,
+                    trainerId = trainer.id,
+                    catalogId = catalog.id,
+                    sessionsTotal = 10,
+                    sessionsUsed = 1,
+                    packageStatus = "active",
+                    startsAt = today.minusDays(14),
+                    expiresAt = today.plusDays(76),
+                ),
+            )
+
+        val riyadhZone = java.time.ZoneId.of("Asia/Riyadh")
+        val nextTuesday = nextWeekday(java.time.DayOfWeek.TUESDAY)
+        val nextThursday = nextWeekday(java.time.DayOfWeek.THURSDAY)
+        val nextSaturday = nextWeekday(java.time.DayOfWeek.SATURDAY)
+
+        ptSessionRepository.save(
+            PTSession(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                trainerId = trainer.id,
+                memberId = member.id,
+                packageId = ptPackage.id,
+                scheduledAt = nextTuesday.atTime(10, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 60,
+                sessionStatus = "scheduled",
+            ),
+        )
+
+        ptSessionRepository.save(
+            PTSession(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                trainerId = trainer.id,
+                memberId = member.id,
+                packageId = ptPackage.id,
+                scheduledAt = nextThursday.atTime(10, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 60,
+                sessionStatus = "scheduled",
+            ),
+        )
+
+        ptSessionRepository.save(
+            PTSession(
+                organizationId = org.id,
+                clubId = club.id,
+                branchId = riyadhBranch.id,
+                trainerId = trainer.id,
+                memberId = member.id,
+                packageId = ptPackage.id,
+                scheduledAt = today.minusDays(7).atTime(10, 0).atZone(riyadhZone).toInstant(),
+                durationMinutes = 60,
+                sessionStatus = "attended",
+            ),
+        )
     }
 
     // ── GX Classes ────────────────────────────────────────────────────────
