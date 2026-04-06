@@ -366,6 +366,76 @@
       "confirm": "تأكيد المراجعة"
     }
   },
+  "reports": {
+    "hubTitle": "التقارير",
+    "viewReport": "عرض التقرير",
+    "from": "من",
+    "to": "إلى",
+    "period": "الفترة",
+    "noData": "لا توجد بيانات لهذه الفترة",
+    "exportCsv": "تصدير CSV",
+    "preset": {
+      "thisWeek": "هذا الأسبوع",
+      "thisMonth": "هذا الشهر",
+      "lastMonth": "الشهر الماضي",
+      "last3Months": "آخر 3 أشهر",
+      "last12Months": "آخر 12 شهر"
+    },
+    "revenue": {
+      "title": "الإيرادات",
+      "description": "إجمالي الإيرادات المحصلة حسب نوع الخطة وطريقة الدفع",
+      "total": "إجمالي الإيرادات (ر.س)",
+      "membership": "العضويات",
+      "pt": "التدريب الشخصي",
+      "other": "أخرى",
+      "payments": "المدفوعات",
+      "growth": "النمو"
+    },
+    "retention": {
+      "title": "الاحتفاظ والمغادرة",
+      "description": "معدلات الاحتفاظ بالأعضاء وتحليل المغادرة والأعضاء المعرضين للخطر",
+      "active": "الأعضاء النشطون",
+      "newMembers": "أعضاء جدد",
+      "renewals": "التجديدات",
+      "expired": "منتهية",
+      "activeAtEnd": "النشطون في النهاية",
+      "churnRate": "معدل المغادرة",
+      "retentionRate": "معدل الاحتفاظ",
+      "expiringNext30": "تنتهي خلال 30 يوم",
+      "atRiskTitle": "الأعضاء المعرضون للخطر",
+      "member": "العضو",
+      "plan": "الخطة",
+      "expiresAt": "تنتهي في",
+      "daysLeft": "الأيام المتبقية"
+    },
+    "leads": {
+      "title": "قمع العملاء المحتملين",
+      "description": "معدلات التحويل والمصادر وتحليل خط الأنابيب",
+      "totalLeads": "إجمالي العملاء المحتملين",
+      "newLeads": "عملاء جدد",
+      "converted": "تم التحويل",
+      "lost": "فُقد",
+      "convRate": "معدل التحويل",
+      "avgDays": "متوسط أيام التحويل",
+      "source": "المصدر",
+      "count": "العدد",
+      "topSources": "أهم المصادر",
+      "lostReasons": "أسباب الفقد",
+      "reason": "السبب"
+    },
+    "cashDrawer": {
+      "title": "ملخص صندوق النقد",
+      "description": "تحليل التدفق النقدي والعجز ومعدلات المراجعة",
+      "totalSessions": "إجمالي الجلسات",
+      "sessions": "الجلسات",
+      "cashIn": "نقد وارد",
+      "cashOut": "نقد صادر",
+      "netCash": "صافي النقد",
+      "shortages": "العجز",
+      "surpluses": "الفائض",
+      "reconciliation": "معدل المراجعة"
+    }
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

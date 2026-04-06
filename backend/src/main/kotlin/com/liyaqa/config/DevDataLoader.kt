@@ -176,6 +176,7 @@ class DevDataLoader(
             PermissionConstants.INVOICE_READ, PermissionConstants.INVOICE_GENERATE,
             PermissionConstants.REPORT_REVENUE_VIEW, PermissionConstants.REPORT_RETENTION_VIEW,
             PermissionConstants.REPORT_UTILIZATION_VIEW,
+            PermissionConstants.REPORT_LEADS_VIEW, PermissionConstants.REPORT_CASH_DRAWER_VIEW,
             PermissionConstants.PT_PACKAGE_CREATE, PermissionConstants.PT_PACKAGE_READ,
             PermissionConstants.PT_SESSION_CREATE, PermissionConstants.PT_SESSION_READ,
             PermissionConstants.PT_SESSION_UPDATE, PermissionConstants.PT_SESSION_MARK_ATTENDANCE,
@@ -228,6 +229,7 @@ class DevDataLoader(
             PermissionConstants.MEMBERSHIP_PLAN_READ,
             PermissionConstants.PAYMENT_COLLECT,
             PermissionConstants.BRANCH_READ,
+            PermissionConstants.REPORT_LEADS_VIEW,
         )
 
     private val trainerPt =

@@ -25,6 +25,8 @@ import { Route as SettingsLeadSourcesRouteImport } from './routes/settings/lead-
 import { Route as ReportsUtilizationRouteImport } from './routes/reports/utilization'
 import { Route as ReportsRevenueRouteImport } from './routes/reports/revenue'
 import { Route as ReportsRetentionRouteImport } from './routes/reports/retention'
+import { Route as ReportsLeadsRouteImport } from './routes/reports/leads'
+import { Route as ReportsCashDrawerRouteImport } from './routes/reports/cash-drawer'
 import { Route as PtTrainersRouteImport } from './routes/pt/trainers'
 import { Route as PtPackagesRouteImport } from './routes/pt/packages'
 import { Route as MembershipsPlansRouteImport } from './routes/memberships/plans'
@@ -126,6 +128,16 @@ const ReportsRevenueRoute = ReportsRevenueRouteImport.update({
 const ReportsRetentionRoute = ReportsRetentionRouteImport.update({
   id: '/reports/retention',
   path: '/reports/retention',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsLeadsRoute = ReportsLeadsRouteImport.update({
+  id: '/reports/leads',
+  path: '/reports/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsCashDrawerRoute = ReportsCashDrawerRouteImport.update({
+  id: '/reports/cash-drawer',
+  path: '/reports/cash-drawer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PtTrainersRoute = PtTrainersRouteImport.update({
@@ -259,6 +271,8 @@ export interface FileRoutesByFullPath {
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
+  '/reports/cash-drawer': typeof ReportsCashDrawerRoute
+  '/reports/leads': typeof ReportsLeadsRoute
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
@@ -299,6 +313,8 @@ export interface FileRoutesByTo {
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
+  '/reports/cash-drawer': typeof ReportsCashDrawerRoute
+  '/reports/leads': typeof ReportsLeadsRoute
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
@@ -340,6 +356,8 @@ export interface FileRoutesById {
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
+  '/reports/cash-drawer': typeof ReportsCashDrawerRoute
+  '/reports/leads': typeof ReportsLeadsRoute
   '/reports/retention': typeof ReportsRetentionRoute
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
@@ -382,6 +400,8 @@ export interface FileRouteTypes {
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
+    | '/reports/cash-drawer'
+    | '/reports/leads'
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
@@ -422,6 +442,8 @@ export interface FileRouteTypes {
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
+    | '/reports/cash-drawer'
+    | '/reports/leads'
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
@@ -462,6 +484,8 @@ export interface FileRouteTypes {
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
+    | '/reports/cash-drawer'
+    | '/reports/leads'
     | '/reports/retention'
     | '/reports/revenue'
     | '/reports/utilization'
@@ -503,6 +527,8 @@ export interface RootRouteChildren {
   MembershipsPlansRoute: typeof MembershipsPlansRoute
   PtPackagesRoute: typeof PtPackagesRoute
   PtTrainersRoute: typeof PtTrainersRoute
+  ReportsCashDrawerRoute: typeof ReportsCashDrawerRoute
+  ReportsLeadsRoute: typeof ReportsLeadsRoute
   ReportsRetentionRoute: typeof ReportsRetentionRoute
   ReportsRevenueRoute: typeof ReportsRevenueRoute
   ReportsUtilizationRoute: typeof ReportsUtilizationRoute
@@ -632,6 +658,20 @@ declare module '@tanstack/react-router' {
       path: '/reports/retention'
       fullPath: '/reports/retention'
       preLoaderRoute: typeof ReportsRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/leads': {
+      id: '/reports/leads'
+      path: '/reports/leads'
+      fullPath: '/reports/leads'
+      preLoaderRoute: typeof ReportsLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/cash-drawer': {
+      id: '/reports/cash-drawer'
+      path: '/reports/cash-drawer'
+      fullPath: '/reports/cash-drawer'
+      preLoaderRoute: typeof ReportsCashDrawerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pt/trainers': {
@@ -831,6 +871,8 @@ const rootRouteChildren: RootRouteChildren = {
   MembershipsPlansRoute: MembershipsPlansRoute,
   PtPackagesRoute: PtPackagesRoute,
   PtTrainersRoute: PtTrainersRoute,
+  ReportsCashDrawerRoute: ReportsCashDrawerRoute,
+  ReportsLeadsRoute: ReportsLeadsRoute,
   ReportsRetentionRoute: ReportsRetentionRoute,
   ReportsRevenueRoute: ReportsRevenueRoute,
   ReportsUtilizationRoute: ReportsUtilizationRoute,

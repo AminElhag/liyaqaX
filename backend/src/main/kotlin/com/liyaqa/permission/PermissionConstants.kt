@@ -76,6 +76,8 @@ object PermissionConstants {
     const val REPORT_REVENUE_VIEW = "report:revenue:view"
     const val REPORT_RETENTION_VIEW = "report:retention:view"
     const val REPORT_UTILIZATION_VIEW = "report:utilization:view"
+    const val REPORT_LEADS_VIEW = "report:leads:view"
+    const val REPORT_CASH_DRAWER_VIEW = "report:cash-drawer:view"
 
     // ── PT Package ────────────────────────────────────────────────────────────
     const val PT_PACKAGE_CREATE = "pt-package:create"

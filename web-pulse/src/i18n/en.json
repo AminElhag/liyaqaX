@@ -366,6 +366,76 @@
       "confirm": "Confirm Reconciliation"
     }
   },
+  "reports": {
+    "hubTitle": "Reports",
+    "viewReport": "View report",
+    "from": "From",
+    "to": "To",
+    "period": "Period",
+    "noData": "No data for this period",
+    "exportCsv": "Export CSV",
+    "preset": {
+      "thisWeek": "This week",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "last3Months": "Last 3 months",
+      "last12Months": "Last 12 months"
+    },
+    "revenue": {
+      "title": "Revenue",
+      "description": "Total collected revenue by plan type and payment method",
+      "total": "Total Revenue (SAR)",
+      "membership": "Membership",
+      "pt": "PT",
+      "other": "Other",
+      "payments": "Payments",
+      "growth": "Growth"
+    },
+    "retention": {
+      "title": "Retention & Churn",
+      "description": "Member retention rates, churn analysis, and at-risk members",
+      "active": "Active Members",
+      "newMembers": "New Members",
+      "renewals": "Renewals",
+      "expired": "Expired",
+      "activeAtEnd": "Active at End",
+      "churnRate": "Churn Rate",
+      "retentionRate": "Retention Rate",
+      "expiringNext30": "Expiring in 30 days",
+      "atRiskTitle": "At-Risk Members",
+      "member": "Member",
+      "plan": "Plan",
+      "expiresAt": "Expires",
+      "daysLeft": "Days Left"
+    },
+    "leads": {
+      "title": "Lead Funnel",
+      "description": "Lead conversion rates, sources, and pipeline analysis",
+      "totalLeads": "Total Leads",
+      "newLeads": "New Leads",
+      "converted": "Converted",
+      "lost": "Lost",
+      "convRate": "Conversion Rate",
+      "avgDays": "Avg Days to Convert",
+      "source": "Source",
+      "count": "Count",
+      "topSources": "Top Sources",
+      "lostReasons": "Lost Reasons",
+      "reason": "Reason"
+    },
+    "cashDrawer": {
+      "title": "Cash Drawer Summary",
+      "description": "Cash flow analysis, shortages, and reconciliation rates",
+      "totalSessions": "Total Sessions",
+      "sessions": "Sessions",
+      "cashIn": "Cash In",
+      "cashOut": "Cash Out",
+      "netCash": "Net Cash",
+      "shortages": "Shortages",
+      "surpluses": "Surpluses",
+      "reconciliation": "Reconciliation Rate"
+    }
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

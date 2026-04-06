@@ -749,3 +749,134 @@ export interface CreateEntryRequest {
   description: string
   paymentId?: string
 }
+
+// ── Report types ──────────────────────────────────────────────────────────
+
+export interface ReportMoneyAmount {
+  halalas: number
+  sar: string
+}
+
+/** Revenue report response */
+export interface RevenueReportResponse {
+  summary: {
+    totalRevenue: ReportMoneyAmount
+    membershipRevenue: ReportMoneyAmount
+    ptRevenue: ReportMoneyAmount
+    otherRevenue: ReportMoneyAmount
+    totalPayments: number
+    averagePaymentValue: ReportMoneyAmount
+    comparisonPeriodRevenue: ReportMoneyAmount
+    growthPercent: number | null
+  }
+  periods: TimePeriodRevenue[]
+}
+
+export interface TimePeriodRevenue {
+  label: string
+  periodStart: string
+  periodEnd: string
+  totalRevenue: ReportMoneyAmount
+  membershipRevenue: ReportMoneyAmount
+  ptRevenue: ReportMoneyAmount
+  otherRevenue: ReportMoneyAmount
+  paymentCount: number
+}
+
+/** Retention report response */
+export interface RetentionReportResponse {
+  summary: {
+    activeMembers: number
+    expiredThisPeriod: number
+    newMembersThisPeriod: number
+    renewedThisPeriod: number
+    churnRate: number
+    retentionRate: number
+    expiringNext30Days: number
+  }
+  periods: TimePeriodRetention[]
+  atRisk: AtRiskMember[]
+}
+
+export interface TimePeriodRetention {
+  label: string
+  periodStart: string
+  periodEnd: string
+  newMembers: number
+  renewals: number
+  expired: number
+  activeAtEnd: number
+  churnRate: number
+}
+
+export interface AtRiskMember {
+  memberId: string
+  memberName: string
+  membershipPlan: string
+  expiresAt: string
+  daysUntilExpiry: number
+  lastPaymentDate: string | null
+}
+
+/** Lead funnel report response */
+export interface LeadReportResponse {
+  summary: {
+    totalLeads: number
+    byStage: Record<string, number>
+    conversionRate: number
+    avgDaysToConvert: number | null
+    topSources: LeadSourceStat[]
+  }
+  periods: TimePeriodLeads[]
+  lostReasons: LostReasonCount[]
+}
+
+export interface LeadSourceStat {
+  sourceName: string
+  sourceNameAr: string
+  color: string
+  count: number
+  conversionRate: number
+}
+
+export interface LostReasonCount {
+  reason: string
+  count: number
+}
+
+export interface TimePeriodLeads {
+  label: string
+  periodStart: string
+  periodEnd: string
+  newLeads: number
+  converted: number
+  lost: number
+  conversionRate: number
+}
+
+/** Cash drawer report response */
+export interface CashDrawerReportResponse {
+  summary: {
+    totalSessions: number
+    totalCashIn: ReportMoneyAmount
+    totalCashOut: ReportMoneyAmount
+    netCash: ReportMoneyAmount
+    totalShortages: ReportMoneyAmount
+    totalSurpluses: ReportMoneyAmount
+    sessionsWithDiscrepancy: number
+    reconciliationRate: number
+  }
+  periods: TimePeriodCashDrawer[]
+}
+
+export interface TimePeriodCashDrawer {
+  label: string
+  periodStart: string
+  periodEnd: string
+  sessionCount: number
+  totalCashIn: ReportMoneyAmount
+  totalCashOut: ReportMoneyAmount
+  netCash: ReportMoneyAmount
+  shortages: ReportMoneyAmount
+  surpluses: ReportMoneyAmount
+}
