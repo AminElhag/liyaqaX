@@ -114,6 +114,8 @@ object PermissionConstants {
     const val CASH_DRAWER_OPEN = "cash-drawer:open"
     const val CASH_DRAWER_CLOSE = "cash-drawer:close"
     const val CASH_DRAWER_READ = "cash-drawer:read"
+    const val CASH_DRAWER_ENTRY_CREATE = "cash-drawer:entry:create"
+    const val CASH_DRAWER_RECONCILE = "cash-drawer:reconcile"
 
     // ── Availability ──────────────────────────────────────────────────────────
     const val AVAILABILITY_MANAGE = "availability:manage"

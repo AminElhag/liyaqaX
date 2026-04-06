@@ -81,6 +81,8 @@ export const Permission = {
   CASH_DRAWER_OPEN: 'cash-drawer:open',
   CASH_DRAWER_CLOSE: 'cash-drawer:close',
   CASH_DRAWER_READ: 'cash-drawer:read',
+  CASH_DRAWER_ENTRY_CREATE: 'cash-drawer:entry:create',
+  CASH_DRAWER_RECONCILE: 'cash-drawer:reconcile',
 
   // Role management
   ROLE_READ: 'role:read',
