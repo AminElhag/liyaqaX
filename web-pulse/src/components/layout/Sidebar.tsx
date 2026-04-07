@@ -1,7 +1,9 @@
 import { Link, useMatches } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { getPendingMembers, memberKeys } from '@/api/members'
 
 interface NavItem {
   key: string
@@ -28,6 +30,13 @@ export function Sidebar() {
   const { isCollapsed, toggle } = useSidebarStore()
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
+
+  const { data: pendingData } = useQuery({
+    queryKey: memberKeys.pendingCount(),
+    queryFn: () => getPendingMembers({ page: 0, size: 1 }),
+    refetchInterval: 60_000,
+  })
+  const pendingCount = pendingData?.pagination.totalElements ?? 0
 
   return (
     <aside
@@ -72,7 +81,16 @@ export function Sidebar() {
                   title={isCollapsed ? t(`nav.${item.key}`) : undefined}
                 >
                   <span className="text-base">{item.icon}</span>
-                  {!isCollapsed && <span>{t(`nav.${item.key}`)}</span>}
+                  {!isCollapsed && (
+                    <span className="flex flex-1 items-center justify-between">
+                      <span>{t(`nav.${item.key}`)}</span>
+                      {item.key === 'members' && pendingCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                          {pendingCount}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </Link>
               </li>
             )

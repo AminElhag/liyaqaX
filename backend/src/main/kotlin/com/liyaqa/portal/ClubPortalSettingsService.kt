@@ -42,6 +42,7 @@ class ClubPortalSettingsService(
         request.invoiceViewEnabled?.let { settings.invoiceViewEnabled = it }
         request.onlinePaymentEnabled?.let { settings.onlinePaymentEnabled = it }
         request.portalMessage?.let { settings.portalMessage = it.ifBlank { null } }
+        request.selfRegistrationEnabled?.let { settings.selfRegistrationEnabled = it }
         return settingsRepository.save(settings).toResponse()
     }
 
@@ -83,5 +84,6 @@ class ClubPortalSettingsService(
             invoiceViewEnabled = invoiceViewEnabled,
             onlinePaymentEnabled = onlinePaymentEnabled,
             portalMessage = portalMessage,
+            selfRegistrationEnabled = selfRegistrationEnabled,
         )
 }

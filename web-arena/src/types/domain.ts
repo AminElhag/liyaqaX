@@ -36,6 +36,17 @@ export interface PortalSettings {
   invoiceViewEnabled: boolean
   onlinePaymentEnabled: boolean
   portalMessage: string | null
+  selfRegistrationEnabled: boolean
+}
+
+export interface MembershipPlanSummary {
+  id: string
+  nameAr: string
+  nameEn: string
+  priceHalalas: number
+  priceSar: string
+  durationDays: number
+  isActive: boolean
 }
 
 export interface GxScheduleItem {

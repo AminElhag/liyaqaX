@@ -6,4 +6,5 @@ data class ClubPortalSettingsResponse(
     val invoiceViewEnabled: Boolean,
     val onlinePaymentEnabled: Boolean,
     val portalMessage: String?,
+    val selfRegistrationEnabled: Boolean,
 )

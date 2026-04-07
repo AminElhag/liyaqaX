@@ -10,14 +10,20 @@ import com.liyaqa.common.audit.softDelete
 import com.liyaqa.common.dto.PageResponse
 import com.liyaqa.common.dto.toPageResponse
 import com.liyaqa.common.exception.ArenaException
+import com.liyaqa.member.dto.ActivateMemberRequest
 import com.liyaqa.member.dto.CreateMemberRequest
 import com.liyaqa.member.dto.EmergencyContactRequest
 import com.liyaqa.member.dto.EmergencyContactResponse
 import com.liyaqa.member.dto.MemberBranchResponse
 import com.liyaqa.member.dto.MemberResponse
 import com.liyaqa.member.dto.MemberSummaryResponse
+import com.liyaqa.member.dto.PendingMemberIntentResponse
+import com.liyaqa.member.dto.PendingMemberResponse
 import com.liyaqa.member.dto.UpdateMemberRequest
 import com.liyaqa.member.dto.WaiverStatusResponse
+import com.liyaqa.membership.Membership
+import com.liyaqa.membership.MembershipPlanRepository
+import com.liyaqa.membership.MembershipRepository
 import com.liyaqa.notification.events.MemberCreatedEvent
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
@@ -54,6 +60,9 @@ class MemberService(
     private val passwordEncoder: PasswordEncoder,
     private val auditService: AuditService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val memberRegistrationIntentRepository: MemberRegistrationIntentRepository,
+    private val membershipPlanRepository: MembershipPlanRepository,
+    private val membershipRepository: MembershipRepository,
 ) {
     @Transactional
     fun create(
@@ -445,6 +454,174 @@ class MemberService(
             waiverId = activeWaiver.publicId,
             waiverVersion = activeWaiver.version,
             signedAt = signature.signedAt,
+        )
+    }
+
+    // ── Pending activation operations ─────────────────────────────────────────
+
+    fun getPendingMembers(
+        orgPublicId: UUID,
+        clubPublicId: UUID,
+        pageable: Pageable,
+    ): PageResponse<PendingMemberResponse> {
+        val org = findOrgOrThrow(orgPublicId)
+        val club = findClubOrThrow(clubPublicId, org.id)
+        val pendingPage =
+            memberRepository.findAllByClubIdAndMembershipStatusAndDeletedAtIsNull(
+                club.id,
+                "pending_activation",
+                pageable,
+            )
+
+        val memberIds = pendingPage.map { it.id }.toList()
+        val intentsByMemberId =
+            if (memberIds.isNotEmpty()) {
+                memberRegistrationIntentRepository.findAll()
+                    .filter { it.memberId in memberIds && it.resolvedAt == null }
+                    .associateBy { it.memberId }
+            } else {
+                emptyMap()
+            }
+
+        val userIds = pendingPage.map { it.userId }.toSet()
+        val usersById = userRepository.findAllById(userIds).associateBy { it.id }
+
+        return pendingPage.map { member ->
+            val intent = intentsByMemberId[member.id]
+            val user = usersById[member.userId]
+            val email = user?.email?.takeIf { !it.endsWith("@self-registration.internal") }
+            PendingMemberResponse(
+                id = member.publicId,
+                nameEn = "${member.firstNameEn} ${member.lastNameEn}".trim(),
+                nameAr = "${member.firstNameAr} ${member.lastNameAr}".trim(),
+                phone = member.phone,
+                email = email,
+                dateOfBirth = member.dateOfBirth,
+                gender = member.gender,
+                registeredAt = member.createdAt,
+                intent =
+                    intent?.let {
+                        PendingMemberIntentResponse(
+                            planId = it.membershipPlanPublicId,
+                            planNameEn = it.membershipPlanNameEn,
+                            planNameAr = it.membershipPlanNameAr,
+                            planPriceSar = it.membershipPlanPriceHalalas?.let { h -> "%.2f".format(h / 100.0) },
+                        )
+                    },
+            )
+        }.toPageResponse()
+    }
+
+    fun getPendingCount(clubId: Long): Long =
+        memberRepository.countByClubIdAndMembershipStatusAndDeletedAtIsNull(clubId, "pending_activation")
+
+    @Transactional
+    fun activate(
+        orgPublicId: UUID,
+        clubPublicId: UUID,
+        memberPublicId: UUID,
+        request: ActivateMemberRequest,
+    ): MemberResponse {
+        val org = findOrgOrThrow(orgPublicId)
+        val club = findClubOrThrow(clubPublicId, org.id)
+        val member = findMemberOrThrow(memberPublicId, org.id, club.id)
+
+        // Business rule — can only activate pending_activation members
+        if (member.membershipStatus != "pending_activation") {
+            throw ArenaException(
+                HttpStatus.CONFLICT,
+                "conflict",
+                "Member is already ${member.membershipStatus}. Cannot activate.",
+            )
+        }
+
+        member.membershipStatus = "active"
+        memberRepository.save(member)
+
+        // Resolve intent
+        val intent = memberRegistrationIntentRepository.findByMemberIdAndResolvedAtIsNull(member.id).orElse(null)
+        if (intent != null) {
+            intent.resolvedAt = java.time.Instant.now()
+            memberRegistrationIntentRepository.save(intent)
+        }
+
+        // Business rule 8 — if plan selected, create pending membership
+        val planPublicId = request.membershipPlanId
+        if (planPublicId != null) {
+            val plan =
+                membershipPlanRepository.findByPublicIdAndClubIdAndDeletedAtIsNull(planPublicId, club.id)
+                    .orElseThrow {
+                        ArenaException(
+                            HttpStatus.UNPROCESSABLE_ENTITY,
+                            "business-rule-violation",
+                            "Membership plan not found or does not belong to this club.",
+                        )
+                    }
+            membershipRepository.save(
+                Membership(
+                    organizationId = org.id,
+                    clubId = club.id,
+                    branchId = member.branchId,
+                    memberId = member.id,
+                    planId = plan.id,
+                    membershipStatus = "pending",
+                    startDate = java.time.LocalDate.now(),
+                    endDate = java.time.LocalDate.now().plusDays(plan.durationDays.toLong()),
+                ),
+            )
+        }
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBER_ACTIVATED,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+        )
+
+        val user = findUserByIdOrThrow(member.userId)
+        val branch = findBranchByIdOrThrow(member.branchId)
+        val contacts = emergencyContactRepository.findAllByMemberIdAndOrganizationId(member.id, org.id)
+        val hasSignedWaiver = checkWaiverSigned(member.id, club.id)
+
+        return member.toResponse(user, branch, org.publicId, club.publicId, contacts, hasSignedWaiver)
+    }
+
+    @Transactional
+    fun reject(
+        orgPublicId: UUID,
+        clubPublicId: UUID,
+        memberPublicId: UUID,
+        reason: String,
+    ) {
+        val org = findOrgOrThrow(orgPublicId)
+        val club = findClubOrThrow(clubPublicId, org.id)
+        val member = findMemberOrThrow(memberPublicId, org.id, club.id)
+
+        // Can only reject pending_activation members
+        if (member.membershipStatus != "pending_activation") {
+            throw ArenaException(
+                HttpStatus.CONFLICT,
+                "conflict",
+                "Member is already ${member.membershipStatus}. Cannot reject.",
+            )
+        }
+
+        // Business rule 9 — store reason in notes, set status to terminated
+        member.notes = "Registration rejected: $reason"
+        member.membershipStatus = "terminated"
+        memberRepository.save(member)
+
+        // Resolve intent
+        val intent = memberRegistrationIntentRepository.findByMemberIdAndResolvedAtIsNull(member.id).orElse(null)
+        if (intent != null) {
+            intent.resolvedAt = java.time.Instant.now()
+            memberRegistrationIntentRepository.save(intent)
+        }
+
+        auditService.logFromContext(
+            action = AuditAction.MEMBER_ACTIVATED,
+            entityType = "Member",
+            entityId = member.publicId.toString(),
+            changesJson = """{"action":"rejected","reason":"$reason"}""",
         )
     }
 

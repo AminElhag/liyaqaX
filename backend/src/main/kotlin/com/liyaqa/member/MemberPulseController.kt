@@ -2,11 +2,14 @@ package com.liyaqa.member
 
 import com.liyaqa.common.dto.PageResponse
 import com.liyaqa.common.exception.ArenaException
+import com.liyaqa.member.dto.ActivateMemberRequest
 import com.liyaqa.member.dto.CreateMemberRequest
 import com.liyaqa.member.dto.EmergencyContactRequest
 import com.liyaqa.member.dto.EmergencyContactResponse
 import com.liyaqa.member.dto.MemberResponse
 import com.liyaqa.member.dto.MemberSummaryResponse
+import com.liyaqa.member.dto.PendingMemberResponse
+import com.liyaqa.member.dto.RejectMemberRequest
 import com.liyaqa.member.dto.UpdateMemberRequest
 import com.liyaqa.member.dto.WaiverStatusResponse
 import com.liyaqa.security.JwtClaims
@@ -110,6 +113,58 @@ class MemberPulseController(
         val claims = authentication.pulseContext()
         memberService.delete(claims.requireOrganizationId(), claims.requireClubId(), id)
         return ResponseEntity.noContent().build()
+    }
+
+    // ── Pending activation endpoints ────────────────────────────────────────
+
+    @GetMapping("/pending")
+    @PreAuthorize("hasPermission(null, 'member:read')")
+    @Operation(summary = "List members with pending_activation status")
+    fun getPendingMembers(
+        @PageableDefault(size = 20) pageable: Pageable,
+        authentication: Authentication,
+    ): ResponseEntity<PageResponse<PendingMemberResponse>> {
+        val claims = authentication.pulseContext()
+        return ResponseEntity.ok(
+            memberService.getPendingMembers(claims.requireOrganizationId(), claims.requireClubId(), pageable),
+        )
+    }
+
+    @PostMapping("/{id}/activate")
+    @PreAuthorize("hasPermission(null, 'member:create')")
+    @Operation(summary = "Activate a pending member")
+    fun activate(
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: ActivateMemberRequest,
+        authentication: Authentication,
+    ): ResponseEntity<MemberResponse> {
+        val claims = authentication.pulseContext()
+        return ResponseEntity.ok(
+            memberService.activate(
+                orgPublicId = claims.requireOrganizationId(),
+                clubPublicId = claims.requireClubId(),
+                memberPublicId = id,
+                request = request,
+            ),
+        )
+    }
+
+    @PostMapping("/{id}/reject")
+    @PreAuthorize("hasPermission(null, 'member:create')")
+    @Operation(summary = "Reject a pending member registration")
+    fun reject(
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: RejectMemberRequest,
+        authentication: Authentication,
+    ): ResponseEntity<Void> {
+        val claims = authentication.pulseContext()
+        memberService.reject(
+            orgPublicId = claims.requireOrganizationId(),
+            clubPublicId = claims.requireClubId(),
+            memberPublicId = id,
+            reason = request.reason,
+        )
+        return ResponseEntity.ok().build()
     }
 
     // ── Emergency contact endpoints ──────────────────────────────────────────

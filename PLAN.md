@@ -1,633 +1,815 @@
-# PLAN.md — Notification System (Plan 21)
+# PLAN.md — Member Self-Registration (Plan 22)
 
 ## Status
 Ready for implementation
 
 ## Branch
-feat/notification-system
+feat/member-self-registration
 
 ## Goal
-Add a persistent in-app notification system with optional email delivery.
-Notifications are triggered by key business events (membership expiring,
-payment collected, GX class booked, etc.) and delivered to the relevant
-user — staff in web-pulse, members in web-arena. A notification bell in
-each app's topbar shows the unread count and links to a notification list.
-Email delivery is optional per notification type, reusing the
-JavaMailSender infrastructure from Plan 20.
+Allow prospective members to register themselves via web-arena without
+any staff involvement. The member enters their details, verifies their
+phone via OTP, and either selects a membership plan and pays at desk
+(staff completes payment on next visit) or skips the plan entirely
+and waits for staff to assign one. The result is a real `Member` record
+with `status = "pending_activation"` that staff can review and activate
+in web-pulse.
 
 ## Context
-- JavaMailSender + Mailpit are already set up (Plan 20).
-- `AuditService` already writes records on every business event — the
-  notification system sits alongside it, not on top of it.
-- `AuditAction` enum already lists all write events — notification triggers
-  map to a subset of these.
-- `Member`, `Membership`, `MembershipPlan`, `GXBooking`, `GXClassInstance`,
-  `Payment`, `Invoice`, `PTSession`, `Lead` all exist.
-- All four web apps have a topbar (`AppHeader`) — notification bell added
-  to each relevant one (web-pulse, web-arena).
-- web-coach and web-nexus get the bell too but with fewer event types.
-- `ddl-auto: create-drop` in dev — Flyway V13 for `notifications` table.
-- Redis already running — used for unread count caching per user.
+- `Member` entity already exists with all profile fields.
+- `MemberOtp` entity already exists (phone OTP, SHA-256, 10-min TTL, 3/10min rate-limit).
+- `MembershipPlan` entity and public catalogue already exist.
+- `ClubPortalSettings` has feature flags — we add `selfRegistrationEnabled`.
+- web-arena already has the OTP login flow — self-registration reuses
+  the same OTP endpoints with a different purpose (identity verification,
+  not login).
+- The existing `MemberStatus` enum has `active`, `frozen`, `terminated` —
+  we add `pending_activation`.
+- `AuditService` exists — wire in 2 new audit action codes.
+- `NotificationTriggerService` already handles `MemberJoinedEvent` —
+  that same event fires here, so staff get notified automatically.
+- No payment gateway — payment is always "pay at desk" (cash/card on arrival).
 
 ---
 
 ## Scope — what this plan covers
 
 ### Backend
-- [ ] `Notification.kt` entity + `NotificationRepository.kt`
-- [ ] `NotificationService.kt` — create, list, mark read, mark all read
-- [ ] `NotificationTriggerService.kt` — listens to business events via
-  Spring application events and creates the right notifications
-- [ ] `NotificationSchedulerService.kt` — `@Scheduled` daily job that
-  generates proactive notifications (expiring memberships, upcoming PT sessions)
-- [ ] `NotificationPulseController.kt` — staff notifications
-- [ ] `NotificationArenaController.kt` — member notifications
-- [ ] `NotificationCoachController.kt` — trainer notifications
-- [ ] Wire `ApplicationEvent` publishing into existing services
-- [ ] Flyway V13: `notifications` table
-- [ ] Unit tests: `NotificationServiceTest`, `NotificationTriggerServiceTest`
-- [ ] Integration tests: all three notification controllers
+- [ ] Add `pending_activation` to `MemberStatus` enum
+- [ ] Add `selfRegistrationEnabled: Boolean` to `ClubPortalSettings` (default `false`)
+- [ ] `SelfRegistrationRequest` DTO — all required member fields
+- [ ] `SelfRegistrationService` — full registration flow (OTP verify → create member → optional plan intent)
+- [ ] `SelfRegistrationArenaController` — 3 public endpoints (no JWT required)
+- [ ] `MemberRegistrationIntent` entity — stores desired plan before activation (optional)
+- [ ] Flyway V14: `member_registration_intents` table + `self_registration_enabled` column on `club_portal_settings`
+- [ ] `MemberPulseController` — add `GET /pending` and `POST /{id}/activate` endpoints
+- [ ] 2 new `AuditAction` codes: `MEMBER_SELF_REGISTERED`, `MEMBER_ACTIVATED`
+- [ ] Unit tests: `SelfRegistrationServiceTest`
+- [ ] Integration tests: `SelfRegistrationArenaControllerTest`, `MemberActivationPulseControllerTest`
 
-### Frontend
-- [ ] web-pulse: notification bell in AppHeader, notification drawer/list
-- [ ] web-arena: notification bell in AppHeader, notification list screen
-- [ ] web-coach: notification bell in AppHeader, notification drawer
-- [ ] Shared pattern: `useNotifications` hook, `NotificationBell`,
-  `NotificationItem` components per app
+### Frontend — web-arena
+- [ ] Registration entry point: "New member? Register here" link on OTP login screen
+- [ ] Multi-step registration wizard (3 steps: Phone verify → Profile → Plan selection)
+- [ ] Step 1: Phone OTP (reuses existing OTP request/verify endpoints)
+- [ ] Step 2: Profile form (name, email, date of birth, gender, emergency contact)
+- [ ] Step 3: Plan selection (optional — can skip) using existing membership plans catalogue
+- [ ] Success screen with "pending activation" message
+- [ ] Guard: hide registration link when `selfRegistrationEnabled = false` (checked via public portal-settings endpoint)
+
+### Frontend — web-pulse
+- [ ] Pending Members queue: new section under Members nav
+- [ ] Pending member detail: profile preview + intended plan + Activate / Reject actions
+- [ ] Activate modal: confirm, optionally assign plan right now (dropdown of active plans)
+- [ ] Reject modal: reason field (stored in member notes)
+- [ ] Badge on sidebar Members nav item showing pending count
+- [ ] Notification bell already fires for `MEMBER_JOINED` — no extra wiring needed
 
 ---
 
 ## Out of scope — do not implement in this plan
-- Push notifications (mobile — no mobile app yet)
-- WebSocket / real-time push to browser (polling only in this plan)
-- SMS notifications (no SMS gateway)
-- Notification preferences UI per user (future plan — all enabled by default)
-- Notification grouping / threading (flat list only)
-- web-nexus notifications (platform team does not need operational alerts)
+- Online payment / payment gateway (pay at desk only)
+- Email verification (phone OTP is sufficient for Saudi market)
+- ID document upload (no file upload support)
+- Auto-activation without staff review
+- Member self-service plan upgrade or purchase
+- Admin-side bulk activation
+- Welcome email (no new email templates — existing notification covers it)
 
 ---
 
 ## Decisions already made
 
-- **Spring ApplicationEvents for decoupling**: existing services publish
-  a typed `ApplicationEvent` subclass (e.g. `MembershipAssignedEvent`,
-  `PaymentCollectedEvent`) immediately after the business operation succeeds.
-  `NotificationTriggerService` is an `@EventListener` — it receives the
-  event and creates the notification. This keeps notification logic
-  completely out of the business services.
+1. **`pending_activation` status** — new members from self-registration are never
+   immediately `active`. A staff member must review and activate. This protects
+   clubs from unverified walk-ins and maintains RBAC integrity (no JWT issued until active).
 
-- **`Notification` entity is append-only for creation, mutable for
-  `readAt`**: created once, never updated except to set `read_at` when
-  the user reads it. No soft delete — notifications expire after 90 days
-  (handled by a scheduled cleanup job in `NotificationSchedulerService`).
+2. **OTP reuse** — existing `/api/v1/arena/auth/otp/request` and `/api/v1/arena/auth/otp/verify`
+   endpoints are reused with a `purpose` query param (`login` vs `registration`).
+   The `verify` endpoint returns a short-lived `registrationToken` (JWT with `scope = "registration"`, 15-min TTL)
+   instead of a full member JWT when `purpose = registration`. This token is used
+   only for the subsequent `POST /api/v1/arena/register/complete` call.
 
-- **Recipient is a `userId` (User.publicId UUID)**: notifications target
-  a specific user — staff member, trainer, or member — via their User
-  record. The `scope` field (`club`, `trainer`, `member`) determines which
-  app's API serves it.
+3. **`MemberRegistrationIntent`** — optional link from member to desired plan.
+   Staff can see which plan the member wanted. Not a `Membership` — only becomes
+   one when staff activates and assigns.
 
-- **Unread count in Redis**: `notification_unread:{userId}` stores the
-  count as an integer. Incremented on notification creation, decremented
-  on read (or reset to 0 on mark-all-read). TTL: 24 hours (refreshed on
-  access). Cache miss → count from DB. This avoids a DB count query on
-  every topbar render.
+4. **`selfRegistrationEnabled` default = false** — clubs must explicitly opt in
+   via Settings → Portal → Self-Registration toggle (web-pulse).
 
-- **Polling, not WebSocket**: each app polls `GET /notifications/unread-count`
-  every 30 seconds. On count change → fetch the notification list.
-  Simple, reliable, no infrastructure change needed.
+5. **Phone uniqueness** — during registration, check phone is not already used by
+   an active/frozen/pending member in the same club. Return `409` if duplicate.
+   Different clubs may share a phone (member may join multiple clubs).
 
-- **Email delivery is per notification type**: a `NotificationType` enum
-  carries a boolean `sendEmail`. Types that send email:
-  `MEMBERSHIP_EXPIRING_SOON`, `PAYMENT_COLLECTED`, `PT_SESSION_REMINDER`.
-  Types that are in-app only: `GX_CLASS_BOOKED`, `GX_CLASS_CANCELLED`,
-  `LEAD_ASSIGNED`, `MEMBERSHIP_FROZEN`. Email uses the existing
-  `ReportEmailService` pattern (JavaMailSender, HTML body, no attachment).
+6. **`MemberJoinedEvent` reuse** — `SelfRegistrationService` publishes
+   `MemberJoinedEvent` after creating the member record, triggering the existing
+   notification flow (staff get a bell notification in web-pulse automatically).
 
-- **Notification types and recipients**:
-
-  | Type | Trigger | Recipient | Email? |
-  |---|---|---|---|
-  | MEMBERSHIP_EXPIRING_SOON | Scheduler: expiry in 7 days | Member | ✅ |
-  | MEMBERSHIP_ASSIGNED | MembershipAssignedEvent | Member | ❌ |
-  | MEMBERSHIP_FROZEN | MembershipFrozenEvent | Member | ❌ |
-  | PAYMENT_COLLECTED | PaymentCollectedEvent | Member | ✅ |
-  | GX_CLASS_BOOKED | GxBookedEvent | Member | ❌ |
-  | GX_CLASS_CANCELLED | GxCancelledEvent | Member | ❌ |
-  | GX_CLASS_REMINDER | Scheduler: class in 2 hours | Member | ❌ |
-  | PT_SESSION_REMINDER | Scheduler: session tomorrow | Member | ✅ |
-  | PT_ATTENDANCE_MARKED | PtAttendanceMarkedEvent | Member | ❌ |
-  | LEAD_ASSIGNED | LeadAssignedEvent | Staff (assignee) | ❌ |
-  | NEW_MEMBER_REGISTERED | MemberCreatedEvent | Staff (branch manager) | ❌ |
-  | LOW_GX_SPOTS | Scheduler: class < 3 spots, 24h before | Staff (GX instructor) | ❌ |
-
-- **`NotificationSchedulerService` runs at 06:00 UTC daily**:
-  - Membership expiring in exactly 7 days → `MEMBERSHIP_EXPIRING_SOON`
-    (deduplicated: skip if already sent in last 24h for same membership)
-  - PT sessions tomorrow → `PT_SESSION_REMINDER` for each member
-  - GX classes with < 3 spots in next 24h → `LOW_GX_SPOTS` for instructor
-  - Delete notifications older than 90 days (cleanup)
-
-- **Deduplication for scheduler notifications**: before creating a
-  proactive notification, check if an identical one (same type + same
-  `entityId`) was created in the last 24 hours. Skip if so. Prevents
-  duplicate reminders from scheduler restarts.
-
-- **Flyway V13**.
+7. **Activation by staff** — Activate endpoint creates the member JWT scope if
+   the member logs in later (no immediate JWT issued at activation time — member
+   must log in again). Sets `status = "active"`, optionally assigns chosen plan
+   (creates `Membership` with `status = "pending_payment"` if plan selected).
 
 ---
 
 ## Entity design
 
-### Notification
-
-Fields beyond standard AuditEntity columns (no soft delete — use cleanup
-scheduler instead):
-
-```
-recipient_user_id   VARCHAR(100) NOT NULL   (User.publicId UUID)
-recipient_scope     VARCHAR(20) NOT NULL    'club' | 'trainer' | 'member'
-type                VARCHAR(60) NOT NULL    NotificationType enum value
-title_key           VARCHAR(100) NOT NULL   i18n key for title
-body_key            VARCHAR(100) NOT NULL   i18n key for body
-params_json         TEXT                    nullable, JSON of i18n interpolation params
-entity_type         VARCHAR(100)            nullable ('Membership', 'Payment', etc.)
-entity_id           VARCHAR(100)            nullable (publicId of related entity)
-read_at             TIMESTAMPTZ             nullable — null = unread
-email_sent_at       TIMESTAMPTZ             nullable — null = not sent or not applicable
+### Modified: `ClubPortalSettings`
+```kotlin
+var selfRegistrationEnabled: Boolean = false
 ```
 
-Note: title and body are stored as i18n keys + params rather than
-rendered strings, so the frontend can render in the user's preferred
-language.
-
-### Flyway V13
-
-```sql
-CREATE TABLE notifications (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    recipient_user_id   VARCHAR(100) NOT NULL,
-    recipient_scope     VARCHAR(20) NOT NULL,
-    type                VARCHAR(60) NOT NULL,
-    title_key           VARCHAR(100) NOT NULL,
-    body_key            VARCHAR(100) NOT NULL,
-    params_json         TEXT,
-    entity_type         VARCHAR(100),
-    entity_id           VARCHAR(100),
-    read_at             TIMESTAMPTZ,
-    email_sent_at       TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_notifications_recipient  ON notifications(recipient_user_id, read_at);
-CREATE INDEX idx_notifications_type       ON notifications(type);
-CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
-CREATE INDEX idx_notifications_entity     ON notifications(entity_type, entity_id);
+### Modified: `MemberStatus` enum
+```kotlin
+enum class MemberStatus {
+    active,
+    frozen,
+    terminated,
+    pending_activation   // NEW — set on self-registration
+}
 ```
+
+### New entity: `MemberRegistrationIntent`
+```kotlin
+@Entity
+@Table(name = "member_registration_intents")
+class MemberRegistrationIntent(
+    var memberId: Long,                          // FK to members.id
+    var memberPublicId: UUID,                    // denormalized for fast lookup
+    var membershipPlanId: Long?,                 // FK to membership_plans.id (nullable)
+    var membershipPlanPublicId: UUID?,           // denormalized
+    var membershipPlanNameEn: String?,           // snapshot at registration time
+    var membershipPlanNameAr: String?,
+    var membershipPlanPriceHalalas: Long?,       // snapshot
+    var clubId: Long,
+    var resolvedAt: Instant? = null,             // set when staff activates or rejects
+    var resolvedBy: Long? = null                 // FK to users.id
+) : AuditEntity()
+```
+
+Table: `member_registration_intents`
 
 ---
 
 ## API endpoints
 
-### NotificationPulseController — `/api/v1/notifications` (club staff)
-
+### New — public (no JWT)
 ```
-GET    /api/v1/notifications?page=0&size=20&unreadOnly=false
-GET    /api/v1/notifications/unread-count
-PATCH  /api/v1/notifications/{id}/read
-PATCH  /api/v1/notifications/read-all
-```
+POST /api/v1/arena/register/otp/request
+     Body: { phone, clubPortalSlug }
+     → Reuses MemberOtp infrastructure, purpose = "registration"
+     → 200 OK (never reveals phone existence in error, same as login)
 
-### NotificationArenaController — `/api/v1/arena/notifications` (members)
+POST /api/v1/arena/register/otp/verify
+     Body: { phone, otp, clubPortalSlug }
+     → Returns { registrationToken: String } (JWT, scope="registration", 15-min TTL)
+     → 200 OK or 422 UNPROCESSABLE_ENTITY on wrong OTP / expired
 
-```
-GET    /api/v1/arena/notifications?page=0&size=20&unreadOnly=false
-GET    /api/v1/arena/notifications/unread-count
-PATCH  /api/v1/arena/notifications/{id}/read
-PATCH  /api/v1/arena/notifications/read-all
-```
-
-### NotificationCoachController — `/api/v1/coach/notifications` (trainers)
-
-```
-GET    /api/v1/coach/notifications?page=0&size=20&unreadOnly=false
-GET    /api/v1/coach/notifications/unread-count
-PATCH  /api/v1/coach/notifications/{id}/read
-PATCH  /api/v1/coach/notifications/read-all
+POST /api/v1/arena/register/complete
+     Header: Authorization: Bearer {registrationToken}
+     Body: SelfRegistrationRequest
+     → 201 CREATED { memberId: UUID, status: "pending_activation" }
+     → 409 CONFLICT if phone already registered in this club
 ```
 
-No new permissions needed — all notification endpoints require only a
-valid JWT with the matching scope.
+### New — staff (scope=club, permission=member:create)
+```
+GET  /api/v1/members/pending
+     → Page<PendingMemberResponse> (pending_activation status only, scoped to club)
+     → Supports ?page, ?size, ?search (name/phone)
+
+POST /api/v1/members/{id}/activate
+     Body: { membershipPlanId?: UUID }
+     → 200 OK MemberResponse (status now "active")
+     → 409 if already active
+
+POST /api/v1/members/{id}/reject
+     Body: { reason: String }
+     → 200 OK (status set to "terminated", reason stored in member notes)
+     → 409 if already active or terminated
+```
+
+### Modified — staff portal settings (scope=club, permission=portal-settings:update)
+```
+PATCH /api/v1/portal-settings
+      Body now includes: { selfRegistrationEnabled?: Boolean }
+```
+
+### Modified — public portal settings
+```
+GET /api/v1/portal-settings/public?clubPortalSlug=...
+    Response now includes: selfRegistrationEnabled: Boolean
+```
 
 ---
 
 ## Request / Response shapes
 
-### NotificationResponse
+### `SelfRegistrationRequest`
+```json
+{
+  "phone": "+966501234567",
+  "clubPortalSlug": "elixir-gym",
+  "nameEn": "Ahmed Al-Rashidi",
+  "nameAr": "أحمد الراشدي",
+  "email": "ahmed@example.com",
+  "dateOfBirth": "1990-05-15",
+  "gender": "male",
+  "emergencyContactName": "Sara Al-Rashidi",
+  "emergencyContactPhone": "+966509876543",
+  "desiredMembershipPlanId": "uuid-or-null"
+}
+```
+
+### `PendingMemberResponse`
 ```json
 {
   "id": "uuid",
-  "type": "MEMBERSHIP_EXPIRING_SOON",
-  "titleKey": "notification.membership_expiring.title",
-  "bodyKey": "notification.membership_expiring.body",
-  "params": { "planName": "Basic Monthly", "daysRemaining": 7 },
-  "entityType": "Membership",
-  "entityId": "uuid",
-  "readAt": "ISO 8601 | null",
-  "createdAt": "ISO 8601"
+  "nameEn": "Ahmed Al-Rashidi",
+  "nameAr": "أحمد الراشدي",
+  "phone": "+966501234567",
+  "email": "ahmed@example.com",
+  "dateOfBirth": "1990-05-15",
+  "gender": "male",
+  "registeredAt": "2026-04-07T09:15:00Z",
+  "intent": {
+    "planId": "uuid",
+    "planNameEn": "Basic Monthly",
+    "planNameAr": "الشهري الأساسي",
+    "planPriceSar": "150.00"
+  }
 }
 ```
 
-### UnreadCountResponse
-```json
-{ "count": 3 }
-```
-
-### i18n key examples (resolved on frontend)
+### `ActivateMemberRequest`
 ```json
 {
-  "notification.membership_expiring.title": "Membership expiring soon",
-  "notification.membership_expiring.body": "Your {{planName}} membership expires in {{daysRemaining}} days.",
-  "notification.payment_collected.title": "Payment received",
-  "notification.payment_collected.body": "A payment of {{amountSar}} SAR has been collected.",
-  "notification.gx_booked.title": "Class booked",
-  "notification.gx_booked.body": "You are booked for {{className}} on {{classDate}}.",
-  "notification.pt_session_reminder.title": "PT session tomorrow",
-  "notification.pt_session_reminder.body": "Your PT session with {{trainerName}} is tomorrow at {{time}}.",
-  "notification.lead_assigned.title": "New lead assigned",
-  "notification.lead_assigned.body": "{{leadName}} has been assigned to you.",
-  "notification.low_gx_spots.title": "Low spots alert",
-  "notification.low_gx_spots.body": "{{className}} tomorrow has only {{spotsRemaining}} spots left."
+  "membershipPlanId": "uuid-or-null"
 }
 ```
-
----
-
-## ApplicationEvents to publish from existing services
-
-```kotlin
-// New event classes in notification/events/
-MembershipAssignedEvent(membership, member)
-MembershipFrozenEvent(membership, member)
-PaymentCollectedEvent(payment, member)
-GxBookedEvent(booking, member, classInstance)
-GxCancelledEvent(booking, member, classInstance)
-PtAttendanceMarkedEvent(session, member)
-LeadAssignedEvent(lead, assigneeStaffMember)
-MemberCreatedEvent(member, branchManagerUser)
-```
-
-Services that need `applicationEventPublisher.publishEvent(...)` added:
-- `MembershipService` → publish `MembershipAssignedEvent`, `MembershipFrozenEvent`
-- `PaymentService` → publish `PaymentCollectedEvent`
-- `GxArenaService` → publish `GxBookedEvent`, `GxCancelledEvent`
-- `PtCoachService` → publish `PtAttendanceMarkedEvent`
-- `LeadService` → publish `LeadAssignedEvent`
-- `MemberService` → publish `MemberCreatedEvent`
 
 ---
 
 ## Business rules — enforce in service layer
 
-1. **Recipient must exist**: `NotificationService.create()` verifies
-   `recipientUserId` is a known User publicId. Log WARN and skip if not
-   found — never throw (same pattern as AuditService).
+1. **Self-registration disabled** — if `ClubPortalSettings.selfRegistrationEnabled = false`
+   for the club resolved from `clubPortalSlug`, return `403 FORBIDDEN` with
+   `"Self-registration is not enabled for this club"`.
 
-2. **Notifications never throw**: `NotificationTriggerService` catches all
-   exceptions in `@EventListener` methods. A notification failure must
-   never cause the business operation to fail or roll back.
+2. **Phone uniqueness per club** — if a member with the same phone and same `clubId`
+   already exists with `status IN (active, frozen, pending_activation)`, return
+   `409 CONFLICT` with `"Phone number already registered at this club"`.
+   Different clubs: allow.
 
-3. **Deduplication for scheduler notifications**: before creating
-   `MEMBERSHIP_EXPIRING_SOON`, `PT_SESSION_REMINDER`, `LOW_GX_SPOTS`,
-   `GX_CLASS_REMINDER` — check if an identical notification (same type +
-   same `entityId`) was created in the last 24 hours. Skip if found.
+3. **OTP purpose isolation** — a `registrationToken` (scope=registration) cannot be
+   used to log in as a member (login endpoint rejects scope=registration). A member
+   JWT (scope=member) cannot be used on the register/complete endpoint.
 
-4. **Mark-read scoped to recipient**: `PATCH /notifications/{id}/read`
-   verifies `notification.recipientUserId == JWT sub`. Return 403 if not.
+4. **Registration token one-time use** — after `POST /register/complete` succeeds,
+   the `MemberOtp` record is marked `used = true`. The token cannot be replayed.
 
-5. **Unread count from Redis**: `GET /notifications/unread-count` checks
-   Redis key `notification_unread:{userId}` first. Cache miss → COUNT(*)
-   from DB where `readAt IS NULL`. Store in Redis with 24h TTL.
+5. **Name required in at least one language** — `nameEn` OR `nameAr` must be
+   non-blank. If both are blank, return `422` with field error.
 
-6. **Redis unread count update**: on notification creation → `INCR
-   notification_unread:{userId}`. On mark-read → `DECR`. On mark-all-read
-   → `SET notification_unread:{userId} 0`. Always refresh TTL to 24h.
+6. **Plan must belong to this club** — if `desiredMembershipPlanId` is provided,
+   verify `MembershipPlan.clubId` matches the registering club and plan is not
+   soft-deleted. Return `422` if not found or mismatched club.
 
-7. **Email for applicable types**: after persisting the notification,
-   if `NotificationType.sendEmail = true` AND the recipient has an email
-   address → send via `ReportEmailService` pattern (JavaMailSender).
-   Email failure is non-fatal — log ERROR, set `emailSentAt` only on success.
+7. **Activate: staff club scope** — staff can only activate members in their own
+   club's scope (enforced via `TenantContext.clubId`, same as all other member endpoints).
 
-8. **Cleanup**: scheduler deletes notifications older than 90 days daily.
-   Uses `DELETE FROM notifications WHERE created_at < NOW() - INTERVAL '90 days'`
-   via `nativeQuery = true`.
+8. **Activate creates pending membership** — if staff selects a plan during activation,
+   create a `Membership` with `status = "pending_payment"`, `startDate = today`,
+   `endDate = today + plan.durationDays`. Payment is NOT collected automatically.
 
-9. **`LOW_GX_SPOTS` sent to instructor only**: only the GX instructor
-   assigned to the class instance receives this notification — not all
-   staff members.
+9. **Reject reason stored** — on rejection, create a `MemberNote` with
+   `content = "Registration rejected: {reason}"`, `authorId = staffUserId`,
+   then set `member.status = "terminated"`.
 
-10. **`NEW_MEMBER_REGISTERED` sent to branch manager**: fetch the Branch
-    Manager `UserRole` for the same branch as the new member. If multiple
-    branch managers exist → notify all of them.
+10. **No JWT issued to pending members** — the OTP login flow already checks
+    `member.status`. `pending_activation` status → `401` with
+    `"Your registration is pending staff approval"`.
 
 ---
 
 ## Seed data updates
 
-No new seed data needed. On first `bootRun` with dev profile, the
-scheduler will generate notifications based on existing seeded data:
-- Ahmed's Basic Monthly membership (7 days before expiry if timing matches)
-- Ahmed's upcoming PT session reminder
-- Upcoming GX class low-spots alert for Noura
+### `ClubPortalSettings`
+```kotlin
+selfRegistrationEnabled = true   // enable for demo club so it's testable
+```
 
-These appear naturally without any DevDataLoader changes.
+### Dev test user
+No new seed members — the registration flow creates its own during testing.
+
+---
+
+## Frontend additions
+
+### web-arena
+
+**Modified: OTP login screen** (`/auth/login`)
+- Add "New member? Register here" link below the OTP form
+- Hide the link when `portalSettings.selfRegistrationEnabled = false`
+  (fetch portal settings from public endpoint before rendering)
+
+**New: Registration wizard** (`/register`)
+Three-step wizard with step indicator (Step 1 of 3):
+
+**Step 1 — Verify Phone** (`/register/step-1`)
+- Phone input → calls `POST /api/v1/arena/register/otp/request`
+- OTP input → calls `POST /api/v1/arena/register/otp/verify`
+- Stores `registrationToken` in Zustand (UI state — 15 min only, lost on refresh)
+- If OTP verify returns existing active member → redirect to `/auth/login` with toast
+  "You already have an account, please log in"
+
+**Step 2 — Your Details** (`/register/step-2`)
+- Fields: nameAr (required), nameEn, email, dateOfBirth, gender (radio: male/female)
+- Emergency contact: name + phone (optional section, collapsible)
+- Validation: React Hook Form + Zod
+- Guarded: if `registrationToken` is missing → redirect to `/register/step-1`
+
+**Step 3 — Choose a Plan** (`/register/step-3`)
+- "Skip for now" button always visible
+- Plan cards: fetch from `GET /api/v1/arena/membership-plans` (public endpoint)
+- Each card: plan name (Arabic primary), duration, price in SAR, features list
+- Selecting a plan highlights it; submit posts `desiredMembershipPlanId`
+- Guarded: if `registrationToken` missing → redirect to `/register/step-1`
+
+**New: Registration Success screen** (`/register/success`)
+- Illustration + heading: "Registration Received" (Arabic: "تم استلام طلبك")
+- Body: "Our staff will review your registration and contact you within 24 hours."
+- CTA: "Back to Login"
+- Clears `registrationToken` from Zustand
+
+### web-pulse
+
+**New: Pending Members page** (`/members/pending`)
+- Table: Name, Phone, Date of Birth, Desired Plan, Registered At, Actions
+- Actions: Activate button, Reject button
+- Search bar: filter by name or phone
+- Pagination (page size 20)
+- Empty state: "No pending registrations"
+
+**New: Activate Modal**
+- Shows member name + desired plan (if any)
+- Plan dropdown: shows desired plan pre-selected, allows staff to change
+- "Confirm Activation" button → calls `POST /members/{id}/activate`
+- On success: row removed from pending list, success toast
+
+**New: Reject Modal**
+- Reason textarea (required, min 10 chars)
+- "Confirm Rejection" button → calls `POST /members/{id}/reject`
+- On success: row removed from pending list, warning toast
+
+**Modified: Members sidebar nav item**
+- Badge showing count of pending members (fetched alongside the main member list)
+- Calls `GET /api/v1/members/pending?size=1` and reads `meta.totalCount` for the badge number
+- Refresh every 60 seconds (same pattern as notification polling)
+
+**Modified: Portal Settings screen** (web-pulse)
+- Add toggle: "Allow member self-registration" (maps to `selfRegistrationEnabled`)
+- Warning text below toggle: "Members who register online will appear in the Pending Members queue for your review before gaining access."
 
 ---
 
 ## Files to generate
 
-### Backend — new files
+### New backend files
 ```
-notification/
-  Notification.kt
-  NotificationRepository.kt
-  NotificationService.kt
-  NotificationTriggerService.kt    (@EventListener for all event types)
-  NotificationSchedulerService.kt  (@Scheduled 06:00 UTC, cleanup)
-  NotificationEmailService.kt      (thin wrapper over JavaMailSender for notifications)
-  NotificationPulseController.kt
-  NotificationArenaController.kt
-  NotificationCoachController.kt
-  events/
-    MembershipAssignedEvent.kt
-    MembershipFrozenEvent.kt
-    PaymentCollectedEvent.kt
-    GxBookedEvent.kt
-    GxCancelledEvent.kt
-    PtAttendanceMarkedEvent.kt
-    LeadAssignedEvent.kt
-    MemberCreatedEvent.kt
-  dto/
-    NotificationResponse.kt
-    UnreadCountResponse.kt
+backend/src/main/kotlin/com/liyaqa/member/
+  MemberRegistrationIntent.kt
+  MemberRegistrationIntentRepository.kt
 
-resources/db/migration/V13__notifications.sql
+backend/src/main/kotlin/com/liyaqa/arena/
+  SelfRegistrationRequest.kt          (DTO)
+  SelfRegistrationArenaController.kt
+
+backend/src/main/kotlin/com/liyaqa/member/
+  SelfRegistrationService.kt
+  PendingMemberResponse.kt            (DTO)
+  ActivateMemberRequest.kt            (DTO)
+
+backend/src/main/resources/db/migration/
+  V14__member_self_registration.sql
+
+backend/src/test/kotlin/com/liyaqa/arena/
+  SelfRegistrationArenaControllerTest.kt
+
+backend/src/test/kotlin/com/liyaqa/member/
+  SelfRegistrationServiceTest.kt
+  MemberActivationPulseControllerTest.kt
 ```
 
-### Backend — modified files
+### Modified backend files
 ```
-membership/MembershipService.kt      publish MembershipAssignedEvent, MembershipFrozenEvent
-payment/PaymentService.kt            publish PaymentCollectedEvent
-arena/GxArenaService.kt              publish GxBookedEvent, GxCancelledEvent
-coach/PtCoachService.kt              publish PtAttendanceMarkedEvent
-lead/LeadService.kt                  publish LeadAssignedEvent
-member/MemberService.kt              publish MemberCreatedEvent
-audit/AuditAction.kt                 no change (notifications are separate from audit)
-```
-
-### Frontend — web-pulse additions
-```
-src/api/notifications.ts
-src/hooks/useNotifications.ts        (polling every 30s, unread count, list)
-src/components/notifications/
-  NotificationBell.tsx               (bell icon + unread badge)
-  NotificationDrawer.tsx             (slide-out panel with list)
-  NotificationItem.tsx               (single notification row)
-src/components/shell/AppHeader.tsx   (modify: add NotificationBell)
+MemberStatus.kt               — add pending_activation
+ClubPortalSettings.kt         — add selfRegistrationEnabled field
+MemberPulseController.kt      — add /pending, /{id}/activate, /{id}/reject
+PortalSettingsArenaController.kt — expose selfRegistrationEnabled in public response
+PortalSettingsPulseController.kt — accept selfRegistrationEnabled in PATCH
+AuditAction.kt                — add MEMBER_SELF_REGISTERED, MEMBER_ACTIVATED
+DevDataLoader.kt              — set selfRegistrationEnabled = true for demo club
 ```
 
-### Frontend — web-arena additions
+### New frontend files — web-arena
 ```
-src/api/notifications.ts
-src/hooks/useNotifications.ts
-src/components/notifications/
-  NotificationBell.tsx
-  NotificationItem.tsx
-src/routes/notifications.tsx         (full-page list for mobile)
-src/components/shell/AppHeader.tsx   (modify: add NotificationBell)
+src/pages/register/
+  step-1.tsx        (phone OTP)
+  step-2.tsx        (profile form)
+  step-3.tsx        (plan selection)
+  success.tsx       (confirmation screen)
+src/components/register/
+  StepIndicator.tsx
+  PlanCard.tsx
+src/api/
+  register.ts       (3 API functions)
+src/store/
+  useRegistrationStore.ts   (Zustand: registrationToken + form data across steps)
+src/__tests__/register/
+  RegistrationWizard.test.tsx
 ```
 
-### Frontend — web-coach additions
+### Modified frontend files — web-arena
 ```
-src/api/notifications.ts
-src/hooks/useNotifications.ts
-src/components/notifications/
-  NotificationBell.tsx
-  NotificationDrawer.tsx
-  NotificationItem.tsx
-src/components/shell/AppHeader.tsx   (modify: add NotificationBell)
+src/pages/auth/login.tsx            — add registration link
+src/router.tsx (or routes config)   — add /register/* routes (public, no auth guard)
+src/api/portalSettings.ts           — include selfRegistrationEnabled
+```
+
+### New frontend files — web-pulse
+```
+src/pages/members/pending.tsx
+src/components/members/
+  ActivateModal.tsx
+  RejectModal.tsx
+  PendingMemberRow.tsx
+src/api/pendingMembers.ts
+src/__tests__/members/
+  PendingMembers.test.tsx
+```
+
+### Modified frontend files — web-pulse
+```
+src/components/layout/Sidebar.tsx   — add pending count badge on Members nav
+src/pages/settings/portal.tsx       — add selfRegistrationEnabled toggle
+src/api/portalSettings.ts           — include selfRegistrationEnabled in PATCH body
 ```
 
 ---
 
 ## Implementation order
 
+### Step 1 — Flyway V14 + entity changes
+Create `V14__member_self_registration.sql`:
+```sql
+-- Add self_registration_enabled to club_portal_settings
+ALTER TABLE club_portal_settings
+    ADD COLUMN self_registration_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Member registration intents
+CREATE TABLE member_registration_intents (
+    id                          BIGSERIAL PRIMARY KEY,
+    public_id                   UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    member_id                   BIGINT      NOT NULL REFERENCES members(id),
+    member_public_id            UUID        NOT NULL,
+    membership_plan_id          BIGINT      REFERENCES membership_plans(id),
+    membership_plan_public_id   UUID,
+    membership_plan_name_en     VARCHAR(200),
+    membership_plan_name_ar     VARCHAR(200),
+    membership_plan_price_halalas BIGINT,
+    club_id                     BIGINT      NOT NULL,
+    resolved_at                 TIMESTAMPTZ,
+    resolved_by                 BIGINT      REFERENCES users(id),
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at                  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_mri_member_id   ON member_registration_intents(member_id);
+CREATE INDEX idx_mri_club_id     ON member_registration_intents(club_id);
+CREATE INDEX idx_mri_resolved_at ON member_registration_intents(resolved_at)
+    WHERE resolved_at IS NULL;
 ```
-Step 1 — Notification entity + Flyway V13
-  notification/Notification.kt — entity, no soft delete, readAt nullable
-  notification/NotificationRepository.kt:
-    findByRecipientUserIdOrderByCreatedAtDesc(userId, pageable)
-    countByRecipientUserIdAndReadAtIsNull(userId)
-    existsByTypeAndEntityIdAndCreatedAtAfter(type, entityId, cutoff) ← dedup check
-    deleteByCreatedAtBefore(cutoff) ← cleanup (nativeQuery=true)
-  resources/db/migration/V13__notifications.sql — table + 4 indexes
-  Verify: ./gradlew build -x test
 
-Step 2 — ApplicationEvent classes + publish from services
-  notification/events/*.kt — 8 event data classes (Kotlin data class)
-  Modify MembershipService, PaymentService, GxArenaService, PtCoachService,
-    LeadService, MemberService — inject ApplicationEventPublisher,
-    call publishEvent() after successful business operation
-  No logic in services — just publish. NotificationTriggerService handles the rest.
-  Verify: ./gradlew build -x test
+Update `MemberStatus.kt` → add `pending_activation`.
+Update `ClubPortalSettings.kt` → add `selfRegistrationEnabled`.
+Update `MemberRegistrationIntent.kt` + `MemberRegistrationIntentRepository.kt`.
+Verify: `./gradlew test` — all existing tests still pass.
 
-Step 3 — NotificationService (core CRUD)
-  notification/NotificationService.kt:
-    create(recipientUserId, scope, type, titleKey, bodyKey, paramsJson?,
-           entityType?, entityId?):
-      - Verify recipient exists (rule 1) — WARN + return if not
-      - Deduplicate scheduler types (rule 3)
-      - Persist Notification
-      - INCR Redis unread count (rule 6)
-      - If type.sendEmail → NotificationEmailService.send() non-fatally (rule 7)
-    listNotifications(userId, unreadOnly, pageable)
-    getUnreadCount(userId): Redis → DB fallback (rule 5)
-    markRead(notificationId, userId): rule 4, DECR Redis (rule 6)
-    markAllRead(userId): bulk update, SET Redis to 0 (rule 6)
-  DTOs: NotificationResponse, UnreadCountResponse
-  Verify: ./gradlew build -x test
+---
 
-Step 4 — NotificationTriggerService (@EventListener)
-  notification/NotificationTriggerService.kt:
-    @EventListener for each event type → calls NotificationService.create()
-    All in try/catch — never throws (rule 2)
-    Maps event data to titleKey + bodyKey + paramsJson
-    Example:
-      on MembershipAssignedEvent → create MEMBERSHIP_ASSIGNED for member
-      on PaymentCollectedEvent → create PAYMENT_COLLECTED for member
-      on LeadAssignedEvent → create LEAD_ASSIGNED for assignee staff member
-      on MemberCreatedEvent → create NEW_MEMBER_REGISTERED for branch managers
-  Verify: ./gradlew build -x test
+### Step 2 — OTP registration purpose
+Add `purpose: String = "login"` param to existing OTP request/verify endpoints.
+When `purpose = "registration"`:
+- `requestOtp` — same logic as login but does NOT require an existing active member.
+  Any phone can request a registration OTP.
+- `verifyOtp` (registration) — after verifying hash + TTL + rate-limit:
+  - If member exists with `status = active` or `frozen` → return
+    `409` with `"Phone already registered — please log in"`.
+  - If member exists with `status = pending_activation` → return
+    `409` with `"Registration already pending staff review"`.
+  - Otherwise → issue a `registrationToken` (JWT, `scope = "registration"`,
+    `phone` claim, `clubId` claim, 15-min expiry).
+  - Mark `MemberOtp.used = true`.
 
-Step 5 — NotificationSchedulerService
-  notification/NotificationSchedulerService.kt:
-    @Scheduled(cron = "0 0 6 * * *", zone = "UTC") runDailyNotifications():
-      1. MEMBERSHIP_EXPIRING_SOON: find memberships expiring in 7 days,
-         dedup (rule 3), create for each member
-      2. PT_SESSION_REMINDER: find PT sessions tomorrow for each member,
-         dedup, create
-      3. LOW_GX_SPOTS: find GX instances in next 24h with < 3 spots,
-         dedup, create for instructor (rule 9)
-      4. Cleanup: delete notifications older than 90 days (rule 8)
-    All DB queries: nativeQuery=true (no JPQL date arithmetic)
-  Verify: ./gradlew build -x test
+Update `JwtService` to support issuing registration-scoped tokens.
+Update `MemberAuthArenaController` (or split into `SelfRegistrationArenaController`).
+Verify: existing OTP login tests still pass.
 
-Step 6 — NotificationEmailService + controllers
-  notification/NotificationEmailService.kt:
-    sendNotificationEmail(recipientEmail, titleKey, bodyKey, paramsJson?):
-      Resolve subject + body from hardcoded English strings (not i18n on
-      backend — backend always sends English email; member's language
-      preference applies to in-app display only)
-      Send via JavaMailSender — non-fatal on failure
-  NotificationPulseController.kt — 4 endpoints, scope=club JWT
-  NotificationArenaController.kt — 4 endpoints, scope=member JWT
-  NotificationCoachController.kt — 4 endpoints, scope=trainer JWT
-  Verify: ./gradlew build -x test
+---
 
-Step 7 — Backend tests
-  NotificationServiceTest.kt (unit):
-    - create: persists + Redis INCR
-    - create: unknown recipient → WARN + skip, no throw (rule 1)
-    - create: dedup scheduler type within 24h → skipped (rule 3)
-    - markRead: own notification → readAt set, Redis DECR (rule 4)
-    - markRead: other user's notification → 403 (rule 4)
-    - markAllRead: Redis SET 0 (rule 6)
-    - getUnreadCount: Redis hit → no DB query; cache miss → DB count + cache
-  NotificationTriggerServiceTest.kt (unit):
-    - MembershipAssignedEvent → MEMBERSHIP_ASSIGNED created for member
-    - PaymentCollectedEvent → PAYMENT_COLLECTED + email sent for member
-    - LeadAssignedEvent → LEAD_ASSIGNED for correct assignee
-    - Exception in listener → caught, not re-thrown (rule 2)
-  NotificationPulseControllerTest.kt (integration):
-    - GET list: returns staff notifications only
-    - GET unread-count: returns correct count
-    - PATCH read: marks own notification read
-    - PATCH read other user's → 403
-    - PATCH read-all: all unread → read
-  Verify: ./gradlew test --no-daemon
+### Step 3 — `SelfRegistrationService`
+Implement all 10 business rules.
 
-Step 8 — Backend final checks
-  ./gradlew ktlintFormat --no-daemon
-  ./gradlew ktlintCheck --no-daemon
-  ./gradlew build --no-daemon
+Key flow:
+1. Validate `registrationToken` (scope = "registration") — extract `phone` + `clubId`.
+2. Validate `selfRegistrationEnabled = true` (business rule 1).
+3. Phone uniqueness check (business rule 2).
+4. Validate `desiredMembershipPlanId` if provided (business rule 6).
+5. Create `Member` with `status = "pending_activation"`.
+6. Create `MemberRegistrationIntent` if plan desired.
+7. Publish `MemberJoinedEvent` — existing notification flow fires automatically.
+8. Call `auditService.log(MEMBER_SELF_REGISTERED, ...)`.
+9. Return `{ memberId: UUID, status: "pending_activation" }`.
 
-Step 9 — Frontend: web-pulse notification bell + drawer
-  src/api/notifications.ts — getNotifications, getUnreadCount, markRead, markAllRead
-  src/hooks/useNotifications.ts:
-    useQuery for list + unreadCount
-    Poll unreadCount every 30s (refetchInterval: 30000)
-    On count increase → invalidate list query
-    markRead / markAllRead mutations
-  src/components/notifications/NotificationBell.tsx:
-    Bell icon (Lucide BellIcon) + red badge with unread count (hidden if 0)
-    Click → opens NotificationDrawer
-  src/components/notifications/NotificationDrawer.tsx:
-    Slide-out panel from right (web-pulse sidebar-style)
-    "Notifications" header + "Mark all read" button
-    List of NotificationItem components
-    Empty state: "No notifications"
-  src/components/notifications/NotificationItem.tsx:
-    Icon by type, title (i18n resolved), body (i18n resolved with params),
-    timestamp (relative: "2 hours ago"), unread dot, click → markRead
-  Modify src/components/shell/AppHeader.tsx: add NotificationBell
-  Verify: npm run dev → login as owner → bell shows count → open drawer →
-    items visible → mark read → count decrements
+Verify: `./gradlew test`
 
-Step 10 — Frontend: web-arena notification screen
-  src/api/notifications.ts (arena base URL)
-  src/hooks/useNotifications.ts
-  src/components/notifications/NotificationBell.tsx — tap → /notifications
-  src/routes/notifications.tsx:
-    Full-page list (mobile-first, not a drawer)
-    "Mark all read" button at top
-    NotificationItem list with tap-to-read
-    Unread items have highlighted background
-  Modify src/components/shell/AppHeader.tsx: add NotificationBell
-  Verify: npm run dev → login as Ahmed → bell shows count → tap → full page
+---
 
-Step 11 — Frontend: web-coach notification drawer
-  src/api/notifications.ts (coach base URL)
-  src/hooks/useNotifications.ts
-  src/components/notifications/ (same pattern as web-pulse)
-  Modify src/components/shell/AppHeader.tsx: add NotificationBell
-  Verify: npm run dev → login as Khalid → bell shows PT session reminder
+### Step 4 — `SelfRegistrationArenaController`
+3 endpoints (no `@PreAuthorize` — public):
+- `POST /api/v1/arena/register/otp/request` — delegates to existing OTP service with `purpose=registration`
+- `POST /api/v1/arena/register/otp/verify` — returns `registrationToken`
+- `POST /api/v1/arena/register/complete` — validates `scope=registration` JWT, delegates to `SelfRegistrationService`
 
-Step 12 — Frontend tests + final checks (all three apps)
-  web-pulse:
-    NotificationBell.test.tsx — badge shows count, hidden when 0
-    NotificationItem.test.tsx — resolves i18n key + params, unread dot
-    NotificationDrawer.test.tsx — mark all read button calls mutation
-  web-arena:
-    NotificationBell.test.tsx — links to /notifications
-  web-coach:
-    NotificationBell.test.tsx — renders with count
-  All apps:
-    npm test && npm run typecheck && npm run lint && npm run build
+For `complete`, manually validate JWT scope in the controller (cannot use standard
+`@PreAuthorize` — no `roleId` in registration JWT):
+```kotlin
+@PostMapping("/complete")
+fun complete(
+    @RequestHeader("Authorization") authHeader: String,
+    @Valid @RequestBody request: SelfRegistrationRequest
+): ResponseEntity<RegistrationCompleteResponse> {
+    val token = authHeader.removePrefix("Bearer ")
+    val claims = jwtService.parseRegistrationToken(token) // throws 401 if invalid/expired/wrong scope
+    return ResponseEntity.status(201).body(selfRegistrationService.register(claims, request))
+}
 ```
+
+Verify: `./gradlew test`
+
+---
+
+### Step 5 — Member activation endpoints
+Add to `MemberPulseController`:
+- `GET /api/v1/members/pending` — `@PreAuthorize("hasPermission(null, 'member:read')")`
+  Returns `Page<PendingMemberResponse>` including intent data (joined query).
+  Filter: `status = pending_activation`, scoped to `TenantContext.clubId`.
+
+- `POST /api/v1/members/{id}/activate` — `@PreAuthorize("hasPermission(null, 'member:create')")`
+  Calls `MemberService.activate(memberPublicId, request)`.
+  On success: audit `MEMBER_ACTIVATED`, return updated `MemberResponse`.
+
+- `POST /api/v1/members/{id}/reject` — `@PreAuthorize("hasPermission(null, 'member:create')")`
+  Calls `MemberService.reject(memberPublicId, reason, staffUserId)`.
+  Creates `MemberNote`, sets `status = terminated`, resolves intent.
+
+Verify: `./gradlew test`
+
+---
+
+### Step 6 — OTP login guard for pending members
+In `MemberAuthArenaController.verifyOtp` (the login purpose path):
+After fetching member by phone + clubId, add check:
+```kotlin
+if (member.status == MemberStatus.pending_activation) {
+    throw ArenaException(HttpStatus.UNAUTHORIZED,
+        "Your registration is pending staff approval")
+}
+```
+
+Verify: existing login tests still pass + new test for pending_activation rejection.
+
+---
+
+### Step 7 — Portal settings exposure
+Update `PortalSettingsArenaController`:
+- Public GET endpoint response includes `selfRegistrationEnabled`.
+
+Update `PortalSettingsPulseController`:
+- `PATCH` body accepts `selfRegistrationEnabled?: Boolean`.
+
+Update `ClubPortalSettingsService` accordingly.
+Verify: `./gradlew test`
+
+---
+
+### Step 8 — Integration tests
+
+**`SelfRegistrationArenaControllerTest`** (covers rules 1, 2, 3, 4, 5, 6, 10):
+```
+- registrationDisabled_returns403
+- duplicatePhone_activeStatus_returns409
+- duplicatePhone_pendingStatus_returns409
+- invalidRegistrationToken_returns401
+- replayedToken_returns401
+- bothNamesBlank_returns422
+- planFromOtherClub_returns422
+- validRegistration_withPlan_returns201
+- validRegistration_withoutPlan_returns201
+- pendingMemberCannotLogin_returns401
+```
+
+**`SelfRegistrationServiceTest`** (unit, rules 1–10):
+```
+- selfRegistrationDisabled_throwsForbidden
+- phoneAlreadyUsed_sameClub_throwsConflict
+- phoneUsed_differentClub_allowed
+- planNotInClub_throwsUnprocessable
+- nameValidation_bothBlank_throwsUnprocessable
+- successWithPlan_createsIntentAndPublishesEvent
+- successWithoutPlan_noIntentCreated
+```
+
+**`MemberActivationPulseControllerTest`** (covers rules 7, 8, 9):
+```
+- activate_setsStatusActive
+- activate_withPlan_createsPendingMembership
+- activate_wrongClub_returns404
+- activate_alreadyActive_returns409
+- reject_createsNoteAndTerminates
+- reject_alreadyActive_returns409
+- pendingList_onlyShowsPendingStatus
+- pendingList_scopedToClub
+```
+
+Verify: `./gradlew test` — all tests pass, ktlint clean.
+
+---
+
+### Step 9 — web-arena: registration store + API module
+
+**`useRegistrationStore.ts`** (Zustand):
+```typescript
+interface RegistrationState {
+  registrationToken: string | null
+  phone: string | null
+  step: 1 | 2 | 3
+  profileData: ProfileFormData | null
+  setToken: (token: string, phone: string) => void
+  setProfile: (data: ProfileFormData) => void
+  advance: () => void
+  reset: () => void
+}
+```
+
+**`src/api/register.ts`**:
+```typescript
+requestRegistrationOtp(phone: string, clubPortalSlug: string): Promise<void>
+verifyRegistrationOtp(phone: string, otp: string, clubPortalSlug: string): Promise<{ registrationToken: string }>
+completeRegistration(token: string, data: SelfRegistrationRequest): Promise<{ memberId: string, status: string }>
+```
+
+Verify: TypeScript strict + lint pass.
+
+---
+
+### Step 10 — web-arena: registration wizard screens
+
+**`/register` route** — public (no auth guard, before the login redirect).
+Add to router config.
+
+**Step 1** (`step-1.tsx`):
+- Phone form → OTP form (same pattern as login)
+- On `verifyRegistrationOtp` success → store token → navigate to `/register/step-2`
+- Show error if phone already registered (409 → redirect to login with toast)
+
+**Step 2** (`step-2.tsx`):
+- Profile form with Zod schema (nameAr required, others validated)
+- On submit → save to store → navigate to `/register/step-3`
+- Back button → `/register/step-1`
+
+**Step 3** (`step-3.tsx`):
+- Fetch plans from `GET /api/v1/arena/membership-plans` (already exists)
+- `PlanCard` component: plan name (Arabic primary), duration badge, price SAR, select state
+- "Skip for now" → `completeRegistration` with `desiredMembershipPlanId: null`
+- "Continue with plan" → `completeRegistration` with selected plan ID
+- On success → navigate to `/register/success`
+
+**`success.tsx`**: static confirmation, CTA back to login.
+
+**`StepIndicator.tsx`**: visual step 1/2/3 dots.
+
+**Modify `src/pages/auth/login.tsx`**:
+- Fetch portal settings on mount (already done for other feature flags)
+- Conditionally render "Register" link if `selfRegistrationEnabled = true`
+
+Add Arabic + English i18n strings for all new UI text.
+Verify: `npm run typecheck && npm run lint && npm test && npm run build`
+
+---
+
+### Step 11 — web-pulse: pending members queue
+
+**`/members/pending`** route — existing `member:read` permission gate.
+
+**`pending.tsx`**:
+```typescript
+// TanStack Query
+const { data: pendingMembers } = useQuery({
+  queryKey: ['members', 'pending'],
+  queryFn: () => api.getPendingMembers({ search, page }),
+})
+```
+
+**`ActivateModal.tsx`**:
+- Fetches membership plans for dropdown
+- Pre-selects the intended plan (from intent)
+- On confirm → `POST /members/{id}/activate` → invalidate `['members', 'pending']`
+
+**`RejectModal.tsx`**:
+- Reason textarea (Zod: min 10 chars)
+- On confirm → `POST /members/{id}/reject` → invalidate `['members', 'pending']`
+
+**Modify `Sidebar.tsx`**:
+- Pending badge: `useQuery` on `GET /members/pending?size=1` for total count
+- `refetchInterval: 60_000`
+- Show red dot badge only when count > 0
+
+**Modify `src/pages/settings/portal.tsx`**:
+- Add `selfRegistrationEnabled` toggle with `Switch` component
+- Warning text below toggle (Arabic + English)
+- Include in PATCH payload
+
+Add i18n strings (ar + en) for all new pulse UI.
+Verify: `npm run typecheck && npm run lint && npm test && npm run build`
+
+---
+
+### Step 12 — Final verification + DevDataLoader
+
+Update `DevDataLoader`:
+- Set `selfRegistrationEnabled = true` for the demo club.
+
+Run full test suite:
+```bash
+./gradlew test
+cd web-arena && npm run typecheck && npm run lint && npm test && npm run build
+cd web-pulse && npm run typecheck && npm run lint && npm test && npm run build
+```
+
+Confirm:
+- All backend tests pass (437+)
+- ktlint clean
+- web-arena builds clean with registration wizard routes
+- web-pulse builds clean with pending queue
+- No PLAN.md references left in code
 
 ---
 
 ## Acceptance criteria
 
 ### Backend
-- [ ] Flyway V13 creates `notifications` table with 4 indexes
-- [ ] Assigning a membership creates a `MEMBERSHIP_ASSIGNED` notification for member
-- [ ] Collecting a payment creates a `PAYMENT_COLLECTED` notification + sends email
-- [ ] GX booking creates `GX_CLASS_BOOKED` notification for member
-- [ ] Lead assigned creates `LEAD_ASSIGNED` for the assignee staff member only
-- [ ] Scheduler: membership expiring in 7 days → `MEMBERSHIP_EXPIRING_SOON` created
-- [ ] Scheduler: dedup — same notification not created twice in 24h (rule 3)
-- [ ] Scheduler: cleanup deletes notifications older than 90 days
-- [ ] `GET /notifications/unread-count` returns from Redis on second call (no DB query)
-- [ ] `PATCH /notifications/{id}/read` returns 403 for wrong user (rule 4)
-- [ ] `PATCH /notifications/read-all` sets Redis unread count to 0
-- [ ] Notification creation failure never propagates to business operation (rule 2)
-- [ ] Email failure after notification persisted: notification saved, emailSentAt null
-- [ ] All 424+ existing tests still pass
+- [ ] `POST /api/v1/arena/register/complete` returns 201 with `pending_activation` status
+- [ ] Duplicate phone in same club returns 409
+- [ ] `selfRegistrationEnabled = false` returns 403
+- [ ] Invalid / expired registration token returns 401
+- [ ] Pending member attempting login returns 401 with clear message
+- [ ] `POST /members/{id}/activate` sets status to `active`, optionally creates `Membership`
+- [ ] `POST /members/{id}/reject` sets status to `terminated`, creates `MemberNote`
+- [ ] `MemberJoinedEvent` published on self-registration → staff notification fires
+- [ ] 2 new AuditAction codes present and wired
+- [ ] All new + existing tests pass; ktlint clean
 
 ### Frontend
-- [ ] Bell badge visible with correct count in web-pulse topbar
-- [ ] Badge hidden when unread count is 0
-- [ ] Drawer opens on bell click, lists notifications in descending order
-- [ ] Clicking a notification item marks it read, unread dot disappears
-- [ ] "Mark all read" clears all unread dots and resets count to 0
-- [ ] web-arena: bell taps to /notifications full-page list
-- [ ] web-coach: bell opens drawer with PT/GX notifications
-- [ ] i18n params correctly interpolated ("expires in 7 days", not "expires in {{daysRemaining}} days")
-- [ ] Polling: unread count refreshes every 30 seconds automatically
-- [ ] All three apps: typecheck, lint, test, build pass
+- [ ] "Register" link hidden when `selfRegistrationEnabled = false` in web-arena
+- [ ] Registration wizard navigates steps in order; back navigation works
+- [ ] Step guard: accessing step 2 or 3 without token redirects to step 1
+- [ ] Success screen shows correct Arabic confirmation message
+- [ ] web-pulse pending queue shows only `pending_activation` members
+- [ ] Activate modal pre-populates intended plan
+- [ ] Reject modal requires reason (min 10 chars)
+- [ ] Sidebar badge shows pending count; refreshes every 60 seconds
+- [ ] Portal settings toggle persists `selfRegistrationEnabled`
 
 ---
 
-## RBAC matrix
+## RBAC matrix rows added by this plan
 
-No new permissions. Notification endpoints require only a valid JWT with
-the matching scope — no additional permission codes needed.
+| Permission | Super Admin | Owner | Branch Manager | Receptionist | Sales Agent | PT Trainer | GX Instructor |
+|---|---|---|---|---|---|---|---|
+| `member:read` (pending list) | ✓ (nexus) | ✓ | ✓ | ✓ | — | — | — |
+| `member:create` (activate/reject) | — | ✓ | ✓ | — | — | — | — |
+
+No new permission codes needed — `member:read` and `member:create` already exist
+and already gate the relevant endpoints.
 
 ---
 
 ## Definition of done
-
 - All acceptance criteria checked
-- All 10 business rules covered by tests
-- Event listener exception swallowing tested (rule 2)
-- Redis unread count cache hit/miss tested (rule 5)
-- Deduplication tested: same scheduler notification within 24h → skipped
-- Email notification tested with mocked JavaMailSender
-- All three apps have working notification bells (manual verify)
-- All CI checks pass on PR
+- All tests pass (`./gradlew test`, `npm test` in web-arena + web-pulse)
+- ktlint clean
 - PLAN.md deleted before merging
-- PR title: `feat(notifications): add in-app notification system with email delivery`
+- PR title: `feat(member): self-registration with pending activation queue`
 - Target branch: `develop`
-

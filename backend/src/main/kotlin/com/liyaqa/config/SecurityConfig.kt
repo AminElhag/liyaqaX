@@ -32,6 +32,7 @@ class SecurityConfig(
             .authorizeHttpRequests {
                 it.requestMatchers("/api/v1/auth/**").permitAll()
                 it.requestMatchers("/api/v1/arena/auth/**").permitAll()
+                it.requestMatchers("/api/v1/arena/register/**").permitAll()
                 it.requestMatchers("/actuator/**").permitAll()
                 it.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 it.anyRequest().authenticated()

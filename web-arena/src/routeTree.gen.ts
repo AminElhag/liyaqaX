@@ -32,6 +32,8 @@ import { Route as AuthLanguageRouteImport } from './routes/auth/language'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AccountSecurityRouteImport } from './routes/account/security'
 import { Route as AccountPreferencesRouteImport } from './routes/account/preferences'
+import { Route as AuthRegisterIndexRouteImport } from './routes/auth/register/index'
+import { Route as AuthRegisterSuccessRouteImport } from './routes/auth/register/success'
 
 const NotificationsRoute = NotificationsRouteImport.update({
   id: '/notifications',
@@ -148,6 +150,16 @@ const AccountPreferencesRoute = AccountPreferencesRouteImport.update({
   path: '/account/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRegisterIndexRoute = AuthRegisterIndexRouteImport.update({
+  id: '/auth/register/',
+  path: '/auth/register/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRegisterSuccessRoute = AuthRegisterSuccessRouteImport.update({
+  id: '/auth/register/success',
+  path: '/auth/register/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -173,6 +185,8 @@ export interface FileRoutesByFullPath {
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/auth/register/success': typeof AuthRegisterSuccessRoute
+  '/auth/register/': typeof AuthRegisterIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -198,6 +212,8 @@ export interface FileRoutesByTo {
   '/payments': typeof PaymentsIndexRoute
   '/progress': typeof ProgressIndexRoute
   '/sessions': typeof SessionsIndexRoute
+  '/auth/register/success': typeof AuthRegisterSuccessRoute
+  '/auth/register': typeof AuthRegisterIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -224,6 +240,8 @@ export interface FileRoutesById {
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
   '/sessions/': typeof SessionsIndexRoute
+  '/auth/register/success': typeof AuthRegisterSuccessRoute
+  '/auth/register/': typeof AuthRegisterIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -251,6 +269,8 @@ export interface FileRouteTypes {
     | '/payments/'
     | '/progress/'
     | '/sessions/'
+    | '/auth/register/success'
+    | '/auth/register/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -276,6 +296,8 @@ export interface FileRouteTypes {
     | '/payments'
     | '/progress'
     | '/sessions'
+    | '/auth/register/success'
+    | '/auth/register'
   id:
     | '__root__'
     | '/'
@@ -301,6 +323,8 @@ export interface FileRouteTypes {
     | '/payments/'
     | '/progress/'
     | '/sessions/'
+    | '/auth/register/success'
+    | '/auth/register/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -327,6 +351,8 @@ export interface RootRouteChildren {
   PaymentsIndexRoute: typeof PaymentsIndexRoute
   ProgressIndexRoute: typeof ProgressIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
+  AuthRegisterSuccessRoute: typeof AuthRegisterSuccessRoute
+  AuthRegisterIndexRoute: typeof AuthRegisterIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -492,6 +518,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/register/': {
+      id: '/auth/register/'
+      path: '/auth/register'
+      fullPath: '/auth/register/'
+      preLoaderRoute: typeof AuthRegisterIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/register/success': {
+      id: '/auth/register/success'
+      path: '/auth/register/success'
+      fullPath: '/auth/register/success'
+      preLoaderRoute: typeof AuthRegisterSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -519,6 +559,8 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentsIndexRoute: PaymentsIndexRoute,
   ProgressIndexRoute: ProgressIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
+  AuthRegisterSuccessRoute: AuthRegisterSuccessRoute,
+  AuthRegisterIndexRoute: AuthRegisterIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

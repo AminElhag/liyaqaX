@@ -63,6 +63,12 @@ class MemberServiceTest {
 
     @Mock lateinit var eventPublisher: org.springframework.context.ApplicationEventPublisher
 
+    @Mock lateinit var memberRegistrationIntentRepository: MemberRegistrationIntentRepository
+
+    @Mock lateinit var membershipPlanRepository: com.liyaqa.membership.MembershipPlanRepository
+
+    @Mock lateinit var membershipRepository: com.liyaqa.membership.MembershipRepository
+
     @InjectMocks lateinit var service: MemberService
 
     private val org = Organization(nameAr = "منظمة", nameEn = "Org", email = "o@t.com")

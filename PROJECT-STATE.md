@@ -203,10 +203,11 @@ All seeded roles have `isSystem = true` — cannot be deleted via UI.
 | Role Management | Role, Permission, RolePermission, UserRole | CRUD /api/v1/nexus/roles, /api/v1/roles, PATCH /api/v1/staff/{id}/role |
 | Custom Reports | ReportTemplate, ReportResult | CRUD /api/v1/report-templates, POST /run, GET /result, GET /export, GET /reports/meta/* |
 | Scheduled Reports | ReportSchedule | CRUD /api/v1/report-templates/{id}/schedule, GET /export/pdf |
+| Notifications | Notification | GET /api/v1/pulse/notifications, /arena/notifications, /coach/notifications + mark-read, mark-all-read, unread-count |
 
-**Current test count: 424+ backend tests + 135 frontend tests**
-**Current Flyway migrations: V1 through V12** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules)
-⚠️ NOTE: V7 was skipped — next plan uses V13.
+**Current test count: 437+ backend tests + 143 frontend tests (web-pulse)**
+**Current Flyway migrations: V1 through V13** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules, V13 = notifications)
+⚠️ NOTE: V7 was skipped — next plan uses V14.
 
 ### New entities added (web-arena plan)
 - `ClubPortalSettings` — per-club feature flags: gxBookingEnabled, ptViewEnabled, invoiceViewEnabled, onlinePaymentEnabled, portalMessage
@@ -332,7 +333,7 @@ Root package.json must NOT have a `workspaces` field.
 - No new migrations — pure read-only aggregations over existing data
 - 296 backend tests, 112 frontend tests
 
-### ✅ Scheduled Report Emails + PDF Exports (Plan 20) — COMPLETE (all 11 steps done)
+### ✅ Plan 20 — Scheduled Report Emails + PDF Exports — COMPLETE (all 11 steps done)
 - `ReportSchedule` entity — one per template (UNIQUE), Flyway V12, pause/resume via `isActive`
 - `ReportPdfService` — iText 7 Community, tabular PDF layout, 1,000-row cap with truncation note
 - `ReportEmailService` — JavaMailSender, HTML email with PDF attachment
@@ -414,11 +415,24 @@ Root package.json must NOT have a `workspaces` field.
 - Portal-settings management screen added to web-pulse (Owner + Branch Manager)
 - 305+ backend tests, 112 frontend tests
 
+### ✅ Plan 21 — Notification System — COMPLETE (all 12 steps done)
+- `Notification` entity — append-only, no soft delete, 90-day hard delete via scheduler, Flyway V13
+- 12 notification types (MEMBERSHIP_EXPIRING_SOON, PAYMENT_COLLECTED, GX_CLASS_BOOKED, GX_CLASS_CANCELLED, GX_CLASS_REMINDER, PT_SESSION_REMINDER, LOW_GX_SPOTS, LEAD_ASSIGNED, MEMBER_JOINED, MEMBERSHIP_FROZEN, MEMBERSHIP_TERMINATED, INVOICE_GENERATED)
+- 8 Spring ApplicationEvent classes — MembershipService, PaymentService, GxArenaController, PtCoachController, LeadService, MemberService each publish typed events
+- `NotificationTriggerService` — @EventListener for all 8 events, all try/catch, WARN on failure (never throws)
+- `NotificationSchedulerService` — @Scheduled 06:00 UTC daily: expiring memberships (7 days ahead), PT session reminders (24h ahead), low GX spots (< 20% capacity), 90-day cleanup
+- Deduplication: proactive notifications check last 24h for same (type + entityId) pair before creating
+- Redis unread count: key `notification_unread:{userId}` — INCR on create, DECR on mark-read, SET 0 on mark-all-read
+- 3 controllers: NotificationPulseController (scope=club), NotificationArenaController (scope=member), NotificationCoachController (scope=trainer)
+- Email sent for MEMBERSHIP_EXPIRING_SOON, PAYMENT_COLLECTED, PT_SESSION_REMINDER via JavaMailSender (reused from Plan 20)
+- Frontend: bell + drawer in web-pulse and web-coach; bell → full-page /notifications in web-arena; 30-second polling
+- 12 new backend tests (7 service + 5 trigger) — 437+ total; 8 new frontend tests in web-pulse — 143 total
+- 1 pre-existing flaky test in AuditNexusControllerTest (not introduced by this plan)
+
 ### Next — Remaining roadmap
 ```
 mobile-arena — KMP/CMP mobile app (Android + iOS) — not started (parked)
 Plan 17 — ZATCA Phase 2 (Fatoora API) — blocked (needs ZATCA certificates per club)
-Plan 21 — Notification system — in-app + email notifications for key events
 Plan 22 — Member self-registration — allow members to register without staff
 ```
 

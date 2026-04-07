@@ -27,6 +27,17 @@ interface MemberRepository : JpaRepository<Member, Long> {
 
     fun findByPhoneAndDeletedAtIsNull(phone: String): Optional<Member>
 
+    fun findByPhoneAndClubIdAndDeletedAtIsNull(
+        phone: String,
+        clubId: Long,
+    ): Optional<Member>
+
+    fun findAllByClubIdAndMembershipStatusAndDeletedAtIsNull(
+        clubId: Long,
+        membershipStatus: String,
+        pageable: Pageable,
+    ): Page<Member>
+
     fun countByMembershipStatusAndDeletedAtIsNull(membershipStatus: String): Long
 
     @org.springframework.data.jpa.repository.Query(

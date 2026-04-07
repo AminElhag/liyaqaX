@@ -9,4 +9,5 @@ data class UpdatePortalSettingsRequest(
     val onlinePaymentEnabled: Boolean? = null,
     @field:Size(max = 500, message = "Portal message must be at most 500 characters")
     val portalMessage: String? = null,
+    val selfRegistrationEnabled: Boolean? = null,
 )
