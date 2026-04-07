@@ -191,6 +191,40 @@ export async function getMemberGXBookings(
   return data
 }
 
+// ── Waitlist (new) ─────────────────────────────────────────────────────────
+
+export interface WaitlistEntry {
+  entryId: string
+  position: number
+  status: string
+  memberName: string
+  memberPhone: string
+  notifiedAt: string | null
+  offerExpiresAt: string | null
+  createdAt: string
+}
+
+export interface WaitlistListResponse {
+  waitlistCount: number
+  entries: WaitlistEntry[]
+}
+
+export async function getWaitlistEntries(
+  classId: string,
+): Promise<WaitlistListResponse> {
+  const { data } = await apiClient.get<WaitlistListResponse>(
+    `/gx/classes/${classId}/waitlist-entries`,
+  )
+  return data
+}
+
+export async function removeWaitlistEntry(
+  classId: string,
+  entryId: string,
+): Promise<void> {
+  await apiClient.delete(`/gx/classes/${classId}/waitlist-entries/${entryId}`)
+}
+
 // ── Query key factories for TanStack Query ──────────────────────────────────
 
 export const gxKeys = {
@@ -209,6 +243,8 @@ export const gxKeys = {
     [...gxKeys.instanceDetail(classId), 'bookings'] as const,
   waitlist: (classId: string) =>
     [...gxKeys.instanceDetail(classId), 'waitlist'] as const,
+  waitlistEntries: (classId: string) =>
+    [...gxKeys.instanceDetail(classId), 'waitlist-entries'] as const,
   attendance: (classId: string) =>
     [...gxKeys.instanceDetail(classId), 'attendance'] as const,
   memberBookings: (memberId: string) =>

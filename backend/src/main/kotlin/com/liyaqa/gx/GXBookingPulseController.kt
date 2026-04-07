@@ -6,6 +6,7 @@ import com.liyaqa.gx.dto.BookMemberRequest
 import com.liyaqa.gx.dto.BulkAttendanceRequest
 import com.liyaqa.gx.dto.GXAttendanceResponse
 import com.liyaqa.gx.dto.GXBookingResponse
+import com.liyaqa.gx.dto.WaitlistListResponse
 import com.liyaqa.security.JwtClaims
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -32,6 +33,8 @@ import java.util.UUID
 @Validated
 class GXBookingPulseController(
     private val gxBookingService: GXBookingService,
+    private val gxWaitlistService: GXWaitlistService,
+    private val classInstanceRepository: GXClassInstanceRepository,
 ) {
     // ── Booking endpoints ──────────────────────────────────────────────────
 
@@ -104,6 +107,42 @@ class GXBookingPulseController(
             ),
         )
     }
+
+    // ── Waitlist endpoints ──────────────────────────────────────────────────
+
+    @GetMapping("/classes/{classId}/waitlist-entries")
+    @PreAuthorize("hasPermission(null, 'gx-class:manage-bookings')")
+    @Operation(summary = "List waitlist entries for a GX class instance")
+    fun listWaitlistEntries(
+        @PathVariable classId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<WaitlistListResponse> {
+        authentication.pulseContext()
+        val instance = resolveInstance(classId)
+        return ResponseEntity.ok(gxWaitlistService.listEntriesForClass(instance.id))
+    }
+
+    @DeleteMapping("/classes/{classId}/waitlist-entries/{entryId}")
+    @PreAuthorize("hasPermission(null, 'gx-class:manage-bookings')")
+    @Operation(summary = "Staff removes a member from the waitlist")
+    fun removeWaitlistEntry(
+        @PathVariable classId: UUID,
+        @PathVariable entryId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<Void> {
+        authentication.pulseContext()
+        val instance = resolveInstance(classId)
+        val entry =
+            gxWaitlistService.findEntryByPublicId(entryId)
+                ?: throw ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Waitlist entry not found.")
+        gxWaitlistService.staffRemoveEntry(instance.id, entry.id)
+        return ResponseEntity.noContent().build()
+    }
+
+    private fun resolveInstance(classPublicId: UUID): GXClassInstance =
+        classInstanceRepository.findAll()
+            .firstOrNull { it.publicId == classPublicId && it.deletedAt == null }
+            ?: throw ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Class not found.")
 
     // ── Attendance endpoints ───────────────────────────────────────────────
 

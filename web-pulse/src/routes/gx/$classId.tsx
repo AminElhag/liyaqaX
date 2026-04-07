@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import {
   getClassInstance,
@@ -12,6 +13,7 @@ import {
 import { GXStatusBadge } from '@/components/gx/GXStatusBadge'
 import { GXCapacityBar } from '@/components/gx/GXCapacityBar'
 import { GXBookingList } from '@/components/gx/GXBookingList'
+import { WaitlistTab } from '@/components/gx/WaitlistTab'
 
 export const Route = createFileRoute('/gx/$classId')({
   component: GXClassDetailPage,
@@ -22,6 +24,7 @@ function GXClassDetailPage() {
   const { t, i18n } = useTranslation()
   const isAr = i18n.language === 'ar'
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<'bookings' | 'waitlist'>('bookings')
 
   const { data: instance, isLoading } = useQuery({
     queryKey: gxKeys.instanceDetail(classId),
@@ -120,12 +123,40 @@ function GXClassDetailPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold">{t('gx.detail.bookings')}</h2>
-        <GXBookingList
-          bookings={bookingsData?.items ?? []}
-          showCancelButton={instance.status !== 'cancelled'}
-          onCancel={(bookingId) => cancelBookingMutation.mutate(bookingId)}
-        />
+        <div className="mb-4 flex gap-4 border-b">
+          <button
+            type="button"
+            onClick={() => setActiveTab('bookings')}
+            className={`pb-2 text-sm font-medium ${
+              activeTab === 'bookings'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500'
+            }`}
+          >
+            {t('gx.detail.bookings')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('waitlist')}
+            className={`pb-2 text-sm font-medium ${
+              activeTab === 'waitlist'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500'
+            }`}
+          >
+            {t('gx.waitlist.tab_title')} ({instance.waitlistCount})
+          </button>
+        </div>
+
+        {activeTab === 'bookings' ? (
+          <GXBookingList
+            bookings={bookingsData?.items ?? []}
+            showCancelButton={instance.status !== 'cancelled'}
+            onCancel={(bookingId) => cancelBookingMutation.mutate(bookingId)}
+          />
+        ) : (
+          <WaitlistTab classId={classId} />
+        )}
       </div>
     </div>
   )

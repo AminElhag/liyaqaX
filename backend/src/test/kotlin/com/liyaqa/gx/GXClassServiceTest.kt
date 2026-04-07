@@ -42,6 +42,8 @@ class GXClassServiceTest {
 
     @Mock lateinit var trainerRepository: TrainerRepository
 
+    @Mock lateinit var waitlistService: GXWaitlistService
+
     @InjectMocks lateinit var service: GXClassService
 
     // ── Helpers ────────────────────────────────────────────────────────────

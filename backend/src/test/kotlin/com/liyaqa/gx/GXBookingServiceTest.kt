@@ -49,6 +49,8 @@ class GXBookingServiceTest {
 
     @Mock lateinit var userRepository: UserRepository
 
+    @Mock lateinit var waitlistService: GXWaitlistService
+
     @InjectMocks lateinit var service: GXBookingService
 
     // ── Helpers ────────────────────────────────────────────────────────────

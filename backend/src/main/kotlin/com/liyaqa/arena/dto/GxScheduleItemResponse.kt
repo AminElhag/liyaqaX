@@ -13,6 +13,9 @@ data class GxScheduleItemResponse(
     val bookedCount: Int,
     val spotsRemaining: Int,
     val isBooked: Boolean,
+    val waitlistStatus: String? = null,
+    val waitlistPosition: Int? = null,
+    val waitlistOfferExpiresAt: Instant? = null,
 )
 
 data class GxClassTypeSummary(

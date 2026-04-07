@@ -80,4 +80,19 @@ enum class NotificationType(
         "notification.member_import_completed.body",
         true,
     ),
+    GX_WAITLIST_OFFERED(
+        "notification.gx_waitlist_offered.title",
+        "notification.gx_waitlist_offered.body",
+        false,
+    ),
+    GX_WAITLIST_EXPIRED(
+        "notification.gx_waitlist_expired.title",
+        "notification.gx_waitlist_expired.body",
+        false,
+    ),
+    GX_WAITLIST_CONFIRMED(
+        "notification.gx_waitlist_confirmed.title",
+        "notification.gx_waitlist_confirmed.body",
+        false,
+    ),
 }

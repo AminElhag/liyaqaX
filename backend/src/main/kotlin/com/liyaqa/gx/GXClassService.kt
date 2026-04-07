@@ -35,6 +35,7 @@ class GXClassService(
     private val clubRepository: ClubRepository,
     private val branchRepository: BranchRepository,
     private val trainerRepository: TrainerRepository,
+    private val waitlistService: GXWaitlistService,
 ) {
     // ── Class Type CRUD ────────────────────────────────────────────────────
 
@@ -260,14 +261,30 @@ class GXClassService(
             }
         }
 
+        val oldCapacity = instance.capacity
+        val newCapacity = request.capacity ?: classType.defaultCapacity
+
         instance.instructorId = instructor.id
         instance.scheduledAt = request.scheduledAt
         instance.durationMinutes = durationMinutes
-        instance.capacity = request.capacity ?: classType.defaultCapacity
+        instance.capacity = newCapacity
         instance.room = request.room
         instance.notes = request.notes
 
-        return toInstanceResponse(classInstanceRepository.save(instance), classType, instructor)
+        val saved = classInstanceRepository.save(instance)
+
+        // Rule 12 — capacity increased: promote waitlist entries for each new spot
+        if (newCapacity > oldCapacity) {
+            val newSpots = newCapacity - instance.bookingsCount
+            if (newSpots > 0) {
+                val spotsToPromote = newCapacity - oldCapacity
+                repeat(spotsToPromote.coerceAtMost(newSpots)) {
+                    waitlistService.promoteNext(instance.id)
+                }
+            }
+        }
+
+        return toInstanceResponse(saved, classType, instructor)
     }
 
     @Transactional
@@ -303,6 +320,9 @@ class GXClassService(
         instance.bookingsCount = 0
         instance.waitlistCount = 0
         classInstanceRepository.save(instance)
+
+        // Rule 13 — cancel all waitlist entries and notify
+        waitlistService.cancelAllForClass(instance.id)
 
         val classType = classTypeRepository.findById(instance.classTypeId).orElseThrow()
         val instructor = trainerRepository.findById(instance.instructorId).orElseThrow()

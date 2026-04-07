@@ -41,11 +41,18 @@ export function GXClassCard({ instance }: GXClassCardProps) {
         <span>{timeStr} &middot; {instance.durationMinutes}m</span>
         {instance.room && <span>{instance.room}</span>}
       </div>
-      <div className="mt-2">
-        <GXCapacityBar
-          bookingsCount={instance.bookingsCount}
-          capacity={instance.capacity}
-        />
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex-1">
+          <GXCapacityBar
+            bookingsCount={instance.bookingsCount}
+            capacity={instance.capacity}
+          />
+        </div>
+        {instance.waitlistCount > 0 && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+            {instance.waitlistCount} WL
+          </span>
+        )}
       </div>
     </Link>
   )

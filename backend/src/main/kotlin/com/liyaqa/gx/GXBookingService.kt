@@ -35,6 +35,7 @@ class GXBookingService(
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
     private val userRepository: UserRepository,
+    private val waitlistService: GXWaitlistService,
 ) {
     companion object {
         private val ACTIVE_MEMBERSHIP_STATUSES = listOf("active", "frozen")
@@ -169,6 +170,9 @@ class GXBookingService(
 
                 instance.bookingsCount++
                 instance.waitlistCount = (instance.waitlistCount - 1).coerceAtLeast(0)
+            } else {
+                // No old-style waitlist entry — try new GX waitlist
+                waitlistService.promoteNext(instance.id)
             }
             classInstanceRepository.save(instance)
         } else if (wasWaitlist) {

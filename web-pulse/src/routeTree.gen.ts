@@ -21,6 +21,7 @@ import { Route as GxIndexRouteImport } from './routes/gx/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as CashDrawerIndexRouteImport } from './routes/cash-drawer/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
+import { Route as SettingsZatcaRouteImport } from './routes/settings/zatca'
 import { Route as SettingsLeadSourcesRouteImport } from './routes/settings/lead-sources'
 import { Route as ReportsUtilizationRouteImport } from './routes/reports/utilization'
 import { Route as ReportsRevenueRouteImport } from './routes/reports/revenue'
@@ -114,6 +115,11 @@ const CashDrawerIndexRoute = CashDrawerIndexRouteImport.update({
 const StaffStaffIdRoute = StaffStaffIdRouteImport.update({
   id: '/staff/$staffId',
   path: '/staff/$staffId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsZatcaRoute = SettingsZatcaRouteImport.update({
+  id: '/settings/zatca',
+  path: '/settings/zatca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsLeadSourcesRoute = SettingsLeadSourcesRouteImport.update({
@@ -315,6 +321,7 @@ export interface FileRoutesByFullPath {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
@@ -363,6 +370,7 @@ export interface FileRoutesByTo {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer': typeof CashDrawerIndexRoute
   '/finance': typeof FinanceIndexRoute
@@ -412,6 +420,7 @@ export interface FileRoutesById {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
@@ -462,6 +471,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
     | '/finance/'
@@ -510,6 +520,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer'
     | '/finance'
@@ -558,6 +569,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
     | '/finance/'
@@ -607,6 +619,7 @@ export interface RootRouteChildren {
   ReportsRevenueRoute: typeof ReportsRevenueRoute
   ReportsUtilizationRoute: typeof ReportsUtilizationRoute
   SettingsLeadSourcesRoute: typeof SettingsLeadSourcesRoute
+  SettingsZatcaRoute: typeof SettingsZatcaRoute
   StaffStaffIdRoute: typeof StaffStaffIdRoute
   CashDrawerIndexRoute: typeof CashDrawerIndexRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
@@ -709,6 +722,13 @@ declare module '@tanstack/react-router' {
       path: '/staff/$staffId'
       fullPath: '/staff/$staffId'
       preLoaderRoute: typeof StaffStaffIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/zatca': {
+      id: '/settings/zatca'
+      path: '/settings/zatca'
+      fullPath: '/settings/zatca'
+      preLoaderRoute: typeof SettingsZatcaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/lead-sources': {
@@ -999,6 +1019,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRevenueRoute: ReportsRevenueRoute,
   ReportsUtilizationRoute: ReportsUtilizationRoute,
   SettingsLeadSourcesRoute: SettingsLeadSourcesRoute,
+  SettingsZatcaRoute: SettingsZatcaRoute,
   StaffStaffIdRoute: StaffStaffIdRoute,
   CashDrawerIndexRoute: CashDrawerIndexRoute,
   FinanceIndexRoute: FinanceIndexRoute,

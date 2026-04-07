@@ -11,6 +11,8 @@ import com.liyaqa.gx.GXBookingRepository
 import com.liyaqa.gx.GXClassInstance
 import com.liyaqa.gx.GXClassInstanceRepository
 import com.liyaqa.gx.GXClassTypeRepository
+import com.liyaqa.gx.GXWaitlistService
+import com.liyaqa.gx.dto.WaitlistJoinResponse
 import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.notification.events.GxBookedEvent
@@ -50,6 +52,7 @@ class GxArenaController(
     private val portalSettingsService: ClubPortalSettingsService,
     private val auditService: AuditService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val waitlistService: GXWaitlistService,
 ) {
     @GetMapping("/schedule")
     @Operation(summary = "Get upcoming GX class schedule for the next 7 days")
@@ -79,6 +82,7 @@ class GxArenaController(
                 val classType = classTypesById[instance.classTypeId]
                 val trainer = trainersById[instance.instructorId]
                 val isBooked = bookingRepository.existsByInstanceIdAndMemberId(instance.id, member.id)
+                val waitlistEntry = waitlistService.getMemberEntryForClass(instance.id, member.id)
                 GxScheduleItemResponse(
                     id = instance.publicId,
                     classType =
@@ -94,6 +98,9 @@ class GxArenaController(
                     bookedCount = instance.bookingsCount,
                     spotsRemaining = (instance.capacity - instance.bookingsCount).coerceAtLeast(0),
                     isBooked = isBooked,
+                    waitlistStatus = waitlistEntry?.status?.name,
+                    waitlistPosition = waitlistEntry?.position,
+                    waitlistOfferExpiresAt = waitlistEntry?.notifiedAt?.plus(2, ChronoUnit.HOURS),
                 )
             }
 
@@ -199,6 +206,7 @@ class GxArenaController(
         booking.cancelledAt = Instant.now()
         bookingRepository.save(booking)
 
+        // Rule 10 — decrement BEFORE promoteNext so the spot is genuinely available
         instance.bookingsCount = (instance.bookingsCount - 1).coerceAtLeast(0)
         classInstanceRepository.save(instance)
 
@@ -218,7 +226,76 @@ class GxArenaController(
             ),
         )
 
+        // Hook: promote next waitlist member
+        waitlistService.promoteNext(instance.id)
+
         return ResponseEntity.noContent().build()
+    }
+
+    // ── Waitlist endpoints ──────────────────────────────────────────────────
+
+    @PostMapping("/{instanceId}/waitlist")
+    @Operation(summary = "Join the waitlist for a full GX class")
+    fun joinWaitlist(
+        @PathVariable instanceId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<WaitlistJoinResponse> {
+        val member = resolveMember(authentication)
+        portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
+
+        val instance =
+            classInstanceRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(
+                instanceId,
+                member.organizationId,
+            ).orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Class not found.") }
+
+        val response = waitlistService.joinWaitlist(instance.id, member.id)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @DeleteMapping("/{instanceId}/waitlist")
+    @Operation(summary = "Leave the waitlist for a GX class")
+    fun leaveWaitlist(
+        @PathVariable instanceId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<Void> {
+        val member = resolveMember(authentication)
+        portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
+
+        val instance =
+            classInstanceRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(
+                instanceId,
+                member.organizationId,
+            ).orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Class not found.") }
+
+        waitlistService.leaveWaitlist(instance.id, member.id)
+        return ResponseEntity.noContent().build()
+    }
+
+    @PostMapping("/{instanceId}/waitlist/accept")
+    @Operation(summary = "Accept an offered waitlist spot — creates a booking")
+    fun acceptWaitlistOffer(
+        @PathVariable instanceId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<GxBookingResponse> {
+        val member = resolveMember(authentication)
+        portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
+
+        val instance =
+            classInstanceRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(
+                instanceId,
+                member.organizationId,
+            ).orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Class not found.") }
+
+        val booking = waitlistService.acceptOffer(instance.id, member.id)
+
+        auditService.logFromContext(
+            action = AuditAction.GX_BOOKED,
+            entityType = "GXBooking",
+            entityId = booking.publicId.toString(),
+        )
+
+        return ResponseEntity.ok(toBookingResponse(booking, instance, member))
     }
 
     @GetMapping("/bookings")

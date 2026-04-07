@@ -185,7 +185,7 @@ All seeded roles have `isSystem = true` — cannot be deleted via UI.
 | Cash Drawer | CashDrawerSession, CashDrawerEntry | /api/v1/cash-drawer/sessions, /entries |
 | Reports | (read-only, no new entities) | /api/v1/reports/revenue|retention|leads|cash-drawer + /export |
 | PT | PTPackageCatalog, PTPackage, PTSession | /api/v1/pt/catalog, /api/v1/pt-sessions |
-| GX | GXClassType, GXClassInstance, GXBooking, GXAttendance | /api/v1/gx/* |
+| GX | GXClassType, GXClassInstance, GXBooking, GXAttendance, GXWaitlistEntry | /api/v1/gx/*, /api/v1/arena/gx/*/waitlist |
 | Portal | ClubPortalSettings | GET/PATCH /api/v1/portal-settings |
 | Arena Auth | MemberOtp | POST /api/v1/arena/auth/otp/request, /otp/verify, /logout |
 | Arena Profile | (Member + existing entities) | GET /api/v1/arena/me, PATCH /api/v1/arena/profile, GET /api/v1/arena/membership, GET /api/v1/arena/portal-settings |
@@ -205,9 +205,9 @@ All seeded roles have `isSystem = true` — cannot be deleted via UI.
 | Scheduled Reports | ReportSchedule | CRUD /api/v1/report-templates/{id}/schedule, GET /export/pdf |
 | Notifications | Notification | GET /api/v1/pulse/notifications, /arena/notifications, /coach/notifications + mark-read, mark-all-read, unread-count |
 
-**Current test count: 502+ backend tests + 143 frontend tests (web-pulse) + 18 frontend tests (web-nexus)**
-**Current Flyway migrations: V1 through V13** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules, V13 = notifications)
-⚠️ NOTE: V7 was skipped — next plan uses V14.
+**Current test count: 521+ backend tests + 147 frontend tests (web-pulse) + 18 frontend tests (web-nexus)**
+**Current Flyway migrations: V1 through V17** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules, V13 = notifications, V14 = member_self_registration, V15 = zatca_phase2, V16 = member_import, V17 = gx_waitlist)
+⚠️ NOTE: V7 was skipped.
 
 ### New entities added (web-arena plan)
 - `ClubPortalSettings` — per-club feature flags: gxBookingEnabled, ptViewEnabled, invoiceViewEnabled, onlinePaymentEnabled, portalMessage
@@ -442,6 +442,19 @@ Root package.json must NOT have a `workspaces` field.
 - web-nexus: 6 health cards (color-coded, 60s auto-refresh), tab layout (Clubs + Failed Invoices), retry buttons with permission gate
 - 19 new backend tests (3 unit classes + 1 integration class), 5 new frontend tests — 502+ backend tests, 18 frontend tests
 - 1 pre-existing flaky test in AuditNexusControllerTest (not introduced by this plan)
+
+### ✅ Plan 25 — GX Class Waitlist — COMPLETE (all 9 steps done)
+- `GXWaitlistEntry` entity — Flyway V17, operational (no soft delete), `uq_waitlist_member_class` unique constraint
+- `GXWaitlistStatus` enum: WAITING, OFFERED, ACCEPTED, EXPIRED, CANCELLED
+- `GXWaitlistService` — join, accept, leave, promoteNext, cancelAllForClass, staffRemoveEntry (15 business rules)
+- `GXWaitlistScheduler` — hourly `@Scheduled(fixedDelay)`, expires OFFERED entries older than 2 hours, immediately promotes next
+- 3 new notification types: `GX_WAITLIST_OFFERED`, `GX_WAITLIST_EXPIRED`, `GX_WAITLIST_CONFIRMED`
+- 5 new endpoints: 3 arena (POST/DELETE waitlist, POST accept) + 2 pulse (GET waitlist-entries, DELETE entry)
+- Spot-opening hooks: booking cancellation (arena + pulse), staff removal, capacity increase, class cancellation
+- Race condition handling: acceptOffer reverts to WAITING if class full at accept time (409)
+- web-arena: Join Waitlist button, position badge, amber OFFERED banner, Accept Spot CTA, Waitlist tab on bookings
+- web-pulse: waitlist count on GX class card, Waitlist tab on class detail with Remove button
+- 19 new backend tests (15 service + 4 scheduler), 10 integration tests, 6 frontend tests (4 arena + 2 pulse)
 
 ### Next — Remaining roadmap
 ```
