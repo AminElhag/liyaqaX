@@ -44,7 +44,10 @@ import { Route as CashDrawerHistoryRouteImport } from './routes/cash-drawer/hist
 import { Route as CashDrawerSessionIdRouteImport } from './routes/cash-drawer/$sessionId'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as SettingsRolesIndexRouteImport } from './routes/settings/roles/index'
+import { Route as ReportsBuilderIndexRouteImport } from './routes/reports/builder/index'
 import { Route as SettingsRolesRoleIdRouteImport } from './routes/settings/roles/$roleId'
+import { Route as ReportsBuilderNewRouteImport } from './routes/reports/builder/new'
+import { Route as ReportsBuilderTemplateIdRouteImport } from './routes/reports/builder/$templateId'
 import { Route as MembersMemberIdPtRouteImport } from './routes/members/$memberId.pt'
 import { Route as MembersMemberIdPaymentsRouteImport } from './routes/members/$memberId.payments'
 import { Route as MembersMemberIdOverviewRouteImport } from './routes/members/$memberId.overview'
@@ -227,11 +230,27 @@ const SettingsRolesIndexRoute = SettingsRolesIndexRouteImport.update({
   path: '/settings/roles/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsBuilderIndexRoute = ReportsBuilderIndexRouteImport.update({
+  id: '/reports/builder/',
+  path: '/reports/builder/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRolesRoleIdRoute = SettingsRolesRoleIdRouteImport.update({
   id: '/settings/roles/$roleId',
   path: '/settings/roles/$roleId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsBuilderNewRoute = ReportsBuilderNewRouteImport.update({
+  id: '/reports/builder/new',
+  path: '/reports/builder/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsBuilderTemplateIdRoute =
+  ReportsBuilderTemplateIdRouteImport.update({
+    id: '/reports/builder/$templateId',
+    path: '/reports/builder/$templateId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const MembersMemberIdPtRoute = MembersMemberIdPtRouteImport.update({
   id: '/pt',
   path: '/pt',
@@ -306,7 +325,10 @@ export interface FileRoutesByFullPath {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/reports/builder/$templateId': typeof ReportsBuilderTemplateIdRoute
+  '/reports/builder/new': typeof ReportsBuilderNewRoute
   '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/reports/builder/': typeof ReportsBuilderIndexRoute
   '/settings/roles/': typeof SettingsRolesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -350,7 +372,10 @@ export interface FileRoutesByTo {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/reports/builder/$templateId': typeof ReportsBuilderTemplateIdRoute
+  '/reports/builder/new': typeof ReportsBuilderNewRoute
   '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/reports/builder': typeof ReportsBuilderIndexRoute
   '/settings/roles': typeof SettingsRolesIndexRoute
 }
 export interface FileRoutesById {
@@ -395,7 +420,10 @@ export interface FileRoutesById {
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
+  '/reports/builder/$templateId': typeof ReportsBuilderTemplateIdRoute
+  '/reports/builder/new': typeof ReportsBuilderNewRoute
   '/settings/roles/$roleId': typeof SettingsRolesRoleIdRoute
+  '/reports/builder/': typeof ReportsBuilderIndexRoute
   '/settings/roles/': typeof SettingsRolesIndexRoute
 }
 export interface FileRouteTypes {
@@ -441,7 +469,10 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/reports/builder/$templateId'
+    | '/reports/builder/new'
     | '/settings/roles/$roleId'
+    | '/reports/builder/'
     | '/settings/roles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -485,7 +516,10 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/reports/builder/$templateId'
+    | '/reports/builder/new'
     | '/settings/roles/$roleId'
+    | '/reports/builder'
     | '/settings/roles'
   id:
     | '__root__'
@@ -529,7 +563,10 @@ export interface FileRouteTypes {
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
+    | '/reports/builder/$templateId'
+    | '/reports/builder/new'
     | '/settings/roles/$roleId'
+    | '/reports/builder/'
     | '/settings/roles/'
   fileRoutesById: FileRoutesById
 }
@@ -568,7 +605,10 @@ export interface RootRouteChildren {
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   StaffIndexRoute: typeof StaffIndexRoute
+  ReportsBuilderTemplateIdRoute: typeof ReportsBuilderTemplateIdRoute
+  ReportsBuilderNewRoute: typeof ReportsBuilderNewRoute
   SettingsRolesRoleIdRoute: typeof SettingsRolesRoleIdRoute
+  ReportsBuilderIndexRoute: typeof ReportsBuilderIndexRoute
   SettingsRolesIndexRoute: typeof SettingsRolesIndexRoute
 }
 
@@ -819,11 +859,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRolesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/builder/': {
+      id: '/reports/builder/'
+      path: '/reports/builder'
+      fullPath: '/reports/builder/'
+      preLoaderRoute: typeof ReportsBuilderIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/roles/$roleId': {
       id: '/settings/roles/$roleId'
       path: '/settings/roles/$roleId'
       fullPath: '/settings/roles/$roleId'
       preLoaderRoute: typeof SettingsRolesRoleIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/builder/new': {
+      id: '/reports/builder/new'
+      path: '/reports/builder/new'
+      fullPath: '/reports/builder/new'
+      preLoaderRoute: typeof ReportsBuilderNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/builder/$templateId': {
+      id: '/reports/builder/$templateId'
+      path: '/reports/builder/$templateId'
+      fullPath: '/reports/builder/$templateId'
+      preLoaderRoute: typeof ReportsBuilderTemplateIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members/$memberId/pt': {
@@ -928,7 +989,10 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   StaffIndexRoute: StaffIndexRoute,
+  ReportsBuilderTemplateIdRoute: ReportsBuilderTemplateIdRoute,
+  ReportsBuilderNewRoute: ReportsBuilderNewRoute,
   SettingsRolesRoleIdRoute: SettingsRolesRoleIdRoute,
+  ReportsBuilderIndexRoute: ReportsBuilderIndexRoute,
   SettingsRolesIndexRoute: SettingsRolesIndexRoute,
 }
 export const routeTree = rootRouteImport

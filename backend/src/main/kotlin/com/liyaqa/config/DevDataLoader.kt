@@ -53,6 +53,8 @@ import com.liyaqa.rbac.RolePermission
 import com.liyaqa.rbac.RolePermissionRepository
 import com.liyaqa.rbac.UserRole
 import com.liyaqa.rbac.UserRoleRepository
+import com.liyaqa.report.builder.ReportTemplate
+import com.liyaqa.report.builder.ReportTemplateRepository
 import com.liyaqa.role.Role
 import com.liyaqa.role.RoleRepository
 import com.liyaqa.staff.StaffBranchAssignment
@@ -116,6 +118,7 @@ class DevDataLoader(
     private val cashDrawerSessionRepository: CashDrawerSessionRepository,
     private val cashDrawerEntryRepository: CashDrawerEntryRepository,
     private val portalSettingsRepository: ClubPortalSettingsRepository,
+    private val reportTemplateRepository: ReportTemplateRepository,
     private val ptPackageCatalogRepository: PTPackageCatalogRepository,
     private val ptPackageRepository: PTPackageRepository,
     private val ptSessionRepository: PTSessionRepository,
@@ -202,6 +205,7 @@ class DevDataLoader(
             PermissionConstants.CASH_DRAWER_READ, PermissionConstants.CASH_DRAWER_ENTRY_CREATE,
             PermissionConstants.CASH_DRAWER_RECONCILE, PermissionConstants.BRANCH_READ,
             PermissionConstants.PORTAL_SETTINGS_UPDATE,
+            PermissionConstants.REPORT_CUSTOM_RUN,
         )
 
     private val clubBranchManager =
@@ -309,12 +313,14 @@ class DevDataLoader(
         val staffByEmail = staffMemberRepository.findAll().associateBy { userRepository.findById(it.userId).get().email }
         seedLeads(org, club, riyadhBranch, staffByEmail)
         seedCashDrawer(org, club, riyadhBranch, staffByEmail)
+        seedReportTemplates(club)
 
         log.info(
             "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
                 "4 staff, 2 trainers, 1 member, 3 plans, 1 membership, 3 GX types, 5 instances, " +
                 "1 booking, 1 PT catalog, 1 PT package, 3 PT sessions, " +
-                "4 lead sources, 3 leads, 1 cash drawer session with 4 entries.",
+                "4 lead sources, 3 leads, 1 cash drawer session with 4 entries, " +
+                "2 report templates.",
             users.size,
             permissions.size,
             roles.size,
@@ -1331,6 +1337,34 @@ class DevDataLoader(
                 invoiceViewEnabled = true,
                 onlinePaymentEnabled = false,
                 portalMessage = "Welcome to Elixir Gym!",
+            ),
+        )
+    }
+
+    // ── Report Templates ─────────────────────────────────────────────────────
+
+    private fun seedReportTemplates(club: Club) {
+        reportTemplateRepository.save(
+            ReportTemplate(
+                clubId = club.id,
+                name = "Monthly Revenue by Branch",
+                description = "Tracks revenue and new members grouped by month and branch.",
+                metrics = """["revenue","net_revenue","new_members"]""",
+                dimensions = """["month","branch"]""",
+                metricScope = "revenue",
+                isSystem = true,
+            ),
+        )
+
+        reportTemplateRepository.save(
+            ReportTemplate(
+                clubId = club.id,
+                name = "Lead Conversion by Source",
+                description = "Tracks lead creation, conversion, and conversion rate by source.",
+                metrics = """["leads_created","leads_converted","lead_conversion_rate"]""",
+                dimensions = """["month","lead_source"]""",
+                metricScope = "leads",
+                isSystem = true,
             ),
         )
     }

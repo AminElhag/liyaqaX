@@ -43,6 +43,12 @@ function ReportsHubPage() {
       to: '/reports/cash-drawer',
       permission: Permission.REPORT_CASH_DRAWER_VIEW,
     },
+    {
+      title: t('reports.builder.title'),
+      description: t('reports.builder.description'),
+      to: '/reports/builder',
+      permission: Permission.REPORT_CUSTOM_RUN,
+    },
   ]
 
   return (

@@ -50,6 +50,7 @@ export const Permission = {
   REPORT_UTILIZATION_VIEW: 'report:utilization:view',
   REPORT_LEADS_VIEW: 'report:leads:view',
   REPORT_CASH_DRAWER_VIEW: 'report:cash-drawer:view',
+  REPORT_CUSTOM_RUN: 'report:custom:run',
 
   // PT
   PT_PACKAGE_CREATE: 'pt-package:create',
