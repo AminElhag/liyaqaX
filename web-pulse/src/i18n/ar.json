@@ -485,6 +485,36 @@
         "leads": "العملاء المحتملون",
         "cash": "صندوق النقد"
       }
+    },
+    "schedule": {
+      "runTab": "تشغيل",
+      "scheduleTab": "الجدولة",
+      "createTitle": "إنشاء جدول",
+      "editTitle": "تعديل الجدول",
+      "createSchedule": "إنشاء جدول",
+      "updateSchedule": "حفظ التغييرات",
+      "removeSchedule": "إزالة الجدول",
+      "removeConfirm": "هل أنت متأكد من إزالة هذا الجدول؟ ستتوقف رسائل البريد التلقائية.",
+      "frequency": "التكرار",
+      "daily": "يومي",
+      "weekly": "أسبوعي (الاثنين)",
+      "monthly": "شهري (الأول)",
+      "recipients": "المستلمون",
+      "addRecipient": "إضافة",
+      "recipientsCount": "مستلمون",
+      "maxRecipients": "الحد الأقصى 10 مستلمين.",
+      "invalidEmail": "عنوان بريد إلكتروني غير صالح.",
+      "duplicateEmail": "البريد مضاف مسبقاً.",
+      "isActive": "الجدول نشط",
+      "saving": "جاري الحفظ...",
+      "nextRun": "التشغيل التالي",
+      "lastRunLabel": "آخر تشغيل",
+      "active": "نشط",
+      "paused": "متوقف",
+      "neverRun": "لم يعمل بعد",
+      "failed": "فشل",
+      "exportPdf": "تصدير PDF",
+      "runFirst": "قم بتشغيل التقرير أولاً"
     }
   },
   "roles": {

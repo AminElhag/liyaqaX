@@ -9,6 +9,16 @@ spring:
 jwt:
   secret: dev-only-secret-key-do-not-use-in-production-must-be-at-least-256-bits
 
+spring:
+  mail:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+
 logging:
   level:
     com.liyaqa: DEBUG

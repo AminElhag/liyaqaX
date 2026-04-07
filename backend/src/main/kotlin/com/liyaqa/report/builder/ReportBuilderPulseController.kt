@@ -9,6 +9,7 @@ import com.liyaqa.report.builder.dto.ReportResultResponse
 import com.liyaqa.report.builder.dto.ReportTemplateResponse
 import com.liyaqa.report.builder.dto.RunReportRequest
 import com.liyaqa.report.builder.dto.UpdateReportTemplateRequest
+import com.liyaqa.report.schedule.ReportPdfService
 import com.liyaqa.security.JwtClaims
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -37,6 +38,7 @@ import java.util.UUID
 class ReportBuilderPulseController(
     private val reportTemplateService: ReportTemplateService,
     private val reportBuilderService: ReportBuilderService,
+    private val reportPdfService: ReportPdfService,
     private val permissionService: PermissionService,
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
@@ -145,6 +147,37 @@ class ReportBuilderPulseController(
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"report-${template.name}.csv\"")
             .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
             .body(csv)
+    }
+
+    @GetMapping("/{id}/export/pdf")
+    @PreAuthorize("hasPermission(null, 'report:custom:run')")
+    @Operation(summary = "Download last result as PDF")
+    fun exportPdf(
+        @PathVariable id: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<ByteArray> {
+        val claims = authentication.pulseContext()
+        val clubId = resolveClubId(authentication)
+        val template = reportTemplateService.findOrThrow(id, clubId)
+
+        enforceMetricScopeGate(claims, template)
+
+        val result = reportBuilderService.getLastResult(template)
+        val clubName = clubRepository.findById(clubId).map { it.nameEn }.orElse("Club")
+        val pdf =
+            reportPdfService.generatePdf(
+                reportName = template.name,
+                clubName = clubName,
+                dateFrom = result.dateFrom,
+                dateTo = result.dateTo,
+                columns = result.columns,
+                rows = result.rows,
+            )
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${template.name}_${result.dateFrom}_${result.dateTo}.pdf\"")
+            .contentType(MediaType.APPLICATION_PDF)
+            .body(pdf)
     }
 
     private fun enforceMetricScopeGate(

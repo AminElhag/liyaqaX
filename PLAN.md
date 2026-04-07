@@ -1,426 +1,319 @@
-
-# PLAN.md — Custom Report Builder (Plan 19)
+# PLAN.md — Scheduled Report Emails + PDF Exports (Plan 20)
 
 ## Status
 Ready for implementation
 
 ## Branch
-feat/custom-report-builder
+feat/scheduled-reports
 
 ## Goal
-Let club owners and managers build and save their own reports by selecting
-metrics, dimensions, date ranges, and filters from the existing data. A saved
-report template is stored per club, can be run on demand, and its last result
-is cached for 10 minutes. The builder UI lives in web-pulse under /reports/builder.
-The four fixed reports from Plan 18 remain unchanged — the custom builder is
-additive only.
+Let club owners schedule any saved report template to run automatically
+(daily, weekly, or monthly) and deliver the result by email as a PDF
+attachment. One-off PDF export of any report result is also added. The
+email is sent to one or more configured recipients per schedule. The
+scheduler runs server-side via Spring's `@Scheduled` + a `ReportSchedule`
+entity. PDF generation uses iText (open source) on the backend — no
+browser or headless Chrome needed.
 
 ## Context
-- Plan 18 built four fixed reports: revenue, retention, lead funnel, cash drawer.
-  All four are read-only aggregations using `nativeQuery = true` services.
-- `ReportPulseController`, four report services, and the reports UI (KpiCard,
-  ReportDateRangePicker, ReportTable, CsvExportButton) all exist and can be
-  reused or extended.
-- `ddl-auto: create-drop` in dev — Flyway V11 needed for two new tables:
-  `report_templates` and `report_results`.
-- Redis 7 is running — used here for 10-minute result caching.
-- Permission `report:revenue:view`, `report:retention:view`,
-  `report:leads:view`, `report:cash-drawer:view` all exist. Custom reports
-  add a new permission: `report:custom:run`.
+- `ReportTemplate` and `ReportResult` entities exist (Plan 19).
+- `ReportBuilderService.runReport()` already executes reports and caches
+  results — the scheduler calls this directly.
+- `ReportResultRepository` already stores the last result as JSON.
+- No email infrastructure exists yet — this plan introduces the first
+  email sending capability in the project (JavaMailSender + SMTP config).
+- No PDF generation exists yet — this plan introduces iText 7 Community.
+- `ddl-auto: create-drop` in dev — Flyway V12 for `report_schedules` table.
+- Redis is running — schedule lock uses Redis `SETNX` to prevent duplicate
+  runs when multiple backend instances are deployed.
 
 ---
 
 ## Scope — what this plan covers
 
 ### Backend
-- [ ] `ReportTemplate.kt` entity + `ReportTemplateRepository.kt`
-- [ ] `ReportResult.kt` entity + `ReportResultRepository.kt` (last run snapshot)
-- [ ] `ReportBuilderService.kt` — build + execute a dynamic report query,
-  cache result in Redis for 10 minutes
-- [ ] `ReportTemplateService.kt` — CRUD for templates (per club)
-- [ ] `ReportBuilderPulseController.kt` — template CRUD + run endpoints
-- [ ] `MetaReportPulseController.kt` — GET available metrics and dimensions
-- [ ] DTOs for all builder endpoints
-- [ ] Flyway V11: `report_templates` + `report_results` tables
-- [ ] Unit tests: `ReportBuilderServiceTest`, `ReportTemplateServiceTest`
-- [ ] Integration tests: `ReportBuilderPulseControllerTest`
+- [ ] `ReportSchedule.kt` entity + `ReportScheduleRepository.kt`
+- [ ] `ReportSchedulerService.kt` — Spring `@Scheduled` cron, Redis lock,
+  calls `ReportBuilderService.runReport()`, sends email
+- [ ] `ReportPdfService.kt` — generates PDF from `ReportResult` using iText 7
+- [ ] `ReportEmailService.kt` — composes and sends email with PDF attachment
+  via JavaMailSender
+- [ ] `ReportSchedulePulseController.kt` — CRUD for schedules per club
+- [ ] `ReportExportPulseController.kt` — `GET /report-templates/{id}/export/pdf`
+  (on-demand PDF of last result)
+- [ ] DTOs for schedule endpoints
+- [ ] `application.yml` additions: SMTP config, scheduler toggle
+- [ ] Flyway V12: `report_schedules` table
+- [ ] Unit tests: `ReportPdfServiceTest`, `ReportEmailServiceTest`,
+  `ReportSchedulerServiceTest`
+- [ ] Integration tests: `ReportSchedulePulseControllerTest`
 
 ### Frontend (web-pulse additions)
-- [ ] `/reports/builder` — template list + "New Report" button
-- [ ] `/reports/builder/new` — report builder UI (metric + dimension +
-  date range + filter selectors)
-- [ ] `/reports/builder/$templateId` — saved template viewer + run button +
-  last result display
-- [ ] `src/api/reportBuilder.ts` — API client module
-- [ ] Components: `MetricSelector`, `DimensionSelector`, `FilterBuilder`,
-  `ReportPreviewTable`, `SaveTemplateModal`
-- [ ] Reuse existing: `KpiCard`, `ReportDateRangePicker`, `ReportTable`,
-  `CsvExportButton`
+- [ ] Schedule management UI on `/reports/builder/$templateId`:
+  "Schedule" tab alongside the existing Run tab
+- [ ] `src/api/reportSchedules.ts` — API client
+- [ ] `ScheduleForm.tsx` — frequency picker (daily/weekly/monthly),
+  day/time selector, recipient email list
+- [ ] "Export PDF" button on the template detail page (on-demand)
+- [ ] Schedule status badge on template list (Active / Paused / Never run)
 
 ---
 
 ## Out of scope — do not implement in this plan
-- Scheduled report emails / PDF exports — Plan 20
-- Cross-org platform reports in web-nexus — separate plan
-- Chart type selection in builder (builder output is always tabular)
-- Real-time / live data (WebSocket) — separate plan
-- Sharing reports between clubs — separate plan
-- Excel export (CSV only — same as fixed reports)
+- In-app notification when a scheduled report runs (Plan 21)
+- Slack / WhatsApp delivery of reports (no messaging gateway yet)
+- Custom email templates / branding (plain HTML email only)
+- Report scheduling for the four fixed reports (Plan 18 reports) —
+  scheduler only works with custom `ReportTemplate` entities
+- Report result history viewer (only last result stored)
+- Retry logic for failed email sends (log + alert only for now)
+- Unsubscribe / bounce handling (future plan)
 
 ---
 
 ## Decisions already made
 
-- **Available metrics are fixed, not freeform**: the builder does not allow
-  arbitrary SQL. It exposes a curated catalogue of pre-approved metrics
-  (e.g. "Revenue", "New Members", "Active Memberships", "Bookings"). Each
-  metric maps to a named aggregate SQL fragment in the backend. Users pick
-  from a list — they cannot type raw SQL.
+- **JavaMailSender + SMTP**: Spring Boot's built-in mail support.
+  SMTP credentials come from environment variables (never hardcoded).
+  In dev: `spring.mail.host=localhost`, `spring.mail.port=1025`
+  pointing to Mailpit (a local SMTP catcher — added to docker-compose).
+  In prod: configured via `.env` → `MAIL_HOST`, `MAIL_PORT`,
+  `MAIL_USERNAME`, `MAIL_PASSWORD`.
 
-- **Available dimensions are fixed**: `day`, `week`, `month`, `staff_member`,
-  `branch`, `membership_plan`, `class_type`, `lead_source`. Each maps to a
-  GROUP BY fragment. Backend validates the combination is legal before executing.
+- **iText 7 Community (AGPL)**: open-source PDF generation. Added to
+  `build.gradle.kts`. Simple tabular layout: report name, date range,
+  run timestamp at top; data table below with column headers and rows.
+  Club name and logo text in header. Page numbers in footer.
+  Arabic text handled via iText's built-in Unicode support — RTL columns
+  rendered correctly if column values are Arabic strings.
 
-- **Available filters are fixed**: `branch`, `membership_plan`, `date_range`,
-  `staff_member`, `class_type`, `lead_source`. Each filter maps to a WHERE
-  clause fragment.
+- **`ReportSchedule` per template**: one schedule per template per club.
+  Attempting to create a second schedule for the same template returns 409.
+  A schedule can be paused (isActive = false) without deleting it.
 
-- **Report execution builds a safe parameterized native query**: the backend
-  assembles the query from pre-approved metric/dimension/filter fragments
-  using string concatenation of trusted enum values — not user input. All
-  user-supplied filter values (IDs, dates) are passed as JDBC parameters.
-  Never interpolated into SQL string.
+- **Cron frequencies**:
+  - `daily` → runs at 07:00 Asia/Riyadh every day
+  - `weekly` → runs at 07:00 Asia/Riyadh every Monday
+  - `monthly` → runs at 07:00 Asia/Riyadh on the 1st of each month
+  Fixed times — not configurable per schedule in this plan.
+  Date range for each run:
+  - daily → yesterday (dateFrom = dateTo = yesterday)
+  - weekly → last 7 days
+  - monthly → previous calendar month
 
-- **Result stored in `report_results` table AND Redis**: on `POST
-  /report-templates/{id}/run`, result rows are serialized as JSON and stored
-  in `report_results.resultJson` (last-run snapshot). Simultaneously cached
-  in Redis at `report_result:{templateId}` with 10-minute TTL. On
-  `GET /report-templates/{id}/result`, check Redis first — cache hit returns
-  immediately, cache miss loads from `report_results` table.
+- **Redis distributed lock**: before each scheduled run, acquire
+  `SETNX report_schedule_lock:{scheduleId}` with 5-minute TTL. If lock
+  already held → skip this run (another instance is handling it). Release
+  lock after run completes or fails. Prevents duplicate emails in
+  multi-instance deployments.
 
-- **Max 10 metric columns per report**: validation returns 422 if more than
-  10 metrics selected. Prevents runaway query complexity.
+- **Recipients stored as JSON array on `ReportSchedule`**: up to 10 email
+  addresses per schedule. Stored as `VARCHAR(2000)` JSON string.
+  Validated as valid email format on create/update.
 
-- **Max 50,000 rows per report result**: query adds `LIMIT 50000`. If result
-  is truncated, response includes `"truncated": true` and `"rowCount": 50000`.
+- **Email format**: subject = `"[Liyaqa] {reportName} — {dateRange}"`.
+  Body = plain HTML with: club name, report name, date range, row count,
+  "Please find the report attached." footer.
+  Attachment = `{reportName}_{dateFrom}_{dateTo}.pdf`.
 
-- **Template is per-club**: `report_templates.club_id` is mandatory. A club
-  owner can only see and run their own templates. Tenant isolation enforced
-  via JWT `clubId`.
+- **On-demand PDF**: `GET /report-templates/{id}/export/pdf` generates a
+  PDF from the last stored `ReportResult`. Returns 404 if no result exists.
+  Returns `application/pdf` with `Content-Disposition: attachment`.
+  This is separate from the existing CSV export endpoint.
 
-- **`report:custom:run` permission**: Owner and Branch Manager can run and
-  manage templates. Sales Agent can run templates that include lead metrics
-  (enforced via template `metricScope` — see entity design).
+- **Audit logging**: `REPORT_SCHEDULE_CREATED`, `REPORT_SCHEDULE_UPDATED`,
+  `REPORT_SCHEDULE_DELETED`, `REPORT_EMAIL_SENT` added to `AuditAction`.
 
-- **Redis cache key includes run parameters**: `report_result:{templateId}:{paramHash}`
-  where `paramHash` is a SHA-256 of the run-time overrides (date range,
-  filter values). Same template with different date ranges gets separate
-  cache entries.
-
-- **Flyway V11**: next available version after V10 (audit_logs).
+- **Mailpit in docker-compose**: add `mailpit` service (port 1025 SMTP,
+  port 8025 web UI) to `docker-compose.yml` for local dev email catching.
+  All dev emails land in Mailpit's web inbox at `localhost:8025`.
 
 ---
 
 ## Entity design
 
-### ReportTemplate
+### ReportSchedule
 
 Fields beyond standard AuditEntity columns:
 
 ```
-club_id           BIGINT NOT NULL   FK → clubs(id)
-name              VARCHAR(200) NOT NULL
-description       VARCHAR(500)      nullable
-metrics           TEXT NOT NULL     JSON array of metric codes e.g. ["revenue","new_members"]
-dimensions        TEXT NOT NULL     JSON array of dimension codes e.g. ["month","branch"]
-filters           TEXT              nullable, JSON object of filter config
-                                    e.g. {"branch_id": null, "plan_id": null}
-metric_scope      VARCHAR(50)       nullable — "revenue"|"leads"|"members"|"gx"|"pt"
-                                    used to gate which roles can run this template
-is_system         BOOLEAN NOT NULL DEFAULT false  (for future platform-seeded templates)
+template_id       BIGINT NOT NULL UNIQUE   FK → report_templates(id)
+                                           UNIQUE: one schedule per template
+club_id           BIGINT NOT NULL          FK → clubs(id) (for tenant isolation)
+frequency         VARCHAR(20) NOT NULL     'daily' | 'weekly' | 'monthly'
+recipients_json   VARCHAR(2000) NOT NULL   JSON array of email strings, max 10
+is_active         BOOLEAN NOT NULL DEFAULT true
+last_run_at       TIMESTAMPTZ              nullable — set after each successful run
+last_run_status   VARCHAR(20)              nullable — 'success' | 'failed'
+last_error        TEXT                     nullable — error message if last_run_status='failed'
 ```
 
-### ReportResult
-
-Fields beyond standard AuditEntity columns:
-
-```
-template_id       BIGINT NOT NULL   FK → report_templates(id)
-run_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
-run_by_user_id    VARCHAR(100) NOT NULL   (actor UUID from JWT)
-date_from         DATE NOT NULL
-date_to           DATE NOT NULL
-result_json       TEXT NOT NULL     JSON array of row objects
-row_count         INTEGER NOT NULL
-truncated         BOOLEAN NOT NULL DEFAULT false
-run_params_hash   VARCHAR(64)       SHA-256 of the run-time parameters (for cache key)
-```
-
-Only the most recent result per template is kept active. Older results are
-soft-deleted (AuditEntity `deletedAt`) when a new run completes.
-
-### Flyway V11
+### Flyway V12
 
 ```sql
-CREATE TABLE report_templates (
-    id            BIGSERIAL PRIMARY KEY,
-    public_id     UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    club_id       BIGINT NOT NULL REFERENCES clubs(id),
-    name          VARCHAR(200) NOT NULL,
-    description   VARCHAR(500),
-    metrics       TEXT NOT NULL,
-    dimensions    TEXT NOT NULL,
-    filters       TEXT,
-    metric_scope  VARCHAR(50),
-    is_system     BOOLEAN NOT NULL DEFAULT false,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at    TIMESTAMPTZ
-);
-
-CREATE TABLE report_results (
+CREATE TABLE report_schedules (
     id                BIGSERIAL PRIMARY KEY,
     public_id         UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    template_id       BIGINT NOT NULL REFERENCES report_templates(id),
-    run_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    run_by_user_id    VARCHAR(100) NOT NULL,
-    date_from         DATE NOT NULL,
-    date_to           DATE NOT NULL,
-    result_json       TEXT NOT NULL,
-    row_count         INTEGER NOT NULL,
-    truncated         BOOLEAN NOT NULL DEFAULT false,
-    run_params_hash   VARCHAR(64),
+    template_id       BIGINT NOT NULL UNIQUE REFERENCES report_templates(id),
+    club_id           BIGINT NOT NULL REFERENCES clubs(id),
+    frequency         VARCHAR(20) NOT NULL,
+    recipients_json   VARCHAR(2000) NOT NULL,
+    is_active         BOOLEAN NOT NULL DEFAULT true,
+    last_run_at       TIMESTAMPTZ,
+    last_run_status   VARCHAR(20),
+    last_error        TEXT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at        TIMESTAMPTZ
 );
 
-CREATE INDEX idx_report_templates_club_id  ON report_templates(club_id);
-CREATE INDEX idx_report_results_template_id ON report_results(template_id);
-CREATE INDEX idx_report_results_run_at      ON report_results(run_at DESC);
+CREATE INDEX idx_report_schedules_club_id      ON report_schedules(club_id);
+CREATE INDEX idx_report_schedules_template_id  ON report_schedules(template_id);
+CREATE INDEX idx_report_schedules_is_active    ON report_schedules(is_active)
+    WHERE deleted_at IS NULL;
 ```
 
 ---
 
 ## API endpoints
 
-### MetaReportPulseController — `/api/v1/reports/meta`
+### ReportSchedulePulseController — `/api/v1/report-templates/{templateId}/schedule`
 
 ```
-GET /api/v1/reports/meta/metrics      list of available metric codes + labels
-GET /api/v1/reports/meta/dimensions   list of available dimension codes + labels
-GET /api/v1/reports/meta/filters      list of available filter codes + config schema
+GET    /api/v1/report-templates/{templateId}/schedule        get schedule (or 404)
+POST   /api/v1/report-templates/{templateId}/schedule        create schedule
+PATCH  /api/v1/report-templates/{templateId}/schedule        update frequency/recipients/isActive
+DELETE /api/v1/report-templates/{templateId}/schedule        delete schedule
 ```
 
-No permission gate — any authenticated club user can read the catalogue.
-
-### ReportBuilderPulseController — `/api/v1/report-templates`
+### ReportExportPulseController — additions to existing export
 
 ```
-GET    /api/v1/report-templates              list templates for this club
-GET    /api/v1/report-templates/{id}         template detail
-POST   /api/v1/report-templates              create template
-PATCH  /api/v1/report-templates/{id}         update template
-DELETE /api/v1/report-templates/{id}         soft delete template
-
-POST   /api/v1/report-templates/{id}/run     execute report → returns result
-GET    /api/v1/report-templates/{id}/result  last cached result
-GET    /api/v1/report-templates/{id}/export  CSV download of last result
+GET    /api/v1/report-templates/{id}/export/pdf    on-demand PDF of last result
 ```
 
-Required permission: `report:custom:run` for all endpoints.
+(Existing CSV: `GET /api/v1/report-templates/{id}/export` — unchanged.)
+
+Required permission: `report:custom:run` for all schedule endpoints.
 
 ---
 
 ## Request / Response shapes
 
-### MetricMetaResponse
-```json
-{
-  "code": "revenue",
-  "label": "Revenue",
-  "labelAr": "الإيرادات",
-  "unit": "sar",
-  "scope": "revenue",
-  "description": "Total payments collected"
-}
-```
-
-### DimensionMetaResponse
-```json
-{
-  "code": "month",
-  "label": "Month",
-  "labelAr": "الشهر",
-  "compatibleMetricScopes": ["revenue", "members", "leads", "gx", "pt"]
-}
-```
-
-### ReportTemplateResponse
+### ReportScheduleResponse
 ```json
 {
   "id": "uuid",
-  "name": "string",
-  "description": "string | null",
-  "metrics": ["revenue", "new_members"],
-  "dimensions": ["month", "branch"],
-  "filters": { "branch_id": null, "plan_id": null },
-  "metricScope": "revenue",
-  "isSystem": false,
-  "lastRunAt": "ISO 8601 | null",
-  "createdAt": "ISO 8601"
-}
-```
-
-### CreateReportTemplateRequest
-```json
-{
-  "name": "string (required)",
-  "description": "string (optional)",
-  "metrics": ["revenue", "new_members"],
-  "dimensions": ["month"],
-  "filters": { "branch_id": null }
-}
-```
-
-### RunReportRequest
-```json
-{
-  "dateFrom": "yyyy-MM-dd (required)",
-  "dateTo": "yyyy-MM-dd (required)",
-  "filters": {
-    "branch_id": "uuid (optional override)",
-    "plan_id": "uuid (optional override)"
-  }
-}
-```
-
-### ReportResultResponse
-```json
-{
   "templateId": "uuid",
-  "runAt": "ISO 8601",
-  "dateFrom": "yyyy-MM-dd",
-  "dateTo": "yyyy-MM-dd",
-  "columns": ["month", "branch", "revenue_sar", "new_members"],
-  "rows": [
-    { "month": "2026-03", "branch": "Riyadh", "revenue_sar": "15000.00", "new_members": 42 }
-  ],
-  "rowCount": 1,
-  "truncated": false,
-  "fromCache": true
+  "templateName": "string",
+  "frequency": "daily | weekly | monthly",
+  "recipients": ["owner@elixir.com"],
+  "isActive": true,
+  "lastRunAt": "ISO 8601 | null",
+  "lastRunStatus": "success | failed | null",
+  "lastError": "string | null",
+  "nextRunAt": "ISO 8601"
 }
 ```
 
----
+`nextRunAt` is computed by the service based on `frequency` and current time.
 
-## Available metrics catalogue (backend enum)
-
-```
-revenue              → SUM(p.amount_halalas) from payments WHERE status='collected'
-refunds              → SUM(p.amount_halalas) from payments WHERE status='refunded'
-net_revenue          → revenue - refunds
-new_members          → COUNT(m.id) from members WHERE created_at in range
-active_memberships   → COUNT(ms.id) from memberships WHERE status='active'
-expired_memberships  → COUNT(ms.id) from memberships WHERE status='expired'
-frozen_memberships   → COUNT(ms.id) from memberships WHERE status='frozen'
-gx_bookings          → COUNT(b.id) from gx_bookings
-gx_attendance        → COUNT(b.id) from gx_bookings WHERE attended=true
-pt_sessions          → COUNT(s.id) from pt_sessions
-pt_attendance        → COUNT(s.id) from pt_sessions WHERE status='attended'
-leads_created        → COUNT(l.id) from leads WHERE created_at in range
-leads_converted      → COUNT(l.id) from leads WHERE status='converted'
-lead_conversion_rate → leads_converted / leads_created * 100 (%)
-cash_in              → SUM(e.amount_halalas) from cash_drawer_entries WHERE type='cash_in'
-cash_out             → SUM(e.amount_halalas) from cash_drawer_entries WHERE type='cash_out'
+### CreateReportScheduleRequest
+```json
+{
+  "frequency": "daily | weekly | monthly (required)",
+  "recipients": ["email1@example.com", "email2@example.com"],
+  "isActive": true
+}
 ```
 
-## Available dimensions catalogue (backend enum)
-
-```
-day          → DATE_TRUNC('day', <date_column>)
-week         → DATE_TRUNC('week', <date_column>)
-month        → DATE_TRUNC('month', <date_column>)
-branch       → b.name (JOIN branches)
-membership_plan → mp.name (JOIN membership_plans)
-class_type   → ct.name (JOIN gx_class_types)
-lead_source  → ls.name (JOIN lead_sources)
-staff_member → sm.first_name || ' ' || sm.last_name (JOIN staff_members)
-```
-
-## Available filters catalogue (backend enum)
-
-```
-branch_id        → WHERE branch_id = :branchId
-plan_id          → WHERE plan_id = :planId
-class_type_id    → WHERE class_type_id = :classTypeId
-lead_source_id   → WHERE lead_source_id = :leadSourceId
-staff_member_id  → WHERE staff_member_id = :staffMemberId
+### UpdateReportScheduleRequest
+```json
+{
+  "frequency": "daily | weekly | monthly (optional)",
+  "recipients": ["email@example.com"] "(optional)",
+  "isActive": false "(optional — use to pause/resume)"
+}
 ```
 
 ---
 
 ## Business rules — enforce in service layer
 
-1. **Metric/dimension/filter codes must be in the approved catalogue**: any
-   unknown code in `CreateReportTemplateRequest` returns 422 "Unknown metric:
-   {code}". Never pass user-supplied codes into a SQL string.
+1. **One schedule per template**: `template_id` has a UNIQUE constraint.
+   Return 409 "A schedule already exists for this template. Update or delete
+   it instead."
 
-2. **Max 10 metrics per template**: return 422 "Maximum 10 metrics allowed."
+2. **Max 10 recipients**: return 422 if `recipients` array has more than 10
+   entries.
 
-3. **Metric + dimension compatibility**: not all metrics can be grouped by all
-   dimensions. GX/PT metrics cannot use `staff_member` dimension (trainers, not
-   staff). Revenue metrics cannot use `class_type` dimension. Return 422
-   "Metric {code} is not compatible with dimension {code}" on violation.
-   Compatibility matrix stored as a map in `ReportBuilderService`.
+3. **Valid email format**: each recipient must match a basic email regex.
+   Return 422 "Invalid email address: {value}" for the first invalid one.
 
-4. **At least one metric and one dimension required**: return 422 if either
-   list is empty.
+4. **Template must belong to this club**: verify `template.clubId == JWT clubId`
+   before creating a schedule. Return 403 if not.
 
-5. **Date range max 366 days**: `dateTo - dateFrom > 366` returns 422 "Date
-   range cannot exceed 366 days."
+5. **Paused schedules are skipped**: scheduler checks `is_active = true` before
+   running. Paused schedules are not deleted — `isActive = false` is the pause
+   mechanism.
 
-6. **Tenant isolation**: all queries append `AND club_id = :clubId` (from JWT).
-   A club owner can never run a report that includes another club's data.
+6. **Redis distributed lock**: acquire `report_schedule_lock:{scheduleId}`
+   before each run. If lock held → log INFO "Skipping {scheduleId} — already
+   running" and return. Never skip silently.
 
-7. **Result caching**: check Redis key `report_result:{templateId}:{paramHash}`
-   before executing SQL. Cache hit: return immediately with `fromCache: true`.
-   Cache miss: execute, store in Redis (TTL 10 min), persist to `report_results`
-   table, return with `fromCache: false`.
+7. **On run failure**: catch all exceptions. Set `lastRunStatus = "failed"`,
+   store error message in `lastError` (truncated to 500 chars). Log ERROR.
+   Do NOT throw — scheduler must continue to next schedule.
 
-8. **Soft-delete old results**: when a new run completes, soft-delete all
-   previous `ReportResult` rows for this template (`deleted_at = NOW()`).
-   Only one active result per template at a time.
+8. **Email send failure is non-fatal for result storage**: if PDF generation
+   or email send fails AFTER the report has been computed and stored, log
+   ERROR and update `lastRunStatus = "failed"` — but the `ReportResult` is
+   still persisted. User can still fetch the result via the API.
 
-9. **CSV export uses last result**: `GET /export` loads from `report_results`
-   (not Redis) and streams as `text/csv`. Column headers = column codes.
-   If no result exists yet → 404 "No result available. Run the report first."
+9. **PDF max 1000 rows**: if `ReportResult.rowCount > 1000`, PDF shows first
+   1000 rows with a footer note: "Showing first 1,000 of {total} rows.
+   Download the full dataset via CSV export."
 
-10. **metricScope gate for Sales Agent**: if `template.metricScope ∉
-    {"leads"}` and caller has only `report:leads:view`, return 403.
-    Owner and Branch Manager with `report:custom:run` can run any template.
+10. **`nextRunAt` computation**: always computed in Asia/Riyadh timezone,
+    converted to UTC for storage and API response.
 
 ---
 
 ## Seed data updates
 
-Add to `DevDataLoader.kt`:
+Add to `docker-compose.yml`:
+```yaml
+mailpit:
+  image: axllent/mailpit:latest
+  ports:
+    - "1025:1025"   # SMTP
+    - "8025:8025"   # Web UI
 ```
-Add report:custom:run permission to Owner and Branch Manager roles.
 
-Seed 2 system report templates for Elixir Gym:
-  Template 1: "Monthly Revenue by Branch"
-    metrics: ["revenue", "net_revenue", "new_members"]
-    dimensions: ["month", "branch"]
-    metricScope: "revenue"
-    isSystem: true
-
-  Template 2: "Lead Conversion by Source"
-    metrics: ["leads_created", "leads_converted", "lead_conversion_rate"]
-    dimensions: ["month", "lead_source"]
-    metricScope: "leads"
-    isSystem: true
+Add to `application-dev.yml`:
+```yaml
+spring:
+  mail:
+    host: localhost
+    port: 1025
+    username: ""
+    password: ""
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
 ```
+
+Add to `.env.example`:
+```
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM=noreply@liyaqa.com
+```
+
+No new `DevDataLoader` changes — seed report schedules would require
+valid recipient emails not guaranteed in dev.
 
 ---
 
@@ -429,53 +322,39 @@ Seed 2 system report templates for Elixir Gym:
 ### Backend — new files
 ```
 report/
-  builder/
-    ReportBuilderService.kt
-    ReportTemplateService.kt
-    ReportBuilderPulseController.kt
-    MetaReportPulseController.kt
-    MetricCatalogue.kt          (enum + SQL fragment map)
-    DimensionCatalogue.kt       (enum + SQL fragment map)
-    FilterCatalogue.kt          (enum + SQL fragment map)
-    CompatibilityMatrix.kt      (metric ↔ dimension legal combinations)
-    ReportTemplate.kt
-    ReportTemplateRepository.kt
-    ReportResult.kt
-    ReportResultRepository.kt
+  schedule/
+    ReportSchedule.kt
+    ReportScheduleRepository.kt
+    ReportSchedulerService.kt      (@Scheduled cron, Redis lock, orchestrator)
+    ReportSchedulePulseController.kt
+    ReportPdfService.kt            (iText 7 PDF generation)
+    ReportEmailService.kt          (JavaMailSender composition + send)
     dto/
-      MetricMetaResponse.kt
-      DimensionMetaResponse.kt
-      FilterMetaResponse.kt
-      ReportTemplateResponse.kt
-      CreateReportTemplateRequest.kt
-      UpdateReportTemplateRequest.kt
-      RunReportRequest.kt
-      ReportResultResponse.kt
+      ReportScheduleResponse.kt
+      CreateReportScheduleRequest.kt
+      UpdateReportScheduleRequest.kt
 
-resources/db/migration/V11__report_templates_and_results.sql
+resources/db/migration/V12__report_schedules.sql
 ```
 
 ### Backend — modified files
 ```
-config/DevDataLoader.kt    add report:custom:run permission + 2 seed templates
-audit/AuditAction.kt       add REPORT_TEMPLATE_CREATED, REPORT_TEMPLATE_DELETED,
-                           REPORT_RUN
+audit/AuditAction.kt              +4 new codes
+config/SecurityConfig.kt          no change (schedule endpoints use existing auth)
+build.gradle.kts                  add iText 7 Community dependency
+application.yml                   add spring.mail config block
+application-dev.yml               add dev SMTP pointing to Mailpit
+.env.example                      add MAIL_* vars
+docker-compose.yml                add mailpit service
 ```
 
 ### Frontend — web-pulse additions
 ```
-src/api/reportBuilder.ts
-src/routes/reports/builder/
-  index.tsx                  (template list)
-  new.tsx                    (builder form)
-  $templateId.tsx            (template detail + run + result)
+src/api/reportSchedules.ts
+src/routes/reports/builder/$templateId.tsx    (modify: add Schedule tab)
 src/components/reportBuilder/
-  MetricSelector.tsx
-  DimensionSelector.tsx
-  FilterBuilder.tsx
-  ReportPreviewTable.tsx
-  SaveTemplateModal.tsx
-  CompatibilityWarning.tsx
+  ScheduleForm.tsx
+  ScheduleBadge.tsx               (Active / Paused / Never run)
 ```
 
 ---
@@ -483,146 +362,158 @@ src/components/reportBuilder/
 ## Implementation order
 
 ```
-Step 1 — Catalogues + entity definitions
-  report/builder/MetricCatalogue.kt — enum of 16 metric codes + SQL fragments
-  report/builder/DimensionCatalogue.kt — enum of 8 dimension codes + SQL fragments
-  report/builder/FilterCatalogue.kt — enum of 5 filter codes + WHERE fragments
-  report/builder/CompatibilityMatrix.kt — Map<MetricCode, Set<DimensionCode>>
-    encoding all legal combinations (rules 3)
-  ReportTemplate.kt + ReportTemplateRepository.kt
-  ReportResult.kt + ReportResultRepository.kt
+Step 1 — ReportSchedule entity + Flyway V12
+  report/schedule/ReportSchedule.kt — entity with all fields
+  report/schedule/ReportScheduleRepository.kt:
+    findByTemplateIdAndDeletedAtIsNull()
+    findAllByIsActiveTrueAndDeletedAtIsNull()  ← used by scheduler
+  resources/db/migration/V12__report_schedules.sql
   Verify: ./gradlew build -x test
 
-Step 2 — Flyway V11 migration
-  resources/db/migration/V11__report_templates_and_results.sql
-  CREATE TABLE report_templates + report_results + 3 indexes
-  Verify: ./gradlew flywayMigrate
+Step 2 — ReportPdfService (iText 7)
+  build.gradle.kts: add iText 7 Community dependency
+    implementation("com.itextpdf:itext7-core:7.2.5")
+  report/schedule/ReportPdfService.kt:
+    generatePdf(reportName, clubName, dateFrom, dateTo, columns, rows): ByteArray
+    Layout: header (club name, report name, date range, run timestamp),
+      data table (columns as headers, rows as cells), footer (page X of Y)
+    Max 1000 rows in PDF (rule 9) with footer note if truncated
+    Arabic strings rendered via iText Unicode — no special RTL layout needed
+      (cell content direction follows Unicode bidi algorithm)
+  ReportPdfServiceTest.kt (unit):
+    - generates non-empty PDF bytes for sample data
+    - 1000-row cap: 1001 rows → PDF has 1000 rows + truncation note
+    - empty result → PDF with "No data" row
+  Verify: ./gradlew test -t ReportPdfServiceTest
 
-Step 3 — ReportTemplateService
-  report/builder/ReportTemplateService.kt:
-    listTemplates(clubId) → excludes deleted
-    getTemplate(id, clubId) → 403 if wrong club (rule 6)
-    createTemplate(request, clubId) → validate codes (rule 1), metric count (rule 2),
-      compatibility (rule 3), at-least-one (rule 4)
-    updateTemplate(id, request, clubId) → same validations
-    deleteTemplate(id, clubId) → soft delete
-    auditService.log() for create/delete
-  DTOs: ReportTemplateResponse, CreateReportTemplateRequest, UpdateReportTemplateRequest
+Step 3 — ReportEmailService
+  application.yml: add spring.mail config block (injected from env)
+  application-dev.yml: dev SMTP → Mailpit localhost:1025
+  docker-compose.yml: add mailpit service
+  .env.example: add MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM
+  report/schedule/ReportEmailService.kt:
+    sendReportEmail(recipients, reportName, clubName, dateFrom, dateTo,
+                    pdfBytes, rowCount):
+      Subject: "[Liyaqa] {reportName} — {dateFrom} to {dateTo}"
+      Body: plain HTML with club name, report name, row count, footer
+      Attachment: {reportName}_{dateFrom}_{dateTo}.pdf (application/pdf)
+      Sends via JavaMailSender — throws on failure (caller handles rule 8)
+  ReportEmailServiceTest.kt (unit, MockitoExtension):
+    - sends email to all recipients
+    - attachment filename formatted correctly
+    - subject line formatted correctly
+  Verify: ./gradlew test -t ReportEmailServiceTest
+
+Step 4 — ReportSchedulerService
+  report/schedule/ReportSchedulerService.kt:
+    @Scheduled(cron = "0 0 4 * * *", zone = "UTC")  ← 07:00 Riyadh = 04:00 UTC
+    runDueSchedules():
+      loadAll active, non-deleted schedules
+      For each: check frequency vs current day/weekday
+        → daily: always run
+        → weekly: run only on Monday
+        → monthly: run only on 1st of month
+      Acquire Redis lock (rule 6): SETNX + expire 5 min
+      Compute dateFrom/dateTo for this frequency
+      Call ReportBuilderService.runReport(template, request, clubId)
+      Call ReportPdfService.generatePdf(result)
+      Call ReportEmailService.sendReportEmail(recipients, ...)
+      Update schedule: lastRunAt, lastRunStatus (rule 7, rule 8)
+      Release Redis lock
+    nextRunAt(frequency, now): compute next run in Asia/Riyadh, return as UTC
+  ReportSchedulerServiceTest.kt (unit):
+    - daily schedule: runs every call
+    - weekly schedule: runs on Monday, skipped on Tuesday
+    - monthly schedule: runs on 1st, skipped on 15th
+    - Redis lock held → skipped with INFO log (rule 6)
+    - run failure → lastRunStatus=failed, lastError set, no throw (rule 7)
+    - email failure after result stored → result persisted, status=failed (rule 8)
+  Verify: ./gradlew test -t ReportSchedulerServiceTest
+
+Step 5 — ReportSchedulePulseController + PDF export endpoint
+  report/schedule/ReportSchedulePulseController.kt:
+    GET/POST/PATCH/DELETE /report-templates/{templateId}/schedule
+    All rules: 1 (one per template), 2 (max 10 recipients), 3 (valid email),
+      4 (template belongs to club), 5 (isActive pause)
+    Audit: REPORT_SCHEDULE_CREATED / UPDATED / DELETED
+  ReportExportPulseController.kt (modify existing export controller):
+    GET /report-templates/{id}/export/pdf:
+      Load last ReportResult from DB (not Redis — persistence required)
+      If no result → 404 "No result available. Run the report first."
+      Generate PDF via ReportPdfService
+      Return application/pdf with Content-Disposition: attachment
+  audit/AuditAction.kt: +REPORT_SCHEDULE_CREATED, _UPDATED, _DELETED, _EMAIL_SENT
+  DTOs: ReportScheduleResponse, CreateReportScheduleRequest, UpdateReportScheduleRequest
   Verify: ./gradlew build -x test
 
-Step 4 — ReportBuilderService (query execution + caching)
-  report/builder/ReportBuilderService.kt:
-    runReport(template, request, clubId):
-      1. Validate dateFrom/dateTo (rule 5: max 366 days)
-      2. Compute paramHash = SHA-256(templateId + dateFrom + dateTo + filters JSON)
-      3. Check Redis "report_result:{templateId}:{paramHash}" → cache hit → return
-      4. Build parameterized native SQL from catalogues + compatibility matrix
-         - SELECT {dimension columns}, {metric aggregates}
-           FROM {primary table for first metric}
-           LEFT JOIN {dimension tables}
-           WHERE club_id = :clubId AND <date range> AND <filters>
-           GROUP BY {dimension columns}
-           ORDER BY {first dimension}
-           LIMIT 50000
-      5. Execute, collect rows as List<Map<String, Any>>
-      6. Truncate flag if rowCount = 50000 (rule: max rows)
-      7. Serialize to JSON, store in Redis TTL=10min, persist ReportResult
-      8. Soft-delete previous ReportResult for template (rule 8)
-      9. Return ReportResultResponse with fromCache=false
-    getLastResult(templateId, clubId): Redis → DB fallback
-    exportCsv(templateId, clubId): load from DB, stream CSV (rule 9)
-  Verify: ./gradlew build -x test
-
-Step 5 — MetaReportPulseController + ReportBuilderPulseController
-  MetaReportPulseController.kt:
-    GET /reports/meta/metrics → MetricCatalogue.all()
-    GET /reports/meta/dimensions → DimensionCatalogue.all()
-    GET /reports/meta/filters → FilterCatalogue.all()
-  ReportBuilderPulseController.kt:
-    All 8 endpoints (list, get, create, update, delete, run, result, export)
-    Permission: report:custom:run on write/run endpoints
-    metricScope gate on run (rule 10)
-  Verify: ./gradlew build -x test
-
-Step 6 — Seed data + permissions
-  DevDataLoader.kt:
-    Add report:custom:run to Owner + Branch Manager
-    Seed 2 system templates for Elixir Gym
-  audit/AuditAction.kt: REPORT_TEMPLATE_CREATED, REPORT_TEMPLATE_DELETED, REPORT_RUN
-  Verify: ./gradlew bootRun --args='--spring.profiles.active=dev'
-  Manual: POST /api/v1/auth/login as owner → POST /report-templates/{id}/run
-    → result returned with correct columns and rows
-
-Step 7 — Backend tests
-  ReportBuilderServiceTest.kt (unit):
-    - runReport: happy path (revenue + month + branch)
-    - cache hit: Redis key present → returns fromCache=true
-    - date range > 366 days → 422
-    - unknown metric code → 422
-    - metric/dimension incompatibility → 422
-    - max 10 metrics enforced → 422
-    - LIMIT 50000 enforced: mock returns 50001 rows → truncated=true
-    - old ReportResult soft-deleted after new run
-  ReportTemplateServiceTest.kt (unit):
-    - create with valid codes, duplicate name (409)
-    - delete: soft deletes, wrong club (403)
-    - update: partial fields updated
-  ReportBuilderPulseControllerTest.kt (integration):
-    - create template, run it, get result, export CSV
-    - run with wrong club JWT → 403 (tenant isolation)
-    - Sales Agent running leads template → 200; revenue template → 403
-    - GET /reports/meta/metrics → full catalogue returned
+Step 6 — Backend tests
+  ReportSchedulePulseControllerTest.kt (integration):
+    - create schedule: happy path → 201
+    - create second schedule for same template → 409 (rule 1)
+    - create with 11 recipients → 422 (rule 2)
+    - create with invalid email → 422 (rule 3)
+    - create for another club's template → 403 (rule 4)
+    - PATCH isActive=false → paused status in response
+    - DELETE → soft deleted, GET returns 404
+    - GET /export/pdf with result → returns PDF bytes (content-type check)
+    - GET /export/pdf with no result → 404
   Verify: ./gradlew test --no-daemon
 
-Step 8 — Backend final checks
+Step 7 — Backend final checks
   ./gradlew ktlintFormat --no-daemon
   ./gradlew ktlintCheck --no-daemon
   ./gradlew build --no-daemon
+  Manual dev verify:
+    docker compose up -d (includes mailpit)
+    ./gradlew bootRun
+    POST /api/v1/auth/login as owner
+    POST /api/v1/report-templates/{id}/run  ← generate a result first
+    POST /api/v1/report-templates/{id}/schedule {"frequency":"daily","recipients":["test@test.com"]}
+    GET /api/v1/report-templates/{id}/export/pdf → download PDF
+    Check Mailpit at localhost:8025 for the email (trigger via scheduler
+    debug endpoint or wait for 04:00 UTC cron)
 
-Step 9 — Frontend: builder UI
-  src/api/reportBuilder.ts:
-    getMetrics(), getDimensions(), getFilters()
-    listTemplates(), getTemplate(id), createTemplate(), updateTemplate(), deleteTemplate()
-    runReport(id, request), getLastResult(id), exportCsv(id)
-  src/routes/reports/builder/index.tsx:
-    Table of saved templates: name, metrics count, dimensions, last run, Run button
-    "New Report" button → /reports/builder/new
-    Each row → /reports/builder/$templateId
-    PermissionGate: report:custom:run
-  Verify: npm run dev → /reports/builder shows 2 seeded templates
+Step 8 — Frontend: Schedule tab on template detail
+  src/api/reportSchedules.ts:
+    getSchedule(templateId), createSchedule(), updateSchedule(), deleteSchedule()
+  src/routes/reports/builder/$templateId.tsx (modify):
+    Add "Schedule" tab next to "Run" tab
+    If no schedule: show ScheduleForm to create one
+    If schedule exists: show current config + ScheduleBadge + edit form
+    "Pause" / "Resume" toggle button
+    "Remove Schedule" button with confirm modal
+  src/components/reportBuilder/ScheduleForm.tsx:
+    Frequency radio group (Daily / Weekly / Monthly)
+    Next scheduled run preview (computed client-side from frequency)
+    Recipients: tag input (add/remove email addresses, max 10)
+    "Save Schedule" → POST or PATCH
+  src/components/reportBuilder/ScheduleBadge.tsx:
+    Active (green) / Paused (amber) / Never run (grey) + last run timestamp
+  Verify: npm run dev → open a template → Schedule tab → create daily schedule
+    → badge shows "Active, never run yet"
 
-Step 10 — Frontend: builder form (new template)
-  src/routes/reports/builder/new.tsx:
-    MetricSelector: multi-select checkboxes grouped by scope (Revenue, Members,
-      GX, PT, Leads, Cash). Each metric checkbox shows unit (SAR / count / %).
-    DimensionSelector: radio group (one primary dimension required) + optional
-      second dimension (e.g., month + branch).
-    FilterBuilder: per-filter optional value pickers (branch dropdown, plan
-      dropdown, etc. — loaded from existing API endpoints).
-    CompatibilityWarning: inline warning if selected metric+dimension combo is
-      incompatible (client-side pre-validation before submit).
-    "Save Report" → POST /report-templates → redirect to $templateId view.
-  Verify: npm run dev → create "Revenue by Branch" report → saved and shown
+Step 9 — "Export PDF" button
+  src/routes/reports/builder/$templateId.tsx (modify):
+    Add "Export PDF" button next to existing "Export CSV" in results section
+    On click → GET /report-templates/{id}/export/pdf → trigger browser download
+    Disabled if no result exists yet (tooltip: "Run the report first")
+  Verify: npm run dev → run a report → Export PDF → PDF downloads in browser
 
-Step 11 — Frontend: template detail + run + result
-  src/routes/reports/builder/$templateId.tsx:
-    Template header: name, description (inline edit), metrics + dimensions chips.
-    "Run Report" section: date range pickers (max 366 days enforced client-side),
-      filter overrides (branch, plan, etc.)
-    "Run" button → POST /report-templates/{id}/run → loading state →
-      ReportPreviewTable with result rows.
-    "fromCache" badge: shows "Cached result (refreshes in ~X min)" if fromCache=true.
-    "Export CSV" button → GET /report-templates/{id}/export → download.
-    "Delete" button (with confirm modal, gated by report:custom:run).
-    Reuse existing KpiCard for aggregated totals at top of result.
-  Verify: npm run dev → run "Monthly Revenue by Branch" → see result table
-    with month + branch + revenue columns
+Step 10 — Schedule status on template list
+  src/routes/reports/builder/index.tsx (modify):
+    Add "Schedule" column to template list table
+    Fetch schedule status per template (or include in template list response)
+    Show ScheduleBadge inline
+  Verify: npm run dev → /reports/builder → schedule badges visible per row
 
-Step 12 — Frontend tests + final checks
-  MetricSelector.test.tsx — renders grouped metrics, incompatible combos warn
-  DimensionSelector.test.tsx — second dimension optional
-  ReportPreviewTable.test.tsx — renders columns + rows, fromCache badge
-  FilterBuilder.test.tsx — filter value selected/cleared
+Step 11 — Frontend tests + final checks
+  ScheduleForm.test.tsx:
+    - renders frequency options
+    - max 10 recipients enforced client-side (11th input disabled)
+    - invalid email shows inline error
+    - "Next run" preview updates when frequency changes
+  ScheduleBadge.test.tsx:
+    - Active / Paused / Never run states render correctly
   Verify: npm test && npm run typecheck && npm run lint && npm run build
 ```
 
@@ -631,53 +522,53 @@ Step 12 — Frontend tests + final checks
 ## Acceptance criteria
 
 ### Backend
-- [ ] `GET /reports/meta/metrics` returns all 16 metric codes with labels
-- [ ] `POST /report-templates` with unknown metric code returns 422
-- [ ] `POST /report-templates` with 11 metrics returns 422
-- [ ] `POST /report-templates` with incompatible metric+dimension returns 422
-- [ ] `POST /report-templates/{id}/run` with 367-day range returns 422
-- [ ] Running a report returns correct columns and rows for seeded data
-- [ ] Second run with same params returns `fromCache: true`
-- [ ] Result capped at 50,000 rows with `truncated: true`
-- [ ] Old `ReportResult` soft-deleted after new run
-- [ ] `GET /report-templates/{id}/export` returns `text/csv` with correct headers
-- [ ] Club A owner cannot run Club B's template (403)
-- [ ] Sales Agent can run leads-scope template, gets 403 on revenue-scope
-- [ ] All 375+ existing tests still pass
+- [ ] Flyway V12 creates `report_schedules` table with UNIQUE on `template_id`
+- [ ] `POST /schedule` creates schedule, second call returns 409
+- [ ] 11 recipients returns 422, invalid email returns 422
+- [ ] `PATCH isActive=false` pauses schedule — scheduler skips it
+- [ ] Scheduler runs daily schedules on every trigger
+- [ ] Scheduler runs weekly schedules on Monday only
+- [ ] Scheduler runs monthly schedules on 1st of month only
+- [ ] Redis lock prevents duplicate runs (mock: lock held → INFO log + skip)
+- [ ] Run failure updates `lastRunStatus=failed` and `lastError`, does not throw
+- [ ] Email failure after result stored: result persisted, status=failed
+- [ ] `GET /export/pdf` returns `application/pdf` with attachment header
+- [ ] `GET /export/pdf` with no result returns 404
+- [ ] PDF contains report name, date range, column headers, data rows
+- [ ] PDF shows max 1000 rows with truncation note for larger results
+- [ ] All 388+ existing tests still pass
 
 ### Frontend
-- [ ] `/reports/builder` shows 2 seeded templates for Elixir Gym
-- [ ] Builder form groups metrics by scope, shows unit labels
-- [ ] Incompatible metric+dimension shows inline warning before saving
-- [ ] Date range > 366 days shows validation error before submit
-- [ ] "Run Report" shows loading state, then result table
-- [ ] "Cached result" badge appears on second run
-- [ ] "Export CSV" triggers file download
+- [ ] Schedule tab visible on template detail page
+- [ ] Creating a schedule shows "Active, never run yet" badge
+- [ ] Pausing a schedule shows amber "Paused" badge
+- [ ] Max 10 recipients enforced in tag input
+- [ ] "Next run" preview shows correct date for each frequency
+- [ ] "Export PDF" button triggers file download
+- [ ] "Export PDF" disabled with tooltip when no result exists
+- [ ] Schedule badge visible in template list table
 - [ ] `npm run typecheck`, `lint`, `test`, `build` all pass
 
 ---
 
-## RBAC matrix rows added by this plan
+## RBAC matrix
 
-| Permission | Owner | Branch Manager | Receptionist | Sales Agent | PT Trainer | GX Instructor |
-|---|---|---|---|---|---|---|
-| report:custom:run | ✅ | ✅ | ❌ | ❌ (leads-scope only via metricScope) | ❌ | ❌ |
-
-Note: Sales Agent can only run templates where `metricScope = "leads"` —
-enforced in `ReportBuilderService.runReport()` (rule 10).
+No new permissions. `report:custom:run` (added in Plan 19) covers all
+schedule management and PDF export endpoints.
 
 ---
 
 ## Definition of done
 
 - All acceptance criteria checked
-- All 10 business rules covered by unit or integration tests
-- SQL injection prevention verified: no user input ever interpolated into query string
-- Cache hit/miss tested with mocked Redis
-- Tenant isolation: club A cannot run club B's template
-- CSV export tested end-to-end
-- Both fixed reports (Plan 18) and custom builder coexist without conflict
+- Mailpit running in docker-compose — dev emails catchable at localhost:8025
+- All 10 business rules covered by tests
+- Redis lock tested: mock held lock → skip + INFO log
+- PDF generation tested with real iText output (non-empty bytes)
+- Email sending tested with MockMvc / mocked JavaMailSender
+- Scheduler frequency logic tested for all three frequencies + edge cases
 - All CI checks pass on PR
 - PLAN.md deleted before merging
-- PR title: `feat(reports): add custom report builder with saved templates and cached results`
+- PR title: `feat(reports): add scheduled report emails and PDF export`
 - Target branch: `develop`
+

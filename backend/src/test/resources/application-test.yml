@@ -8,6 +8,9 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+  mail:
+    host: localhost
+    port: 1025
 
 jwt:
   secret: test-only-secret-key-that-must-be-at-least-256-bits-long-for-hmac-sha256

@@ -485,6 +485,36 @@
         "leads": "Leads",
         "cash": "Cash Drawer"
       }
+    },
+    "schedule": {
+      "runTab": "Run",
+      "scheduleTab": "Schedule",
+      "createTitle": "Create Schedule",
+      "editTitle": "Edit Schedule",
+      "createSchedule": "Create Schedule",
+      "updateSchedule": "Save Changes",
+      "removeSchedule": "Remove Schedule",
+      "removeConfirm": "Are you sure you want to remove this schedule? Automated emails will stop.",
+      "frequency": "Frequency",
+      "daily": "Daily",
+      "weekly": "Weekly (Monday)",
+      "monthly": "Monthly (1st)",
+      "recipients": "Recipients",
+      "addRecipient": "Add",
+      "recipientsCount": "recipients",
+      "maxRecipients": "Maximum 10 recipients allowed.",
+      "invalidEmail": "Invalid email address.",
+      "duplicateEmail": "Email already added.",
+      "isActive": "Schedule is active",
+      "saving": "Saving...",
+      "nextRun": "Next run",
+      "lastRunLabel": "Last run",
+      "active": "Active",
+      "paused": "Paused",
+      "neverRun": "Never run",
+      "failed": "Failed",
+      "exportPdf": "Export PDF",
+      "runFirst": "Run the report first"
     }
   },
   "roles": {
