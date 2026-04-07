@@ -5,12 +5,25 @@ import { PageShell } from '@/components/layout/PageShell'
 import { PermissionGate } from '@/components/shared/PermissionGate'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { ScheduleBadge } from '@/components/reportBuilder/ScheduleBadge'
 import { Permission } from '@/types/permissions'
 import { listTemplates, reportBuilderKeys } from '@/api/reportBuilder'
+import { getSchedule, reportScheduleKeys } from '@/api/reportSchedules'
 
 export const Route = createFileRoute('/reports/builder/')({
   component: BuilderIndexPage,
 })
+
+function ScheduleCell({ templateId }: { templateId: string }) {
+  const { data: schedule } = useQuery({
+    queryKey: reportScheduleKeys.schedule(templateId),
+    queryFn: () => getSchedule(templateId),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  return <ScheduleBadge schedule={schedule} />
+}
 
 function BuilderIndexPage() {
   const { t } = useTranslation()
@@ -55,6 +68,9 @@ function BuilderIndexPage() {
                     {t('reports.builder.dimensions')}
                   </th>
                   <th className="px-4 py-3 text-start text-xs font-medium uppercase text-gray-500">
+                    {t('reports.schedule.scheduleTab')}
+                  </th>
+                  <th className="px-4 py-3 text-start text-xs font-medium uppercase text-gray-500">
                     {t('reports.builder.lastRun')}
                   </th>
                   <th className="px-4 py-3 text-start text-xs font-medium uppercase text-gray-500">
@@ -84,6 +100,9 @@ function BuilderIndexPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                       {tpl.dimensions.join(', ')}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <ScheduleCell templateId={tpl.id} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
                       {tpl.lastRunAt

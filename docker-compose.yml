@@ -32,6 +32,15 @@ services:
     networks:
       - arena_network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: arena_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - arena_network
+
 volumes:
   postgres_data:
   redis_data:
