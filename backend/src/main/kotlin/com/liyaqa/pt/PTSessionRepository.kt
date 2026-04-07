@@ -29,4 +29,10 @@ interface PTSessionRepository : JpaRepository<PTSession, Long> {
         before: Instant,
         pageable: Pageable,
     ): Page<PTSession>
+
+    fun findAllByScheduledAtBetweenAndSessionStatusAndDeletedAtIsNull(
+        from: Instant,
+        to: Instant,
+        sessionStatus: String,
+    ): List<PTSession>
 }

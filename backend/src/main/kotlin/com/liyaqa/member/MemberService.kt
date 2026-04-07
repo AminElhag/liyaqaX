@@ -18,6 +18,7 @@ import com.liyaqa.member.dto.MemberResponse
 import com.liyaqa.member.dto.MemberSummaryResponse
 import com.liyaqa.member.dto.UpdateMemberRequest
 import com.liyaqa.member.dto.WaiverStatusResponse
+import com.liyaqa.notification.events.MemberCreatedEvent
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.rbac.UserRole
@@ -27,6 +28,7 @@ import com.liyaqa.staff.StaffMemberRepository
 import com.liyaqa.trainer.TrainerRepository
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -51,6 +53,7 @@ class MemberService(
     private val trainerRepository: TrainerRepository,
     private val passwordEncoder: PasswordEncoder,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @Transactional
     fun create(
@@ -152,6 +155,15 @@ class MemberService(
             action = AuditAction.MEMBER_CREATED,
             entityType = "Member",
             entityId = member.publicId.toString(),
+        )
+
+        eventPublisher.publishEvent(
+            MemberCreatedEvent(
+                memberPublicId = member.publicId,
+                memberName = "${member.firstNameEn} ${member.lastNameEn}",
+                branchId = member.branchId,
+                clubId = member.clubId,
+            ),
         )
 
         return member.toResponse(

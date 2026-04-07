@@ -13,10 +13,13 @@ import com.liyaqa.gx.GXClassInstanceRepository
 import com.liyaqa.gx.GXClassTypeRepository
 import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
+import com.liyaqa.notification.events.GxBookedEvent
+import com.liyaqa.notification.events.GxCancelledEvent
 import com.liyaqa.portal.ClubPortalSettingsService
 import com.liyaqa.trainer.TrainerRepository
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableDefault
@@ -46,6 +49,7 @@ class GxArenaController(
     private val trainerRepository: TrainerRepository,
     private val portalSettingsService: ClubPortalSettingsService,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @GetMapping("/schedule")
     @Operation(summary = "Get upcoming GX class schedule for the next 7 days")
@@ -154,6 +158,16 @@ class GxArenaController(
             entityId = booking.publicId.toString(),
         )
 
+        val classType = classTypeRepository.findById(instance.classTypeId).orElse(null)
+        eventPublisher.publishEvent(
+            GxBookedEvent(
+                bookingPublicId = booking.publicId,
+                memberUserId = member.userId,
+                className = classType?.nameEn ?: "",
+                classDate = instance.scheduledAt.toString(),
+            ),
+        )
+
         return ResponseEntity.status(HttpStatus.CREATED).body(toBookingResponse(booking, instance, member))
     }
 
@@ -192,6 +206,16 @@ class GxArenaController(
             action = AuditAction.GX_BOOKING_CANCELLED,
             entityType = "GXBooking",
             entityId = booking.publicId.toString(),
+        )
+
+        val classType = classTypeRepository.findById(instance.classTypeId).orElse(null)
+        eventPublisher.publishEvent(
+            GxCancelledEvent(
+                bookingPublicId = booking.publicId,
+                memberUserId = member.userId,
+                className = classType?.nameEn ?: "",
+                classDate = instance.scheduledAt.toString(),
+            ),
         )
 
         return ResponseEntity.noContent().build()

@@ -33,4 +33,6 @@ interface StaffMemberRepository : JpaRepository<StaffMember, Long> {
     ): Optional<StaffMember>
 
     fun countByClubIdAndDeletedAtIsNull(clubId: Long): Long
+
+    fun findAllByClubIdAndDeletedAtIsNull(clubId: Long): List<StaffMember>
 }

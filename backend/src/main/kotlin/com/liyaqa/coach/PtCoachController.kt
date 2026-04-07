@@ -6,6 +6,7 @@ import com.liyaqa.coach.dto.MarkPtAttendanceRequest
 import com.liyaqa.coach.dto.PtSessionCoachResponse
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.member.MemberRepository
+import com.liyaqa.notification.events.PtAttendanceMarkedEvent
 import com.liyaqa.pt.PTPackageCatalogRepository
 import com.liyaqa.pt.PTPackageRepository
 import com.liyaqa.pt.PTSessionRepository
@@ -13,6 +14,7 @@ import com.liyaqa.trainer.TrainerRepository
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.data.web.PageableDefault
@@ -41,6 +43,7 @@ class PtCoachController(
     private val ptPackageCatalogRepository: PTPackageCatalogRepository,
     private val memberRepository: MemberRepository,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     @GetMapping("/sessions")
     @Operation(summary = "Get PT sessions for this trainer (upcoming or past)")
@@ -155,6 +158,17 @@ class PtCoachController(
         val member = memberRepository.findById(session.memberId).orElse(null)
         val pkg = ptPackageRepository.findById(session.packageId).orElse(null)
         val catalog = pkg?.let { ptPackageCatalogRepository.findById(it.catalogId).orElse(null) }
+
+        if (member != null) {
+            eventPublisher.publishEvent(
+                PtAttendanceMarkedEvent(
+                    sessionPublicId = session.publicId,
+                    memberUserId = member.userId,
+                    status = request.status,
+                    trainerName = "${trainer.firstNameEn} ${trainer.lastNameEn}",
+                ),
+            )
+        }
 
         return ResponseEntity.ok(
             PtSessionCoachResponse(

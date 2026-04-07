@@ -61,6 +61,8 @@ class MemberServiceTest {
 
     @Mock lateinit var auditService: AuditService
 
+    @Mock lateinit var eventPublisher: org.springframework.context.ApplicationEventPublisher
+
     @InjectMocks lateinit var service: MemberService
 
     private val org = Organization(nameAr = "منظمة", nameEn = "Org", email = "o@t.com")

@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -52,9 +53,12 @@ function RootComponent() {
           <span className="text-sm font-medium text-gray-500">
             {member?.club?.nameAr || member?.club?.name}
           </span>
-          <span className="text-sm font-semibold">
-            {member?.firstName} {member?.lastName}
-          </span>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <span className="text-sm font-semibold">
+              {member?.firstName} {member?.lastName}
+            </span>
+          </div>
         </div>
       </header>
       <main className="flex-1 px-4 py-4">

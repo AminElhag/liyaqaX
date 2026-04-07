@@ -48,6 +48,12 @@ interface GXClassInstanceRepository : JpaRepository<GXClassInstance, Long> {
         pageable: Pageable,
     ): Page<GXClassInstance>
 
+    fun findAllByScheduledAtBetweenAndInstanceStatusAndDeletedAtIsNull(
+        from: Instant,
+        to: Instant,
+        instanceStatus: String,
+    ): List<GXClassInstance>
+
     @Query(
         value = """
             SELECT COUNT(i.id) > 0

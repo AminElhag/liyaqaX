@@ -4,8 +4,11 @@ import com.liyaqa.audit.AuditAction
 import com.liyaqa.audit.AuditService
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.member.Member
+import com.liyaqa.notification.events.PaymentCollectedEvent
 import com.liyaqa.payment.dto.PaymentResponse
 import com.liyaqa.user.User
+import com.liyaqa.user.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,7 +19,9 @@ import java.util.UUID
 @Transactional(readOnly = true)
 class PaymentService(
     private val paymentRepository: PaymentRepository,
+    private val userRepository: UserRepository,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     // TODO(#future): Future plan will support refunds via separate refund entity
 
@@ -52,6 +57,16 @@ class PaymentService(
             entityType = "Payment",
             entityId = payment.publicId.toString(),
             changesJson = """{"amountHalalas":$amountHalalas,"paymentMethod":"$paymentMethod"}""",
+        )
+
+        val memberUser = userRepository.findById(member.userId).orElse(null)
+        eventPublisher.publishEvent(
+            PaymentCollectedEvent(
+                paymentPublicId = payment.publicId,
+                memberUserId = member.userId,
+                amountHalalas = amountHalalas,
+                memberEmail = memberUser?.email,
+            ),
         )
 
         return payment

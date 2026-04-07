@@ -22,6 +22,8 @@ import com.liyaqa.membership.dto.MembershipSummaryResponse
 import com.liyaqa.membership.dto.RenewMembershipRequest
 import com.liyaqa.membership.dto.TerminateMembershipRequest
 import com.liyaqa.membership.dto.UnfreezeMembershipRequest
+import com.liyaqa.notification.events.MembershipAssignedEvent
+import com.liyaqa.notification.events.MembershipFrozenEvent
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.payment.Payment
@@ -29,6 +31,7 @@ import com.liyaqa.payment.PaymentRepository
 import com.liyaqa.payment.PaymentService
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -51,6 +54,7 @@ class MembershipService(
     private val paymentService: PaymentService,
     private val invoiceService: InvoiceService,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     companion object {
         private val ACTIVE_STATUSES = listOf("active", "frozen")
@@ -165,6 +169,14 @@ class MembershipService(
             action = AuditAction.MEMBERSHIP_ASSIGNED,
             entityType = "Membership",
             entityId = membership.publicId.toString(),
+        )
+
+        eventPublisher.publishEvent(
+            MembershipAssignedEvent(
+                membershipPublicId = membership.publicId,
+                memberUserId = member.userId,
+                planNameEn = plan.nameEn,
+            ),
         )
 
         return toResponse(membership, member, plan, payment, invoice)
@@ -323,6 +335,14 @@ class MembershipService(
             action = AuditAction.MEMBERSHIP_FROZEN,
             entityType = "Membership",
             entityId = membership.publicId.toString(),
+        )
+
+        eventPublisher.publishEvent(
+            MembershipFrozenEvent(
+                membershipPublicId = membership.publicId,
+                memberUserId = member.userId,
+                freezeEndDate = request.freezeEndDate.toString(),
+            ),
         )
 
         val payment = findPaymentForMembership(membership)

@@ -1,0 +1,68 @@
+package com.liyaqa.notification
+
+enum class NotificationType(
+    val titleKey: String,
+    val bodyKey: String,
+    val sendEmail: Boolean,
+) {
+    MEMBERSHIP_EXPIRING_SOON(
+        "notification.membership_expiring.title",
+        "notification.membership_expiring.body",
+        true,
+    ),
+    MEMBERSHIP_ASSIGNED(
+        "notification.membership_assigned.title",
+        "notification.membership_assigned.body",
+        false,
+    ),
+    MEMBERSHIP_FROZEN(
+        "notification.membership_frozen.title",
+        "notification.membership_frozen.body",
+        false,
+    ),
+    PAYMENT_COLLECTED(
+        "notification.payment_collected.title",
+        "notification.payment_collected.body",
+        true,
+    ),
+    GX_CLASS_BOOKED(
+        "notification.gx_booked.title",
+        "notification.gx_booked.body",
+        false,
+    ),
+    GX_CLASS_CANCELLED(
+        "notification.gx_cancelled.title",
+        "notification.gx_cancelled.body",
+        false,
+    ),
+    GX_CLASS_REMINDER(
+        "notification.gx_reminder.title",
+        "notification.gx_reminder.body",
+        false,
+    ),
+    PT_SESSION_REMINDER(
+        "notification.pt_session_reminder.title",
+        "notification.pt_session_reminder.body",
+        true,
+    ),
+    PT_ATTENDANCE_MARKED(
+        "notification.pt_attendance_marked.title",
+        "notification.pt_attendance_marked.body",
+        false,
+    ),
+    LEAD_ASSIGNED(
+        "notification.lead_assigned.title",
+        "notification.lead_assigned.body",
+        false,
+    ),
+    NEW_MEMBER_REGISTERED(
+        "notification.new_member_registered.title",
+        "notification.new_member_registered.body",
+        false,
+    ),
+    LOW_GX_SPOTS(
+        "notification.low_gx_spots.title",
+        "notification.low_gx_spots.body",
+        false,
+    ),
+}

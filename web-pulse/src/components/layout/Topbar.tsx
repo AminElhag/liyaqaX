@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { NotificationDrawer } from '@/components/notifications/NotificationDrawer'
 import { BranchSelector } from './BranchSelector'
 
 export function Topbar() {
   const { t, i18n } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')
@@ -16,6 +20,8 @@ export function Topbar() {
       <BranchSelector />
 
       <div className="flex items-center gap-4">
+        <NotificationBell onClick={() => setDrawerOpen(true)} />
+        <NotificationDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <button
           type="button"
           onClick={toggleLanguage}

@@ -39,6 +39,11 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
         statuses: List<String>,
     ): Boolean
 
+    fun findAllByEndDateAndMembershipStatusAndDeletedAtIsNull(
+        endDate: LocalDate,
+        membershipStatus: String,
+    ): List<Membership>
+
     @Query(
         value = """
             SELECT * FROM memberships m

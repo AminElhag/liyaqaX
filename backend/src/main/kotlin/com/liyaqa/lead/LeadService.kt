@@ -23,6 +23,7 @@ import com.liyaqa.lead.dto.StageTransitionRequest
 import com.liyaqa.lead.dto.UpdateLeadRequest
 import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
+import com.liyaqa.notification.events.LeadAssignedEvent
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
 import com.liyaqa.rbac.UserRole
@@ -32,6 +33,7 @@ import com.liyaqa.staff.StaffMember
 import com.liyaqa.staff.StaffMemberRepository
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -56,6 +58,7 @@ class LeadService(
     private val organizationRepository: OrganizationRepository,
     private val clubRepository: ClubRepository,
     private val auditService: AuditService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     companion object {
         private val STAGE_ORDER =
@@ -255,9 +258,11 @@ class LeadService(
         }
 
         // Rule 9 — staff assignment scope
+        var newAssigneeStaff: StaffMember? = null
         if (request.assignedStaffId != null) {
             val staff = findStaffInClubOrThrow(request.assignedStaffId, club.id)
             lead.assignedStaffId = staff.id
+            newAssigneeStaff = staff
         }
 
         if (request.branchId != null) {
@@ -272,6 +277,16 @@ class LeadService(
             entityType = "Lead",
             entityId = lead.publicId.toString(),
         )
+
+        if (newAssigneeStaff != null) {
+            eventPublisher.publishEvent(
+                LeadAssignedEvent(
+                    leadPublicId = lead.publicId,
+                    leadName = "${lead.firstName} ${lead.lastName}",
+                    assigneeUserId = newAssigneeStaff.userId,
+                ),
+            )
+        }
 
         return hydrateLeadResponse(lead, club.id)
     }
