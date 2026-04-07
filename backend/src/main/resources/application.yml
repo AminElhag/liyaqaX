@@ -37,6 +37,13 @@ arena:
     access-token-expiry: PT15M
     refresh-token-expiry: P7D
 
+zatca:
+  environment: ${ZATCA_ENV:sandbox}
+  api:
+    base-url: ${ZATCA_API_BASE_URL:https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal}
+  encryption:
+    key: ${ZATCA_ENCRYPTION_KEY}
+
 server:
   port: ${SERVER_PORT:8080}
 

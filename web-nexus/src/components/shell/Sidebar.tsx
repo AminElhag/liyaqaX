@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { labelKey: 'nav.members', to: '/members', permission: Permission.MEMBER_READ },
   { labelKey: 'nav.roles', to: '/roles', permission: Permission.ROLE_READ },
   { labelKey: 'nav.audit', to: '/audit', permission: Permission.AUDIT_READ },
+  { labelKey: 'nav.zatca', to: '/zatca', permission: Permission.ZATCA_READ },
 ]
 
 export function Sidebar() {

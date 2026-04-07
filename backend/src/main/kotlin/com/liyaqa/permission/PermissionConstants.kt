@@ -144,4 +144,8 @@ object PermissionConstants {
 
     // ── Platform ──────────────────────────────────────────────────────────────
     const val PLATFORM_STATS_VIEW = "platform:stats:view"
+
+    // ── ZATCA ─────────────────────────────────────────────────────────────────
+    const val ZATCA_ONBOARD = "zatca:onboard"
+    const val ZATCA_READ = "zatca:read"
 }

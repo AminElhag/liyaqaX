@@ -19,6 +19,13 @@ spring:
       mail.smtp.auth: false
       mail.smtp.starttls.enable: false
 
+zatca:
+  environment: sandbox
+  api:
+    base-url: https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal
+  encryption:
+    key: "YWFhYWJiYmJjY2NjZGRkZGVlZWVmZmZmZ2dnZ2hoaGg="
+
 logging:
   level:
     com.liyaqa: DEBUG

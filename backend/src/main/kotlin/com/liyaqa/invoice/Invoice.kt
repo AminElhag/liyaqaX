@@ -45,4 +45,14 @@ class Invoice(
     var previousInvoiceHash: String? = null,
     @Column(name = "invoice_counter_value")
     var invoiceCounterValue: Long? = null,
+    @Column(name = "zatca_signed_xml", columnDefinition = "TEXT")
+    var zatcaSignedXml: String? = null,
+    @Column(name = "zatca_reported_at")
+    var zatcaReportedAt: Instant? = null,
+    @Column(name = "zatca_report_response", columnDefinition = "TEXT")
+    var zatcaReportResponse: String? = null,
+    @Column(name = "zatca_retry_count")
+    var zatcaRetryCount: Int = 0,
+    @Column(name = "zatca_last_error", columnDefinition = "TEXT")
+    var zatcaLastError: String? = null,
 ) : BaseEntity()

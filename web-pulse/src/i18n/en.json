@@ -580,6 +580,18 @@
   "notification.new_member_registered.body": "{{memberName}} has just registered.",
   "notification.low_gx_spots.title": "Low spots alert",
   "notification.low_gx_spots.body": "Only {{spotsRemaining}} spots left for your upcoming class.",
+  "zatca.title": "ZATCA E-Invoicing Status",
+  "zatca.status": "Status",
+  "zatca.environment": "Environment",
+  "zatca.expires": "CSID Expires",
+  "zatca.not_onboarded": "Not onboarded — contact the platform admin to enable ZATCA for your club.",
+  "zatca.status.not_onboarded": "Not Onboarded",
+  "zatca.status.pending": "Pending",
+  "zatca.status.compliance_issued": "Compliance CSID Issued",
+  "zatca.status.compliance_checked": "Compliance Checked",
+  "zatca.status.active": "Active",
+  "zatca.status.expired": "Expired",
+  "zatca.status.failed": "Failed",
   "language": {
     "ar": "العربية",
     "en": "English"

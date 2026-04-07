@@ -92,6 +92,9 @@ export const Permission = {
   ROLE_READ: 'role:read',
   ROLE_UPDATE: 'role:update',
   ROLE_DELETE: 'role:delete',
+
+  // ZATCA
+  ZATCA_READ: 'zatca:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

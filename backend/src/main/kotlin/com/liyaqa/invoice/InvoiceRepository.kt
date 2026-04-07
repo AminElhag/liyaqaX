@@ -48,4 +48,26 @@ interface InvoiceRepository : JpaRepository<Invoice, Long> {
         clubId: Long,
         year: Int,
     ): Long
+
+    @Query(
+        value = """
+            SELECT i.id FROM invoices i
+            WHERE i.zatca_status IN ('generated', 'signed')
+              AND i.zatca_retry_count < 5
+            ORDER BY i.created_at ASC
+            LIMIT 100
+        """,
+        nativeQuery = true,
+    )
+    fun findPendingZatcaReporting(): List<Long>
+
+    @Query(
+        value = """
+            SELECT i.id FROM invoices i
+            WHERE i.zatca_status = 'failed'
+            ORDER BY i.updated_at DESC
+        """,
+        nativeQuery = true,
+    )
+    fun findFailedZatcaReporting(): List<Long>
 }

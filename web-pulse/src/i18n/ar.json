@@ -580,6 +580,18 @@
   "notification.new_member_registered.body": "تم تسجيل {{memberName}} للتو.",
   "notification.low_gx_spots.title": "تنبيه أماكن قليلة",
   "notification.low_gx_spots.body": "بقي {{spotsRemaining}} أماكن فقط في حصتك القادمة.",
+  "zatca.title": "حالة الفواتير الإلكترونية (زاتكا)",
+  "zatca.status": "الحالة",
+  "zatca.environment": "البيئة",
+  "zatca.expires": "انتهاء صلاحية الشهادة",
+  "zatca.not_onboarded": "غير مُفعّل — تواصل مع مدير المنصة لتفعيل زاتكا لناديك.",
+  "zatca.status.not_onboarded": "غير مُفعّل",
+  "zatca.status.pending": "قيد الانتظار",
+  "zatca.status.compliance_issued": "تم إصدار شهادة الامتثال",
+  "zatca.status.compliance_checked": "تم التحقق من الامتثال",
+  "zatca.status.active": "نشط",
+  "zatca.status.expired": "منتهي الصلاحية",
+  "zatca.status.failed": "فشل",
   "language": {
     "ar": "العربية",
     "en": "English"

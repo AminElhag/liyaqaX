@@ -143,6 +143,7 @@ class DevDataLoader(
             PermissionConstants.INTEGRATION_CONFIGURE, PermissionConstants.INTEGRATION_READ,
             PermissionConstants.SYSTEM_IMPERSONATE, PermissionConstants.AUDIT_READ,
             PermissionConstants.MEMBER_READ, PermissionConstants.PLATFORM_STATS_VIEW,
+            PermissionConstants.ZATCA_ONBOARD, PermissionConstants.ZATCA_READ,
         )
 
     private val platformReadPlusImpersonate =
@@ -206,6 +207,7 @@ class DevDataLoader(
             PermissionConstants.CASH_DRAWER_RECONCILE, PermissionConstants.BRANCH_READ,
             PermissionConstants.PORTAL_SETTINGS_UPDATE,
             PermissionConstants.REPORT_CUSTOM_RUN,
+            PermissionConstants.ZATCA_READ,
         )
 
     private val clubBranchManager =
