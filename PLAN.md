@@ -1,713 +1,587 @@
-# Plan 31 — ZATCA Health Dashboard & CSID Expiry Alerts
+# Plan 28 — Bulk Member Import (CSV)
 
-## Overview
+## Status
+Ready for implementation
 
-Plan 23 built the full ZATCA Phase 2 integration. This plan adds the operational safety net: proactive alerts when CSIDs are about to expire, alerts when invoices are approaching the 24-hour ZATCA reporting deadline without being reported, and a health dashboard in web-nexus that gives platform admins full visibility into every club's ZATCA status. It also adds a manual retry mechanism for permanently failed invoices.
+## Branch
+`feature/plan-28-csv-import`
 
-**No new Flyway migration.** Everything in this plan reads from and writes to tables and columns that already exist: `club_zatca_certificates`, `invoices`, `notifications`, `audit_logs`.
+## Goal
+Allow Integration Specialists to upload a CSV file of existing members (migrating from a legacy gym system) via web-nexus. The backend validates all rows, then processes asynchronously. The entire import is fully reversible — a rollback endpoint soft-deletes all members created by a given job. No memberships are created; plan assignment happens manually after import.
 
-## What Gets Built
-
-### Backend
-
-1. **Two new scheduler jobs** added to the existing `ZatcaReportingScheduler`
-2. **`ZatcaHealthService`** — aggregates health statistics across all clubs
-3. **`ZatcaRetryService`** — resets failed invoices for manual retry
-4. **Two new endpoints** on `ZatcaNexusController` — health summary + failed invoice list + retry action
-5. **One new notification type**: `ZATCA_CSID_EXPIRING_SOON`
-6. **Two new audit actions**: `ZATCA_CSID_RENEWED` (already planned, wire it here), `ZATCA_INVOICE_RETRY_REQUESTED`
-7. **One new permission**: `zatca:retry`
-
-### Frontend (web-nexus only)
-
-8. **ZATCA screen redesigned** — adds health summary cards at the top, color-coded status on the club table, new "Failed Invoices" tab
+## Context
+- `Member` entity already exists with all required fields
+- Notification system (Plan 21) already supports new types — wire `MEMBER_IMPORT_COMPLETED` in
+- `JavaMailSender` already configured (Plan 20)
+- RBAC already supports custom permission codes — add `member:import`
+- Soft delete pattern already used platform-wide (`deleted_at` nullable timestamp)
+- Next Flyway migration: **V16**
 
 ---
 
-## Implementation Steps
+## Scope — what this plan covers
 
-### Step 1 — New Notification Type
+- [ ] Flyway V16 — `member_import_jobs` table + `member_import_job_id` column on `members`
+- [ ] `MemberImportJob` entity
+- [ ] `MemberImportService` — validation pass + job creation
+- [ ] `MemberImportProcessor` — `@Async` bean, full transactional import pass
+- [ ] `MemberImportRollbackService` — soft-deletes all members created by a job
+- [ ] 4 endpoints on `MemberImportNexusController`
+- [ ] New notification type: `MEMBER_IMPORT_COMPLETED`
+- [ ] New audit actions: `MEMBER_IMPORT_STARTED`, `MEMBER_IMPORT_COMPLETED`, `MEMBER_IMPORT_CANCELLED`, `MEMBER_IMPORT_ROLLED_BACK`
+- [ ] New permission: `member:import` seeded to Integration Specialist
+- [ ] web-nexus: upload modal on club detail page, job status polling, result summary, rollback button
+- [ ] Tests — unit + integration + frontend
 
-In `NotificationType.kt` (or wherever the enum/constants live), add:
+## Out of scope — do not implement in this plan
 
-```kotlin
-ZATCA_CSID_EXPIRING_SOON,   // CSID expires within 30 days
-ZATCA_INVOICE_DEADLINE_AT_RISK, // invoice unreported and within 1 hour of 24h deadline
-```
-
-In `NotificationTriggerService` (or `ZatcaHealthService` — see Step 2), these notifications target the **platform admin user(s)** — not club staff, not members. The notification `userId` should be set to all platform users with the `zatca:read` permission.
-
-No new `@EventListener` needed — these are **proactive scheduler-driven** notifications, same pattern as `MEMBERSHIP_EXPIRING_SOON`.
+- Membership creation during import (members only)
+- Email attachment of the error CSV (notification + plain-text email only)
+- Editing an existing member via import (no upsert — duplicate phone = skip)
+- Re-running a rolled-back job
 
 ---
 
-### Step 2 — ZatcaHealthService
+## Decisions already made
 
-**`ZatcaHealthService.kt`** in `com.liyaqa.zatca.service`:
+- **Async with 60-second queued window** — job accepted with `202 Accepted`, sits in `queued` state for 60 seconds before `MemberImportProcessor` picks it up; cancel is allowed during this window
+- **Full atomic transaction** — the entire import pass runs inside a single `@Transactional` method; if it fails mid-way, nothing is written
+- **Rollback via soft-delete** — `member_import_job_id` FK on `members` links every imported member to its job; rollback sets `deleted_at` on all of them
+- **No row limit** — file size capped at 10 MB (Spring multipart config); row count unbounded
+- **Required columns**: `name_ar`, `phone`, `gender` — Optional: `name_en`, `email`, `date_of_birth`
+- **Duplicate phone** — skip row, include in result summary; does NOT fail the import
+- **Completion signal** — both in-app notification (`MEMBER_IMPORT_COMPLETED`) and email via `JavaMailSender`
+- **Roles** — Integration Specialist (web-nexus) only via `member:import` permission
+
+---
+
+## Entity design
+
+### MemberImportJob
 
 ```kotlin
-package com.liyaqa.zatca.service
+@Entity
+@Table(name = "member_import_jobs")
+class MemberImportJob(
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
 
-import com.liyaqa.zatca.dto.ZatcaHealthSummary
-import com.liyaqa.zatca.dto.ZatcaFailedInvoiceResponse
-import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
-import com.liyaqa.invoice.repository.InvoiceRepository
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    val publicId: UUID = UUID.randomUUID(),
 
-@Service
-@Transactional(readOnly = true)
-class ZatcaHealthService(
-    private val certRepository: ClubZatcaCertificateRepository,
-    private val invoiceRepository: InvoiceRepository
-) {
+    @Column(name = "club_id", nullable = false)
+    val clubId: Long,
 
-    /**
-     * Returns a platform-wide health summary across all clubs.
-     */
-    fun getHealthSummary(): ZatcaHealthSummary {
-        val now = Instant.now()
-        val thirtyDaysFromNow = now.plus(30, ChronoUnit.DAYS)
+    @Column(name = "created_by_user_id", nullable = false)
+    val createdByUserId: Long,
 
-        val totalActive = certRepository.countByOnboardingStatusAndDeletedAtIsNull("active")
-        val expiringSoon = certRepository.countExpiringSoon(thirtyDaysFromNow)
-        val notOnboarded = certRepository.countByOnboardingStatusNotAndDeletedAtIsNull("active")
-        val pendingInvoices = invoiceRepository.countPendingZatcaReporting()
-        val failedInvoices = invoiceRepository.countFailedZatcaReporting()
-        val deadlineAtRisk = invoiceRepository.countInvoicesApproachingDeadline(
-            now.minus(23, ChronoUnit.HOURS)
-        )
+    @Column(name = "file_name", nullable = false)
+    val fileName: String,
 
-        return ZatcaHealthSummary(
-            totalActiveCsids = totalActive,
-            csidsExpiringSoon = expiringSoon,
-            clubsNotOnboarded = notOnboarded,
-            invoicesPending = pendingInvoices,
-            invoicesFailed = failedInvoices,
-            invoicesDeadlineAtRisk = deadlineAtRisk
-        )
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    var status: MemberImportJobStatus = MemberImportJobStatus.QUEUED,
 
-    /**
-     * Returns list of permanently failed invoices with enough detail for
-     * platform admin to diagnose and retry.
-     */
-    fun getFailedInvoices(): List<ZatcaFailedInvoiceResponse> {
-        return invoiceRepository.findFailedZatcaInvoicesWithClub()
-            .map { row ->
-                ZatcaFailedInvoiceResponse(
-                    invoicePublicId = row.invoicePublicId,
-                    invoiceNumber = row.invoiceNumber,
-                    clubName = row.clubName,
-                    memberName = row.memberName,
-                    amountSar = "%.2f".format(row.amountHalalas / 100.0),
-                    createdAt = row.createdAt.toString(),
-                    zatcaRetryCount = row.zatcaRetryCount,
-                    zatcaLastError = row.zatcaLastError,
-                    zatcaStatus = row.zatcaStatus
-                )
-            }
-    }
+    @Column(name = "total_rows")
+    var totalRows: Int? = null,
+
+    @Column(name = "imported_count")
+    var importedCount: Int? = null,
+
+    @Column(name = "skipped_count")
+    var skippedCount: Int? = null,
+
+    @Column(name = "error_count")
+    var errorCount: Int? = null,
+
+    // Newline-separated list of "row N: reason" strings for rows that failed validation
+    @Column(name = "error_detail", columnDefinition = "TEXT")
+    var errorDetail: String? = null,
+
+    @Column(name = "started_at")
+    var startedAt: Instant? = null,
+
+    @Column(name = "completed_at")
+    var completedAt: Instant? = null,
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    val createdAt: Instant = Instant.now()
+)
+
+enum class MemberImportJobStatus {
+    QUEUED,       // waiting for 60-second delay before processing
+    PROCESSING,   // async processor is running
+    COMPLETED,    // all rows processed (some may be skipped/errored)
+    CANCELLED,    // cancelled during QUEUED window
+    ROLLED_BACK   // completed job was rolled back — members soft-deleted
 }
 ```
 
-**DTOs:**
+### Member entity change
+
+Add one nullable FK column:
 
 ```kotlin
-// ZatcaHealthSummary.kt
-data class ZatcaHealthSummary(
-    val totalActiveCsids: Long,
-    val csidsExpiringSoon: Long,
-    val clubsNotOnboarded: Long,
-    val invoicesPending: Long,
-    val invoicesFailed: Long,
-    val invoicesDeadlineAtRisk: Long
-)
+@Column(name = "member_import_job_id", nullable = true)
+var memberImportJobId: Long? = null
+```
 
-// ZatcaFailedInvoiceResponse.kt
-data class ZatcaFailedInvoiceResponse(
-    val invoicePublicId: java.util.UUID,
-    val invoiceNumber: String?,
-    val clubName: String,
-    val memberName: String,
-    val amountSar: String,
-    val createdAt: String,
-    val zatcaRetryCount: Int,
-    val zatcaLastError: String?,
-    val zatcaStatus: String
-)
+Set to `job.id` for every member created by an import. Null for all manually created members.
+
+---
+
+## Flyway V16
+
+```sql
+-- V16__member_import.sql
+
+CREATE TABLE member_import_jobs (
+    id                  BIGSERIAL PRIMARY KEY,
+    public_id           UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    club_id             BIGINT NOT NULL REFERENCES clubs(id),
+    created_by_user_id  BIGINT NOT NULL REFERENCES users(id),
+    file_name           VARCHAR(255) NOT NULL,
+    status              VARCHAR(20) NOT NULL DEFAULT 'QUEUED',
+    total_rows          INTEGER,
+    imported_count      INTEGER,
+    skipped_count       INTEGER,
+    error_count         INTEGER,
+    error_detail        TEXT,
+    started_at          TIMESTAMPTZ,
+    completed_at        TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE members
+    ADD COLUMN member_import_job_id BIGINT REFERENCES member_import_jobs(id);
+
+CREATE INDEX idx_member_import_jobs_club_id ON member_import_jobs(club_id);
+CREATE INDEX idx_members_import_job_id ON members(member_import_job_id);
 ```
 
 ---
 
-### Step 3 — ZatcaRetryService
+## CSV format
 
-**`ZatcaRetryService.kt`** in `com.liyaqa.zatca.service`:
+### Required columns (header row must match exactly — case-insensitive)
+
+| Column | Type | Validation |
+|--------|------|-----------|
+| `name_ar` | String | Required, 2–100 chars |
+| `phone` | String | Required, Saudi format (+966XXXXXXXXX or 05XXXXXXXX), normalised to +966 |
+| `gender` | String | Required, must be `male` or `female` (case-insensitive) |
+
+### Optional columns
+
+| Column | Type | Validation |
+|--------|------|-----------|
+| `name_en` | String | 2–100 chars if provided |
+| `email` | String | Valid email format if provided |
+| `date_of_birth` | String | ISO 8601 date (YYYY-MM-DD) if provided, must be in the past |
+
+### Row-level errors (skip row, add to error_detail)
+
+- Missing required field
+- Invalid phone format
+- Invalid gender value
+- `date_of_birth` is in the future
+- Phone already exists for a member in this club (duplicate — skip, logged as skipped not error)
+
+### File-level errors (reject entire file, return 422 before job creation)
+
+- Not a valid CSV (parse failure)
+- Missing required header columns
+- File is empty (0 data rows)
+
+---
+
+## API endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `POST` | `/api/v1/nexus/clubs/{clubPublicId}/members/import` | `member:import` | Upload CSV, create job, return 202 + jobId |
+| `GET` | `/api/v1/nexus/member-import-jobs/{jobPublicId}` | `member:import` | Job status + result counts |
+| `DELETE` | `/api/v1/nexus/member-import-jobs/{jobPublicId}` | `member:import` | Cancel job if status = QUEUED |
+| `POST` | `/api/v1/nexus/member-import-jobs/{jobPublicId}/rollback` | `member:import` | Rollback completed job — soft-delete all imported members |
+
+---
+
+## Request / Response shapes
+
+### POST /import → 202 Accepted
+
+```json
+{
+  "jobId": "uuid",
+  "status": "QUEUED",
+  "fileName": "elixir-members-2024.csv",
+  "message": "Import queued. Processing will begin in ~60 seconds."
+}
+```
+
+### GET /member-import-jobs/{id}
+
+```json
+{
+  "jobId": "uuid",
+  "status": "COMPLETED",
+  "fileName": "elixir-members-2024.csv",
+  "totalRows": 312,
+  "importedCount": 298,
+  "skippedCount": 11,
+  "errorCount": 3,
+  "errorDetail": "Row 14: phone +966501234567 already exists\nRow 87: invalid gender value 'M'\nRow 203: date_of_birth 2026-01-01 is in the future",
+  "startedAt": "2026-04-07T10:01:05Z",
+  "completedAt": "2026-04-07T10:01:18Z",
+  "createdAt": "2026-04-07T10:00:04Z"
+}
+```
+
+### POST /rollback → 200 OK
+
+```json
+{
+  "message": "Rollback complete. 298 members soft-deleted."
+}
+```
+
+---
+
+## Business rules — enforce in service layer
+
+1. File-level validation runs synchronously before the job is created. If it fails, return `422` with an array of error messages — no job record is created.
+2. A job can only be cancelled when `status = QUEUED`. Any other status returns `409 Conflict`.
+3. A job can only be rolled back when `status = COMPLETED`. Any other status returns `409 Conflict`.
+4. The import processor runs the entire import pass inside a single `@Transactional` method. If any unexpected exception occurs, the transaction rolls back and the job is marked `status = COMPLETED` with `errorDetail` noting the failure.
+5. Phone numbers are normalised before duplicate checking: strip spaces/dashes, convert `05XXXXXXXX` → `+966 5XXXXXXXX`. The normalised form is what gets stored on the `Member`.
+6. Duplicate phone check is scoped to the club — the same phone may exist in a different club and is NOT a duplicate.
+7. `memberImportJobId` is set on every `Member` created by the processor. Members created manually always have `memberImportJobId = null`.
+8. Rollback sets `deleted_at = Instant.now()` on all members where `member_import_job_id = job.id` AND `deleted_at IS NULL`. It then sets `job.status = ROLLED_BACK`.
+9. A rolled-back job cannot be re-run or rolled back again.
+10. The 60-second delay is implemented via `Thread.sleep(60_000)` at the start of the async processor method, before `status` is changed to `PROCESSING`. The cancel check reads the latest job status from the DB after the sleep — if it is `CANCELLED`, the processor exits without doing anything.
+
+---
+
+## Seed data updates
+
+No changes to dev seed data needed. The import feature is triggered manually via the UI.
+
+---
+
+## Notification + Email on completion
+
+**Notification** (uses existing `NotificationTriggerService`):
+- Type: `MEMBER_IMPORT_COMPLETED`
+- Target: the user who created the job (`createdByUserId`)
+- Body (en): `"Import of {fileName} complete: {importedCount} imported, {skippedCount} skipped, {errorCount} errors."`
+- Body (ar): `"اكتمل استيراد {fileName}: {importedCount} مستورد، {skippedCount} تم تخطيه، {errorCount} أخطاء."`
+
+**Email** (uses existing `JavaMailSender`):
+- Subject (en): `Liyaqa — Member Import Complete: {fileName}`
+- Body: plain-text summary with same counts
+- No attachment
+
+---
+
+## Frontend additions (web-nexus)
+
+**Club detail page** (`/nexus/clubs/{id}`):
+- "Import Members" button (visible only to users with `member:import` permission)
+- Clicking opens an upload modal
+
+**Upload modal:**
+- File picker (accepts `.csv` only)
+- "Download sample CSV" link (static file showing the 6 columns with one example row)
+- Upload button → calls `POST /import` → shows "Import queued" confirmation with job ID
+- Closes modal, opens job status panel
+
+**Job status panel** (appears below club detail, or as a drawer):
+- Polls `GET /member-import-jobs/{id}` every 3 seconds while `status = QUEUED` or `PROCESSING`
+- Shows: status badge, progress message, counts when completed
+- **Cancel button** — visible when `status = QUEUED`, calls `DELETE /member-import-jobs/{id}`
+- **Rollback button** — visible when `status = COMPLETED`, requires confirmation dialog ("This will soft-delete all {importedCount} members created by this import. Are you sure?"), calls `POST /rollback`
+- **Error detail** — if `errorCount > 0`, shows error lines in a scrollable code block
+- Job history table showing last 10 import jobs for the club (status, file name, counts, date)
+
+**New i18n strings** (`ar.json` + `en.json`):
+```
+import.button
+import.modal.title
+import.modal.download_sample
+import.modal.upload
+import.status.queued
+import.status.processing
+import.status.completed
+import.status.cancelled
+import.status.rolled_back
+import.result.imported
+import.result.skipped
+import.result.errors
+import.cancel.button
+import.cancel.confirm
+import.rollback.button
+import.rollback.confirm
+import.rollback.success
+import.error.file_level
+```
+
+---
+
+## Files to generate
+
+### New files
+
+**Backend:**
+- `backend/src/main/kotlin/com/liyaqa/member/entity/MemberImportJob.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/entity/MemberImportJobStatus.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/repository/MemberImportJobRepository.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/service/MemberImportService.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/service/MemberImportProcessor.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/service/MemberImportRollbackService.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/dto/MemberImportJobResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/dto/MemberImportAcceptedResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/member/controller/MemberImportNexusController.kt`
+- `backend/src/main/resources/db/migration/V16__member_import.sql`
+- `backend/src/test/kotlin/com/liyaqa/member/service/MemberImportServiceTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/member/service/MemberImportProcessorTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/member/controller/MemberImportControllerIntegrationTest.kt`
+
+**Frontend:**
+- `apps/web-nexus/src/components/members/ImportMembersModal.tsx`
+- `apps/web-nexus/src/components/members/ImportJobStatusPanel.tsx`
+- `apps/web-nexus/src/api/memberImport.ts`
+- `apps/web-nexus/src/routes/clubs/$clubId/index.tsx` (modify — add Import button)
+- `apps/web-nexus/src/tests/member-import.test.tsx`
+
+### Files to modify
+
+- `backend/src/main/kotlin/com/liyaqa/member/entity/Member.kt` — add `memberImportJobId` field
+- `backend/src/main/kotlin/com/liyaqa/notification/model/NotificationType.kt` — add `MEMBER_IMPORT_COMPLETED`
+- `backend/src/main/kotlin/com/liyaqa/audit/model/AuditAction.kt` — add 4 new actions
+- `backend/src/main/kotlin/com/liyaqa/permission/PermissionConstants.kt` — add `member:import`
+- `backend/src/main/resources/data-dev.sql` (or DevDataLoader) — seed `member:import` to Integration Specialist role
+- `apps/web-nexus/src/locales/ar.json`
+- `apps/web-nexus/src/locales/en.json`
+
+---
+
+## Implementation order
+
+### Step 1 — Flyway V16 + entities
+- Write `V16__member_import.sql`
+- Write `MemberImportJob.kt` + `MemberImportJobStatus.kt`
+- Add `memberImportJobId: Long?` field to `Member.kt`
+- Write `MemberImportJobRepository.kt` with native queries (see Step 4)
+- Verify: `./gradlew flywayMigrate` succeeds
+
+### Step 2 — Permission + audit actions + notification type
+- Add `MEMBER_IMPORT = "member:import"` to `PermissionConstants.kt`
+- Add `MEMBER_IMPORT_STARTED`, `MEMBER_IMPORT_COMPLETED`, `MEMBER_IMPORT_CANCELLED`, `MEMBER_IMPORT_ROLLED_BACK` to `AuditAction.kt`
+- Add `MEMBER_IMPORT_COMPLETED` to `NotificationType.kt`
+- Seed `member:import` to Integration Specialist role in `DevDataLoader` or SQL
+- Verify: `./gradlew compileKotlin`
+
+### Step 3 — MemberImportService (validation pass + job creation)
+- Parse CSV using Apache Commons CSV (already in classpath — if not, add to `build.gradle.kts`)
+- File-level validation: required headers present, file not empty, parseable
+- Row-level validation: collect all errors with row numbers
+- If file-level errors → throw `ArenaException` with 422 and error list (no job created)
+- If passes → persist `MemberImportJob` with `status = QUEUED`
+- Log `MEMBER_IMPORT_STARTED` audit action
+- Return the saved job
+- Verify: unit tests in `MemberImportServiceTest`
+
+### Step 4 — Repository queries
+Add to `MemberImportJobRepository`:
 
 ```kotlin
-package com.liyaqa.zatca.service
+@Query(
+    value = "SELECT * FROM member_import_jobs WHERE public_id = :publicId",
+    nativeQuery = true
+)
+fun findByPublicId(publicId: UUID): MemberImportJob?
 
-import com.liyaqa.common.exception.ArenaException
-import com.liyaqa.invoice.repository.InvoiceRepository
-import com.liyaqa.audit.service.AuditService
-import com.liyaqa.audit.model.AuditAction
-import org.springframework.http.HttpStatus
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
-import java.util.UUID
+@Query(
+    value = """
+        SELECT * FROM member_import_jobs
+        WHERE club_id = :clubId
+        ORDER BY created_at DESC
+        LIMIT 10
+    """,
+    nativeQuery = true
+)
+fun findTop10ByClubIdOrderByCreatedAtDesc(clubId: Long): List<MemberImportJob>
+```
 
+Add to `MemberRepository`:
+
+```kotlin
+@Query(
+    value = """
+        SELECT COUNT(*) FROM members
+        WHERE phone = :phone
+          AND club_id = :clubId
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun countByPhoneAndClubId(phone: String, clubId: Long): Long
+
+@Modifying
+@Query(
+    value = """
+        UPDATE members
+        SET deleted_at = NOW()
+        WHERE member_import_job_id = :jobId
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun softDeleteByImportJobId(jobId: Long): Int
+```
+
+### Step 5 — MemberImportProcessor (@Async)
+- Annotate class with `@Component`, method with `@Async`
+- On pickup: `Thread.sleep(60_000)` → re-read job from DB → if `status = CANCELLED` exit immediately
+- Set `job.status = PROCESSING`, `job.startedAt = Instant.now()`
+- Run import pass in a single `@Transactional` method:
+  - Re-parse the CSV bytes stored in memory (passed as a `ByteArray` parameter)
+  - For each row: validate → normalise phone → check duplicate → create `Member` with `memberImportJobId = job.id`
+  - Track `importedCount`, `skippedCount`, `errorCount`, `errorDetail`
+- After transaction commits: set `job.status = COMPLETED`, `job.completedAt = Instant.now()`
+- Log `MEMBER_IMPORT_COMPLETED` audit action
+- Call `notificationService.createNotification(...)` for `MEMBER_IMPORT_COMPLETED`
+- Call `JavaMailSender` to send plain-text email to the job creator
+- Verify: unit tests in `MemberImportProcessorTest`
+
+### Step 6 — MemberImportRollbackService
+```kotlin
 @Service
-class ZatcaRetryService(
-    private val invoiceRepository: InvoiceRepository,
+@Transactional
+class MemberImportRollbackService(
+    private val jobRepository: MemberImportJobRepository,
+    private val memberRepository: MemberRepository,
     private val auditService: AuditService
 ) {
+    fun rollback(jobPublicId: UUID): Int {
+        val job = jobRepository.findByPublicId(jobPublicId)
+            ?: throw ArenaException("Import job not found", HttpStatus.NOT_FOUND)
 
-    /**
-     * Resets a permanently failed invoice so the scheduler will pick it
-     * up again on the next run.
-     *
-     * Business rules:
-     * - Invoice must currently have zatcaStatus = 'failed'
-     * - Resets zatcaRetryCount to 0
-     * - Resets zatcaStatus to 'generated'
-     * - Clears zatcaLastError
-     * - Does NOT re-submit immediately — the scheduler handles submission
-     */
-    @Transactional
-    fun retryInvoice(invoicePublicId: UUID) {
-        val invoice = invoiceRepository.findByPublicIdAndDeletedAtIsNull(invoicePublicId)
-            ?: throw ArenaException("Invoice not found", HttpStatus.NOT_FOUND)
-
-        if (invoice.zatcaStatus != "failed") {
+        if (job.status != MemberImportJobStatus.COMPLETED) {
             throw ArenaException(
-                "Invoice is not in failed state (current: ${invoice.zatcaStatus})",
+                "Only completed jobs can be rolled back (current: ${job.status})",
                 HttpStatus.CONFLICT
             )
         }
 
-        invoice.zatcaRetryCount = 0
-        invoice.zatcaStatus = "generated"
-        invoice.zatcaLastError = null
-        invoiceRepository.save(invoice)
+        val deletedCount = memberRepository.softDeleteByImportJobId(job.id)
+        job.status = MemberImportJobStatus.ROLLED_BACK
 
         auditService.log(
-            action = AuditAction.ZATCA_INVOICE_RETRY_REQUESTED,
-            entityType = "Invoice",
-            entityId = invoice.publicId.toString(),
-            changes = mapOf("invoicePublicId" to invoicePublicId.toString())
+            action = AuditAction.MEMBER_IMPORT_ROLLED_BACK,
+            entityType = "MemberImportJob",
+            entityId = job.publicId.toString(),
+            changes = mapOf("deletedCount" to deletedCount.toString())
         )
-    }
 
-    /**
-     * Bulk retry — resets all permanently failed invoices for a specific club.
-     * Used when a club had a temporary CSID issue and all their invoices failed.
-     */
-    @Transactional
-    fun retryAllFailedForClub(clubPublicId: UUID) {
-        val invoiceIds = invoiceRepository.findFailedZatcaReportingByClub(clubPublicId)
-        invoiceIds.forEach { invoiceId ->
-            val invoice = invoiceRepository.findById(invoiceId).orElse(null) ?: return@forEach
-            invoice.zatcaRetryCount = 0
-            invoice.zatcaStatus = "generated"
-            invoice.zatcaLastError = null
-            invoiceRepository.save(invoice)
-        }
-        auditService.log(
-            action = AuditAction.ZATCA_INVOICE_RETRY_REQUESTED,
-            entityType = "Club",
-            entityId = clubPublicId.toString(),
-            changes = mapOf("count" to invoiceIds.size.toString(), "clubPublicId" to clubPublicId.toString())
-        )
+        return deletedCount
     }
 }
 ```
 
----
+### Step 7 — MemberImportNexusController
+- 4 endpoints as defined in the API table above
+- `@PreAuthorize("hasPermission(null, 'member:import')")` on all four
+- `@Operation` Swagger annotations on all four
+- `POST /import` — `@RequestParam file: MultipartFile` — calls `MemberImportService`, returns `202`
+- `GET /{jobPublicId}` — returns `MemberImportJobResponse`
+- `DELETE /{jobPublicId}` — cancel; checks `status = QUEUED`, sets `CANCELLED`, logs `MEMBER_IMPORT_CANCELLED`
+- `POST /{jobPublicId}/rollback` — calls `MemberImportRollbackService`
+- Verify: `./gradlew compileKotlin`
 
-### Step 4 — New Repository Queries
+### Step 8 — Frontend: web-nexus
+- `ImportMembersModal.tsx` — file picker, sample CSV link, upload handler
+- `ImportJobStatusPanel.tsx` — status badge, counts, polling (3s while active), cancel button, rollback button with confirmation dialog, error detail block, last-10 jobs table
+- `memberImport.ts` — 4 API functions (upload, getJob, cancelJob, rollbackJob) using TanStack Query
+- Modify club detail page — add "Import Members" button gated on `member:import` permission
+- Add all i18n strings (Arabic + English)
+- Verify: `npm run typecheck && npm test`
 
-Add to **`ClubZatcaCertificateRepository`**:
+### Step 9 — Tests
 
-```kotlin
-@Query(
-    value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status = :status AND deleted_at IS NULL",
-    nativeQuery = true
-)
-fun countByOnboardingStatusAndDeletedAtIsNull(status: String): Long
+**Unit: `MemberImportServiceTest`**
+- `validates CSV successfully when all required headers are present`
+- `throws 422 when required headers are missing`
+- `throws 422 when file is empty`
+- `throws 422 when file is not parseable CSV`
+- `creates job with QUEUED status on valid file`
+- `logs MEMBER_IMPORT_STARTED audit action`
 
-@Query(
-    value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status != 'active' AND deleted_at IS NULL",
-    nativeQuery = true
-)
-fun countByOnboardingStatusNotAndDeletedAtIsNull(status: String): Long
+**Unit: `MemberImportProcessorTest`**
+- `exits without processing when job is CANCELLED during 60-second window`
+- `imports all valid rows and sets COMPLETED status`
+- `skips duplicate phone and increments skippedCount`
+- `records row error and increments errorCount for invalid gender`
+- `normalises phone from 05XXXXXXXX to +966 format`
+- `sends notification on completion`
+- `sends email on completion`
+- `rolls back entire transaction when unexpected exception occurs`
 
-@Query(
-    value = """
-        SELECT COUNT(*) FROM club_zatca_certificates
-        WHERE onboarding_status = 'active'
-          AND csid_expires_at < :threshold
-          AND deleted_at IS NULL
-    """,
-    nativeQuery = true
-)
-fun countExpiringSoon(threshold: java.time.Instant): Long
-```
+**Integration: `MemberImportControllerIntegrationTest`**
+- `POST /import returns 202 and creates job`
+- `POST /import returns 422 when headers missing`
+- `POST /import returns 403 without member:import permission`
+- `GET /job returns job status with counts`
+- `DELETE /job cancels QUEUED job`
+- `DELETE /job returns 409 when job is PROCESSING`
+- `POST /rollback soft-deletes all imported members`
+- `POST /rollback returns 409 when job is not COMPLETED`
+- `rolled-back members do not appear in GET /members for the club`
 
-Add to **`InvoiceRepository`**:
-
-```kotlin
-@Query(
-    value = """
-        SELECT COUNT(*) FROM invoices
-        WHERE zatca_status IN ('generated', 'signed')
-          AND zatca_retry_count < 5
-          AND deleted_at IS NULL
-    """,
-    nativeQuery = true
-)
-fun countPendingZatcaReporting(): Long
-
-@Query(
-    value = """
-        SELECT COUNT(*) FROM invoices
-        WHERE zatca_status = 'failed'
-          AND deleted_at IS NULL
-    """,
-    nativeQuery = true
-)
-fun countFailedZatcaReporting(): Long
-
-/**
- * Invoices that are still unreported and were created more than 23 hours ago.
- * These are approaching ZATCA's 24-hour reporting deadline.
- */
-@Query(
-    value = """
-        SELECT COUNT(*) FROM invoices
-        WHERE zatca_status IN ('generated', 'signed')
-          AND created_at < :threshold
-          AND deleted_at IS NULL
-    """,
-    nativeQuery = true
-)
-fun countInvoicesApproachingDeadline(threshold: java.time.Instant): Long
-
-/**
- * Returns failed invoice details joined to club and member info.
- * Uses an interface projection to avoid loading full entities.
- */
-@Query(
-    value = """
-        SELECT
-            i.public_id        AS invoicePublicId,
-            i.invoice_number   AS invoiceNumber,
-            c.name_en          AS clubName,
-            m.name_en          AS memberName,
-            i.total_halalas    AS amountHalalas,
-            i.created_at       AS createdAt,
-            i.zatca_retry_count AS zatcaRetryCount,
-            i.zatca_last_error  AS zatcaLastError,
-            i.zatca_status      AS zatcaStatus
-        FROM invoices i
-        JOIN memberships ms ON ms.id = i.membership_id
-        JOIN membership_plans mp ON mp.id = ms.membership_plan_id
-        JOIN clubs c ON c.id = mp.club_id
-        JOIN members m ON m.id = ms.member_id
-        WHERE i.zatca_status = 'failed'
-          AND i.deleted_at IS NULL
-        ORDER BY i.created_at DESC
-        LIMIT 500
-    """,
-    nativeQuery = true
-)
-fun findFailedZatcaInvoicesWithClub(): List<FailedZatcaInvoiceProjection>
-
-@Query(
-    value = """
-        SELECT i.id FROM invoices i
-        JOIN memberships ms ON ms.id = i.membership_id
-        JOIN membership_plans mp ON mp.id = ms.membership_plan_id
-        JOIN clubs c ON c.id = mp.club_id
-        WHERE i.zatca_status = 'failed'
-          AND c.public_id = :clubPublicId
-          AND i.deleted_at IS NULL
-    """,
-    nativeQuery = true
-)
-fun findFailedZatcaReportingByClub(clubPublicId: java.util.UUID): List<Long>
-```
-
-**Interface projection** (in `com.liyaqa.invoice.repository`):
-
-```kotlin
-interface FailedZatcaInvoiceProjection {
-    val invoicePublicId: java.util.UUID
-    val invoiceNumber: String?
-    val clubName: String
-    val memberName: String
-    val amountHalalas: Long
-    val createdAt: java.time.Instant
-    val zatcaRetryCount: Int
-    val zatcaLastError: String?
-    val zatcaStatus: String
-}
-```
+**Frontend: `member-import.test.tsx`**
+- renders Import Members button for users with member:import permission
+- does not render Import Members button without permission
+- upload modal shows file picker and sample CSV link
+- job status panel shows cancel button when status is QUEUED
+- job status panel shows rollback button when status is COMPLETED
+- rollback confirmation dialog appears before calling rollback endpoint
 
 ---
 
-### Step 5 — Extend ZatcaReportingScheduler
+## RBAC matrix rows added by this plan
 
-Add two new scheduled methods to the existing `ZatcaReportingScheduler`:
-
-```kotlin
-/**
- * Daily at 07:00 Riyadh (04:00 UTC): check for CSIDs expiring within 30 days.
- * Creates a ZATCA_CSID_EXPIRING_SOON notification for each platform admin
- * who has zatca:read permission.
- */
-@Scheduled(cron = "0 0 4 * * *")  // 04:00 UTC = 07:00 Riyadh
-fun alertExpiringCsids() {
-    val threshold = Instant.now().plus(30, ChronoUnit.DAYS)
-    val expiring = certRepository.findExpiringSoon(threshold)
-    if (expiring.isEmpty()) return
-
-    log.warn("ZATCA: {} CSIDs expiring within 30 days", expiring.size)
-
-    expiring.forEach { cert ->
-        val daysUntilExpiry = ChronoUnit.DAYS.between(Instant.now(), cert.csidExpiresAt)
-        notificationService.createForPlatformAdmins(
-            type = "ZATCA_CSID_EXPIRING_SOON",
-            titleAr = "شهادة زاتكا تنتهي قريباً",
-            titleEn = "ZATCA Certificate Expiring Soon",
-            bodyAr = "شهادة نادي ${cert.club.nameAr} ستنتهي خلال $daysUntilExpiry يوم. يرجى التجديد.",
-            bodyEn = "CSID for ${cert.club.nameEn} expires in $daysUntilExpiry days. Please renew.",
-            entityId = cert.club.publicId.toString(),
-            entityType = "Club"
-        )
-    }
-}
-
-/**
- * Every hour: check for invoices that are unreported and older than 23 hours.
- * ZATCA requires reporting within 24 hours — these are at risk.
- */
-@Scheduled(fixedDelay = 60 * 60 * 1000)  // every hour
-fun alertInvoicesApproachingDeadline() {
-    val threshold = Instant.now().minus(23, ChronoUnit.HOURS)
-    val count = invoiceRepository.countInvoicesApproachingDeadline(threshold)
-    if (count == 0L) return
-
-    log.error(
-        "ZATCA DEADLINE RISK: {} invoices unreported and older than 23 hours. " +
-        "ZATCA requires reporting within 24 hours.",
-        count
-    )
-
-    notificationService.createForPlatformAdmins(
-        type = "ZATCA_INVOICE_DEADLINE_AT_RISK",
-        titleAr = "تحذير: فواتير لم يتم إرسالها لزاتكا",
-        titleEn = "ZATCA Reporting Deadline At Risk",
-        bodyAr = "$count فاتورة لم يتم إرسالها وقاربت على انتهاء المهلة (24 ساعة).",
-        bodyEn = "$count invoice(s) unreported and approaching the 24-hour ZATCA deadline.",
-        entityId = null,
-        entityType = "Invoice"
-    )
-}
-```
-
-Add a helper to `NotificationService` (or create `ZatcaNotificationHelper`) to create notifications for all platform users with `zatca:read` permission:
-
-```kotlin
-fun createForPlatformAdmins(
-    type: String,
-    titleAr: String,
-    titleEn: String,
-    bodyAr: String,
-    bodyEn: String,
-    entityId: String?,
-    entityType: String
-) {
-    // Find all platform users who have zatca:read permission
-    val adminUserIds = userRepository.findPlatformUsersWithPermission("zatca:read")
-    adminUserIds.forEach { userId ->
-        createNotification(
-            userId = userId,
-            type = type,
-            titleAr = titleAr,
-            titleEn = titleEn,
-            bodyAr = bodyAr,
-            bodyEn = bodyEn,
-            entityId = entityId,
-            entityType = entityType
-        )
-    }
-}
-```
-
----
-
-### Step 6 — New Audit Actions
-
-Add to `AuditAction.kt` (or wherever the enum/constants live):
-
-```kotlin
-ZATCA_CSID_RENEWED,
-ZATCA_INVOICE_RETRY_REQUESTED,
-```
-
-Wire `ZATCA_CSID_RENEWED` into `ZatcaOnboardingService.renewClubCsid()` — it was planned in Plan 23 but was listed as a future action. Add the audit call at the end of the renewal method:
-
-```kotlin
-auditService.log(
-    action = AuditAction.ZATCA_CSID_RENEWED,
-    entityType = "ClubZatcaCertificate",
-    entityId = cert.publicId.toString(),
-    changes = mapOf("clubId" to club.publicId.toString())
-)
-```
-
----
-
-### Step 7 — New Permission
-
-Add to permission constants and seed data:
-
-```kotlin
-// Permission code
-const val ZATCA_RETRY = "zatca:retry"
-```
-
-Seed to: **NexusAdmin** role only (platform admin can reset failed invoices; club owners cannot).
-
----
-
-### Step 8 — New Controller Endpoints
-
-Add to **`ZatcaNexusController`**:
-
-```kotlin
-/**
- * GET /api/v1/zatca/health
- * Platform-wide ZATCA health summary: KPI cards for the dashboard header.
- */
-@GetMapping("/health")
-@Operation(summary = "Get ZATCA platform health summary")
-@PreAuthorize("hasPermission(null, 'zatca:read')")
-fun getHealthSummary(): ResponseEntity<ZatcaHealthSummary> =
-    ResponseEntity.ok(healthService.getHealthSummary())
-
-/**
- * GET /api/v1/zatca/invoices/failed
- * List of permanently failed invoices with error detail.
- */
-@GetMapping("/invoices/failed")
-@Operation(summary = "List permanently failed ZATCA invoices")
-@PreAuthorize("hasPermission(null, 'zatca:read')")
-fun getFailedInvoices(): ResponseEntity<List<ZatcaFailedInvoiceResponse>> =
-    ResponseEntity.ok(healthService.getFailedInvoices())
-
-/**
- * POST /api/v1/zatca/invoices/{invoicePublicId}/retry
- * Reset a single failed invoice for the scheduler to retry.
- */
-@PostMapping("/invoices/{invoicePublicId}/retry")
-@Operation(summary = "Retry a permanently failed ZATCA invoice")
-@PreAuthorize("hasPermission(null, 'zatca:retry')")
-fun retryInvoice(
-    @PathVariable invoicePublicId: UUID
-): ResponseEntity<Map<String, String>> {
-    retryService.retryInvoice(invoicePublicId)
-    return ResponseEntity.ok(mapOf("message" to "Invoice queued for retry"))
-}
-
-/**
- * POST /api/v1/zatca/clubs/{clubPublicId}/retry-all
- * Reset all failed invoices for a specific club.
- */
-@PostMapping("/clubs/{clubPublicId}/retry-all")
-@Operation(summary = "Retry all failed ZATCA invoices for a club")
-@PreAuthorize("hasPermission(null, 'zatca:retry')")
-fun retryAllFailedForClub(
-    @PathVariable clubPublicId: UUID
-): ResponseEntity<Map<String, String>> {
-    retryService.retryAllFailedForClub(clubPublicId)
-    return ResponseEntity.ok(mapOf("message" to "All failed invoices queued for retry"))
-}
-```
-
----
-
-### Step 9 — Frontend: web-nexus ZATCA Screen Redesign
-
-The existing ZATCA management screen (from Plan 23) shows a plain club table. This step adds health cards at the top and a second tab for failed invoices.
-
-**File:** `apps/web-nexus/src/routes/zatca/index.tsx`
-
-The redesigned screen has two tabs:
-- **Tab 1: Clubs** — the existing onboarding table (unchanged), with color-coded row backgrounds based on status
-- **Tab 2: Failed Invoices** — new table of permanently failed invoices with retry actions
-
-**Health summary cards** (above the tabs, always visible):
-
-| Card | Value | Color |
-|------|-------|-------|
-| Active CSIDs | `totalActiveCsids` | green |
-| Expiring Soon (30 days) | `csidsExpiringSoon` | amber if > 0, grey if 0 |
-| Not Onboarded | `clubsNotOnboarded` | red if > 0, grey if 0 |
-| Invoices Pending | `invoicesPending` | blue |
-| Invoices Failed | `invoicesFailed` | red if > 0, grey if 0 |
-| Deadline At Risk | `invoicesDeadlineAtRisk` | red if > 0, grey if 0 |
-
-**Failed Invoices tab** columns:
-- Invoice # (or UUID if no number)
-- Club Name
-- Member Name
-- Amount (SAR)
-- Created At (relative time — "2 hours ago")
-- Retry Count
-- Last Error (truncated to 80 chars, tooltip for full text)
-- Actions: "Retry" button (calls `POST /invoices/{id}/retry`, permission-gated to `zatca:retry`)
-
-Each club row in the Clubs tab gets a "Retry All" button in the actions column if that club has failed invoices (`invoicesFailed > 0` from per-club status).
-
-**New API calls (TanStack Query):**
-
-```ts
-// GET /api/v1/zatca/health
-// GET /api/v1/zatca/invoices/failed
-// POST /api/v1/zatca/invoices/{invoicePublicId}/retry
-// POST /api/v1/zatca/clubs/{clubPublicId}/retry-all
-```
-
-Auto-refresh: health summary cards refresh every 60 seconds (same pattern as Plan 22 pending badge).
-
-**New i18n strings** (add to `ar.json` and `en.json`):
-
-```
-zatca.health.title
-zatca.health.active_csids
-zatca.health.expiring_soon
-zatca.health.not_onboarded
-zatca.health.invoices_pending
-zatca.health.invoices_failed
-zatca.health.deadline_at_risk
-zatca.tabs.clubs
-zatca.tabs.failed_invoices
-zatca.failed_invoices.invoice_number
-zatca.failed_invoices.club
-zatca.failed_invoices.member
-zatca.failed_invoices.amount
-zatca.failed_invoices.created_at
-zatca.failed_invoices.retry_count
-zatca.failed_invoices.last_error
-zatca.failed_invoices.retry
-zatca.failed_invoices.retry_all
-zatca.failed_invoices.retry_success
-zatca.failed_invoices.empty
-```
-
----
-
-### Step 10 — Tests
-
-#### Unit Tests
-
-**`ZatcaHealthServiceTest`**:
-- `getHealthSummary returns correct counts from repository mocks`
-- `getFailedInvoices maps projection to DTO correctly`
-- `expiring soon count is 0 when no CSIDs near threshold`
-
-**`ZatcaRetryServiceTest`**:
-- `retryInvoice resets zatcaRetryCount to 0 and status to generated`
-- `retryInvoice throws NOT_FOUND when invoice does not exist`
-- `retryInvoice throws CONFLICT when invoice status is not failed`
-- `retryInvoice clears zatcaLastError`
-- `retryAllFailedForClub resets all failed invoices for that club`
-- `retryAllFailedForClub does nothing when no failed invoices`
-
-**`ZatcaSchedulerAlertTest`**:
-- `alertExpiringCsids creates notification for each expiring certificate`
-- `alertExpiringCsids skips when no expiring CSIDs`
-- `alertInvoicesApproachingDeadline creates notification when count > 0`
-- `alertInvoicesApproachingDeadline skips when count is 0`
-
-#### Integration Tests (Testcontainers)
-
-**`ZatcaHealthControllerIntegrationTest`**:
-- `GET /api/v1/zatca/health returns 200 with correct shape`
-- `GET /api/v1/zatca/invoices/failed returns 200 with list`
-- `GET /api/v1/zatca/health returns 403 without zatca:read permission`
-- `POST /api/v1/zatca/invoices/{id}/retry returns 200 and resets invoice`
-- `POST /api/v1/zatca/invoices/{id}/retry returns 403 without zatca:retry permission`
-- `POST /api/v1/zatca/invoices/{id}/retry returns 409 when invoice is not in failed state`
-- `POST /api/v1/zatca/clubs/{id}/retry-all resets all failed invoices for the club`
-
-#### Frontend Tests
-
-**`zatca-health.test.tsx`**:
-- renders health summary cards with correct values
-- "Deadline At Risk" card is red when count > 0
-- "Failed Invoices" tab renders failed invoice table
-- "Retry" button calls retry endpoint and invalidates query
-- empty state shown when no failed invoices
-
----
-
-## New Endpoints Summary
-
-| Method | Path | Permission | Description |
-|--------|------|------------|-------------|
-| GET | `/api/v1/zatca/health` | `zatca:read` | Platform health summary KPIs |
-| GET | `/api/v1/zatca/invoices/failed` | `zatca:read` | List permanently failed invoices |
-| POST | `/api/v1/zatca/invoices/{id}/retry` | `zatca:retry` | Reset single failed invoice |
-| POST | `/api/v1/zatca/clubs/{id}/retry-all` | `zatca:retry` | Reset all failed invoices for a club |
-
----
-
-## Business Rules
-
-1. Only invoices with `zatcaStatus = 'failed'` can be retried — any other status returns `409 Conflict`
-2. Retrying resets `zatcaRetryCount = 0` and `zatcaStatus = 'generated'` — the scheduler picks it up within 5 minutes
-3. `zatcaLastError` is cleared on retry so the error field reflects the outcome of the next attempt
-4. The retry action does NOT immediately re-submit — it queues for the existing `@Scheduled` job
-5. `ZATCA_CSID_EXPIRING_SOON` notifications are sent to all platform users with `zatca:read` — not to club staff
-6. `ZATCA_INVOICE_DEADLINE_AT_RISK` fires hourly — deduplication check ensures only one notification per hour per state (same pattern as existing notification deduplication: check last 1 hour for same type)
-7. `alertExpiringCsids` uses the same `findExpiringSoon` query already in `ClubZatcaCertificateRepository` — no new queries needed for that method
-8. The "Retry All" action for a club requires the same `zatca:retry` permission as single retry
-
----
-
-## What Is NOT in Scope
-
-- Automatic CSID renewal — renewal still requires a human to generate an OTP from the FATOORA Portal (same flow as Plan 23). This plan only adds the alert, not automation.
-- Email notifications for CSID expiry — the notification system (Plan 21) already handles bell + drawer. Email for `ZATCA_CSID_EXPIRING_SOON` is not added here; that can be wired later.
-- Reporting for club owners — the ZATCA health data is platform-admin-only. The `ZatcaPulseController` status endpoint from Plan 23 remains the only club-facing ZATCA view.
-- Clearing `zatca_report_response` on retry — it is preserved so admins can see what ZATCA last returned even after a retry is requested.
+| Permission | Integration Specialist | Super Admin | Club Owner |
+|------------|----------------------|-------------|------------|
+| `member:import` | ✅ | — | — |
 
 ---
 
 ## Definition of Done
 
-- [ ] `ZATCA_CSID_EXPIRING_SOON` and `ZATCA_INVOICE_DEADLINE_AT_RISK` added to notification types
-- [ ] `ZatcaHealthService` compiles, all methods return correct data
-- [ ] `ZatcaRetryService` resets invoices correctly with audit logging
-- [ ] 6 new native queries added to `ClubZatcaCertificateRepository` and `InvoiceRepository` — all use `nativeQuery = true`
-- [ ] `FailedZatcaInvoiceProjection` interface defined and used by repository
-- [ ] Two new scheduler jobs in `ZatcaReportingScheduler` (expiry alert at 04:00 UTC, deadline check every hour)
-- [ ] `ZATCA_CSID_RENEWED` audit action wired into `ZatcaOnboardingService.renewClubCsid()`
-- [ ] `ZATCA_INVOICE_RETRY_REQUESTED` audit action wired into both retry methods
-- [ ] `zatca:retry` permission seeded for NexusAdmin role
-- [ ] 4 new endpoints on `ZatcaNexusController` — all with `@Operation` and `@PreAuthorize`
-- [ ] web-nexus ZATCA screen: 6 health cards visible above tabs
-- [ ] web-nexus ZATCA screen: "Failed Invoices" tab with retry buttons
-- [ ] Health cards auto-refresh every 60 seconds
+- [ ] Flyway V16 runs cleanly: `member_import_jobs` table created, `member_import_job_id` column on `members`
+- [ ] `MemberImportJob` entity + `MemberImportJobStatus` enum compile
+- [ ] `memberImportJobId` field added to `Member` entity
+- [ ] `member:import` permission constant defined and seeded to Integration Specialist
+- [ ] 4 audit actions and `MEMBER_IMPORT_COMPLETED` notification type added
+- [ ] CSV validation: file-level errors return 422 before job creation; row-level errors are collected and stored
+- [ ] Phone normalisation: `05XXXXXXXX` → `+966 5XXXXXXXX`
+- [ ] 60-second queued window: cancel during window leaves DB clean
+- [ ] Full atomic import transaction: exception mid-import = zero members written
+- [ ] Rollback: `POST /rollback` soft-deletes all members with matching `member_import_job_id`
+- [ ] Rollback blocked on non-COMPLETED jobs with 409 response
+- [ ] Cancel blocked on non-QUEUED jobs with 409 response
+- [ ] Completion fires both in-app notification and email to job creator
+- [ ] All 4 endpoints have `@Operation` and `@PreAuthorize`
+- [ ] All repository queries use `nativeQuery = true`
+- [ ] web-nexus: Import Members button visible only with `member:import` permission
+- [ ] web-nexus: job status panel polls correctly and shows cancel / rollback buttons at the right states
+- [ ] web-nexus: rollback requires confirmation dialog before calling endpoint
 - [ ] All i18n strings added in Arabic and English
-- [ ] All unit and integration tests pass
-- [ ] Backend builds with `./gradlew build` — no warnings
-- [ ] `PROJECT-STATE.md` updated: Plan 31 complete, test counts updated
-- [ ] `PLAN-zatca-health.md` deleted before merging
+- [ ] All unit tests pass
+- [ ] All integration tests pass
+- [ ] `./gradlew build` — BUILD SUCCESSFUL, no warnings
+- [ ] `npm run typecheck` — no errors
+- [ ] `PROJECT-STATE.md` updated: Plan 28 complete, test counts, V16 noted
+- [ ] `PLAN-28-csv-import.md` deleted before merging
 
-When all items are checked, confirm: **"Plan 31 — ZATCA Health Dashboard complete. X backend tests, Y frontend tests."**
-
+When all items are checked, confirm: **"Plan 28 — Bulk Member Import complete. X backend tests, Y frontend tests."**

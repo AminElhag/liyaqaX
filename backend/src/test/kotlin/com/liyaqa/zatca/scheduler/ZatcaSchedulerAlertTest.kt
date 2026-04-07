@@ -1,7 +1,6 @@
 package com.liyaqa.zatca.scheduler
 
 import com.liyaqa.invoice.InvoiceRepository
-import com.liyaqa.notification.Notification
 import com.liyaqa.notification.NotificationService
 import com.liyaqa.notification.NotificationType
 import com.liyaqa.user.UserRepository
@@ -39,13 +38,14 @@ class ZatcaSchedulerAlertTest {
 
     @BeforeEach
     fun setUp() {
-        scheduler = ZatcaReportingScheduler(
-            invoiceRepository,
-            reportingService,
-            certRepository,
-            notificationService,
-            userRepository,
-        )
+        scheduler =
+            ZatcaReportingScheduler(
+                invoiceRepository,
+                reportingService,
+                certRepository,
+                notificationService,
+                userRepository,
+            )
     }
 
     private fun testCert(daysUntilExpiry: Long = 15): ClubZatcaCertificate {
@@ -67,8 +67,12 @@ class ZatcaSchedulerAlertTest {
         scheduler.alertExpiringCsids()
 
         verify(notificationService, times(2)).create(
-            eq(1L), eq("platform"), eq(NotificationType.ZATCA_CSID_EXPIRING_SOON),
-            anyOrNull(), anyOrNull(), anyOrNull(),
+            eq(1L),
+            eq("platform"),
+            eq(NotificationType.ZATCA_CSID_EXPIRING_SOON),
+            anyOrNull(),
+            anyOrNull(),
+            anyOrNull(),
         )
     }
 
@@ -91,8 +95,12 @@ class ZatcaSchedulerAlertTest {
         scheduler.alertInvoicesApproachingDeadline()
 
         verify(notificationService).create(
-            eq(1L), eq("platform"), eq(NotificationType.ZATCA_INVOICE_DEADLINE_AT_RISK),
-            anyOrNull(), anyOrNull(), anyOrNull(),
+            eq(1L),
+            eq("platform"),
+            eq(NotificationType.ZATCA_INVOICE_DEADLINE_AT_RISK),
+            anyOrNull(),
+            anyOrNull(),
+            anyOrNull(),
         )
     }
 

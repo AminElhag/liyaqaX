@@ -166,6 +166,7 @@ class DevDataLoader(
             PermissionConstants.BRANCH_READ,
             PermissionConstants.INTEGRATION_CONFIGURE,
             PermissionConstants.INTEGRATION_READ,
+            PermissionConstants.MEMBER_IMPORT,
         )
 
     private val platformReadOnly =

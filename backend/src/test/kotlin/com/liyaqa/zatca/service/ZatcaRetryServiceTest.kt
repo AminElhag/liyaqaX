@@ -37,17 +37,18 @@ class ZatcaRetryServiceTest {
         retryCount: Int = 5,
         lastError: String? = "some error",
     ): Invoice {
-        val invoice = Invoice(
-            organizationId = 1L,
-            clubId = 1L,
-            branchId = 1L,
-            memberId = 1L,
-            paymentId = 1L,
-            invoiceNumber = "INV-2026-001",
-            subtotalHalalas = 15000L,
-            vatAmountHalalas = 2250L,
-            totalHalalas = 17250L,
-        )
+        val invoice =
+            Invoice(
+                organizationId = 1L,
+                clubId = 1L,
+                branchId = 1L,
+                memberId = 1L,
+                paymentId = 1L,
+                invoiceNumber = "INV-2026-001",
+                subtotalHalalas = 15000L,
+                vatAmountHalalas = 2250L,
+                totalHalalas = 17250L,
+            )
         invoice.zatcaStatus = status
         invoice.zatcaRetryCount = retryCount
         invoice.zatcaLastError = lastError

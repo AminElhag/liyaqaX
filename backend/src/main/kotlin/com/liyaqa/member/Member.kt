@@ -46,4 +46,6 @@ class Member(
     var joinedAt: LocalDate = LocalDate.now(),
     @Column(name = "preferred_language", length = 10)
     var preferredLanguage: String? = null,
+    @Column(name = "member_import_job_id")
+    var memberImportJobId: Long? = null,
 ) : AuditEntity()

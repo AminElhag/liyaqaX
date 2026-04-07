@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +8,9 @@ import { KpiCard } from '@/components/stats/KpiCard'
 import { PermissionGate } from '@/components/common/PermissionGate'
 import { Permission } from '@/types/permissions'
 import { formatCurrency } from '@/lib/formatCurrency'
+import { ImportMembersModal } from '@/components/members/ImportMembersModal'
+import { ImportJobStatusPanel } from '@/components/members/ImportJobStatusPanel'
+import type { MemberImportAcceptedResponse } from '@/api/memberImport'
 
 export const Route = createFileRoute(
   '/organizations/$orgId/clubs/$clubId',
@@ -32,6 +36,8 @@ function ClubDetailPage() {
   const { orgId, clubId } = Route.useParams()
   const { t, i18n } = useTranslation()
   const isAr = i18n.language === 'ar'
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
 
   const { data: club, isLoading } = useQuery({
     queryKey: ['club', orgId, clubId],
@@ -75,6 +81,16 @@ function ClubDetailPage() {
               className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               {t('common.edit')}
+            </button>
+          </PermissionGate>
+          <PermissionGate permission={Permission.MEMBER_IMPORT}>
+            <button
+              type="button"
+              data-testid="import-members-btn"
+              onClick={() => setImportModalOpen(true)}
+              className="rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+            >
+              {t('import.button')}
             </button>
           </PermissionGate>
           <PermissionGate permission={Permission.BRANCH_CREATE}>
@@ -159,6 +175,19 @@ function ClubDetailPage() {
           </div>
         )}
       </div>
+
+      <ImportJobStatusPanel
+        jobId={activeJobId}
+        clubPublicId={clubId}
+        onClear={() => setActiveJobId(null)}
+      />
+
+      <ImportMembersModal
+        clubPublicId={clubId}
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onJobCreated={(job: MemberImportAcceptedResponse) => setActiveJobId(job.jobId)}
+      />
     </div>
   )
 }

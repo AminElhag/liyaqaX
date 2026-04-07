@@ -75,4 +75,9 @@ enum class NotificationType(
         "notification.zatca_invoice_deadline.body",
         false,
     ),
+    MEMBER_IMPORT_COMPLETED(
+        "notification.member_import_completed.title",
+        "notification.member_import_completed.body",
+        true,
+    ),
 }

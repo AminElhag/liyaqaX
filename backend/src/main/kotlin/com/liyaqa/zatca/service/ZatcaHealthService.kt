@@ -25,9 +25,10 @@ class ZatcaHealthService(
             clubsNotOnboarded = certRepository.countByStatusNotAndNotDeleted("active"),
             invoicesPending = invoiceRepository.countPendingZatcaReporting(),
             invoicesFailed = invoiceRepository.countFailedZatcaReporting(),
-            invoicesDeadlineAtRisk = invoiceRepository.countInvoicesApproachingDeadline(
-                now.minus(23, ChronoUnit.HOURS),
-            ),
+            invoicesDeadlineAtRisk =
+                invoiceRepository.countInvoicesApproachingDeadline(
+                    now.minus(23, ChronoUnit.HOURS),
+                ),
         )
     }
 

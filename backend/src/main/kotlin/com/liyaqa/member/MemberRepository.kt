@@ -3,6 +3,9 @@ package com.liyaqa.member
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import java.util.Optional
 import java.util.UUID
@@ -68,6 +71,34 @@ interface MemberRepository : JpaRepository<Member, Long> {
     ): Long
 
     fun findByPublicIdAndDeletedAtIsNull(publicId: UUID): Optional<Member>
+
+    @Query(
+        value = """
+            SELECT COUNT(*) FROM members
+            WHERE phone = :phone
+              AND club_id = :clubId
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countByPhoneAndClubId(
+        @Param("phone") phone: String,
+        @Param("clubId") clubId: Long,
+    ): Long
+
+    @Modifying
+    @Query(
+        value = """
+            UPDATE members
+            SET deleted_at = NOW()
+            WHERE member_import_job_id = :jobId
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun softDeleteByImportJobId(
+        @Param("jobId") jobId: Long,
+    ): Int
 
     @org.springframework.data.jpa.repository.Query(
         value = """

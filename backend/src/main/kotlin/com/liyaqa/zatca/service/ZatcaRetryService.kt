@@ -16,8 +16,9 @@ class ZatcaRetryService(
 ) {
     @Transactional
     fun retryInvoice(invoicePublicId: UUID) {
-        val invoice = invoiceRepository.findByPublicId(invoicePublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Invoice not found") }
+        val invoice =
+            invoiceRepository.findByPublicId(invoicePublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Invoice not found") }
 
         if (invoice.zatcaStatus != "failed") {
             throw ArenaException(

@@ -46,6 +46,7 @@ object PermissionConstants {
     const val MEMBER_READ = "member:read"
     const val MEMBER_UPDATE = "member:update"
     const val MEMBER_DELETE = "member:delete"
+    const val MEMBER_IMPORT = "member:import"
 
     // ── Membership Plan ──────────────────────────────────────────────────────
     const val MEMBERSHIP_PLAN_CREATE = "membership-plan:create"

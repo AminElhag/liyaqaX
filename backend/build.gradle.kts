@@ -38,6 +38,7 @@ dependencies {
     implementation("com.itextpdf:itext-core:8.0.5")
     implementation("org.bouncycastle:bcprov-jdk15on:1.70")
     implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
+    implementation("org.apache.commons:commons-csv:1.12.0")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")

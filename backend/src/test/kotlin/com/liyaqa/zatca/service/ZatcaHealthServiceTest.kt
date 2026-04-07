@@ -48,17 +48,18 @@ class ZatcaHealthServiceTest {
 
     @Test
     fun `getFailedInvoices maps projection to DTO correctly`() {
-        val projection = object : FailedZatcaInvoiceProjection {
-            override val invoicePublicId: UUID = UUID.randomUUID()
-            override val invoiceNumber: String = "INV-2026-001"
-            override val clubName: String = "Elixir Gym"
-            override val memberName: String = "Ahmed Al-Rashidi"
-            override val amountHalalas: Long = 17250L
-            override val createdAt: Instant = Instant.parse("2026-04-07T10:00:00Z")
-            override val zatcaRetryCount: Int = 5
-            override val zatcaLastError: String = "ZATCA rejected: invalid hash"
-            override val zatcaStatus: String = "failed"
-        }
+        val projection =
+            object : FailedZatcaInvoiceProjection {
+                override val invoicePublicId: UUID = UUID.randomUUID()
+                override val invoiceNumber: String = "INV-2026-001"
+                override val clubName: String = "Elixir Gym"
+                override val memberName: String = "Ahmed Al-Rashidi"
+                override val amountHalalas: Long = 17250L
+                override val createdAt: Instant = Instant.parse("2026-04-07T10:00:00Z")
+                override val zatcaRetryCount: Int = 5
+                override val zatcaLastError: String = "ZATCA rejected: invalid hash"
+                override val zatcaStatus: String = "failed"
+            }
         whenever(invoiceRepository.findFailedZatcaInvoicesWithClub()).thenReturn(listOf(projection))
 
         val result = service.getFailedInvoices()
