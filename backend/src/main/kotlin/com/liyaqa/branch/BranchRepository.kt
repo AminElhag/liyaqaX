@@ -45,4 +45,6 @@ interface BranchRepository : JpaRepository<Branch, Long> {
         publicId: UUID,
         clubId: Long,
     ): Optional<Branch>
+
+    fun findFirstByClubIdAndDeletedAtIsNullOrderByIdAsc(clubId: Long): Optional<Branch>
 }

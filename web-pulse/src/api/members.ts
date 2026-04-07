@@ -100,12 +100,60 @@ export async function signWaiver(
   return data
 }
 
+// ── Pending members (self-registration) ────────────────────────────────────
+
+export interface PendingMemberIntent {
+  planId: string | null
+  planNameEn: string | null
+  planNameAr: string | null
+  planPriceSar: string | null
+}
+
+export interface PendingMember {
+  id: string
+  nameEn: string
+  nameAr: string
+  phone: string
+  email: string | null
+  dateOfBirth: string | null
+  gender: string | null
+  registeredAt: string
+  intent: PendingMemberIntent | null
+}
+
+export async function getPendingMembers(
+  params: { page?: number; size?: number } = {},
+): Promise<PageResponse<PendingMember>> {
+  const { data } = await apiClient.get<PageResponse<PendingMember>>(
+    '/members/pending',
+    { params },
+  )
+  return data
+}
+
+export async function activateMember(
+  id: string,
+  request: { membershipPlanId?: string },
+): Promise<void> {
+  await apiClient.post(`/members/${id}/activate`, request)
+}
+
+export async function rejectMember(
+  id: string,
+  reason: string,
+): Promise<void> {
+  await apiClient.post(`/members/${id}/reject`, { reason })
+}
+
 // ── Query key factories for TanStack Query ───────────────────────────────────
 
 export const memberKeys = {
   all: ['members'] as const,
   lists: () => [...memberKeys.all, 'list'] as const,
   list: (params: MemberListParams) => [...memberKeys.lists(), params] as const,
+  pending: (params: { page?: number; size?: number }) =>
+    [...memberKeys.all, 'pending', params] as const,
+  pendingCount: () => [...memberKeys.all, 'pending-count'] as const,
   details: () => [...memberKeys.all, 'detail'] as const,
   detail: (id: string) => [...memberKeys.details(), id] as const,
   emergencyContacts: (memberId: string) =>

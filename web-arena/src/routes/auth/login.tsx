@@ -1,8 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { apiClient } from '@/api/client'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { checkRegistrationEnabled } from '@/api/register'
 import type { OtpVerifyResponse, MemberMe, PortalSettings } from '@/types/domain'
 import type { ApiError } from '@/types/api'
 
@@ -10,7 +11,18 @@ export const Route = createFileRoute('/auth/login')({
   component: LoginPage,
 })
 
+const CLUB_ID = import.meta.env.VITE_CLUB_ID || ''
+
 function LoginPage() {
+  const [selfRegEnabled, setSelfRegEnabled] = useState(false)
+
+  useEffect(() => {
+    if (CLUB_ID) {
+      checkRegistrationEnabled(CLUB_ID)
+        .then(setSelfRegEnabled)
+        .catch(() => setSelfRegEnabled(false))
+    }
+  }, [])
   const [step, setStep] = useState<'phone' | 'otp'>('phone')
   const [phone, setPhone] = useState('+966')
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
@@ -111,6 +123,11 @@ function LoginPage() {
             >
               {loading ? t('common.loading') : t('auth.phone.sendCode')}
             </button>
+            {selfRegEnabled && (
+              <Link to="/auth/register" className="block text-sm text-blue-600 hover:underline">
+                {t('register.link')}
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-6 text-center">

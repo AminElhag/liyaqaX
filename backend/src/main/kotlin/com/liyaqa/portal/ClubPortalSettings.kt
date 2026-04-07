@@ -23,4 +23,6 @@ class ClubPortalSettings(
     var onlinePaymentEnabled: Boolean = false,
     @Column(name = "portal_message", length = 500)
     var portalMessage: String? = null,
+    @Column(name = "self_registration_enabled", nullable = false)
+    var selfRegistrationEnabled: Boolean = false,
 ) : AuditEntity()

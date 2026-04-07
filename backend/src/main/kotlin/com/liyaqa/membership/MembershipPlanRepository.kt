@@ -14,6 +14,11 @@ interface MembershipPlanRepository : JpaRepository<MembershipPlan, Long> {
         organizationId: Long,
     ): Optional<MembershipPlan>
 
+    fun findByPublicIdAndClubIdAndDeletedAtIsNull(
+        publicId: UUID,
+        clubId: Long,
+    ): Optional<MembershipPlan>
+
     fun findAllByClubIdAndDeletedAtIsNull(
         clubId: Long,
         pageable: Pageable,

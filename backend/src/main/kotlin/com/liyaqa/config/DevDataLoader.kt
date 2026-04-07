@@ -1337,6 +1337,7 @@ class DevDataLoader(
                 invoiceViewEnabled = true,
                 onlinePaymentEnabled = false,
                 portalMessage = "Welcome to Elixir Gym!",
+                selfRegistrationEnabled = true,
             ),
         )
     }
