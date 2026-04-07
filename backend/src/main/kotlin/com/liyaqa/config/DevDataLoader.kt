@@ -144,6 +144,7 @@ class DevDataLoader(
             PermissionConstants.SYSTEM_IMPERSONATE, PermissionConstants.AUDIT_READ,
             PermissionConstants.MEMBER_READ, PermissionConstants.PLATFORM_STATS_VIEW,
             PermissionConstants.ZATCA_ONBOARD, PermissionConstants.ZATCA_READ,
+            PermissionConstants.ZATCA_RETRY,
         )
 
     private val platformReadPlusImpersonate =

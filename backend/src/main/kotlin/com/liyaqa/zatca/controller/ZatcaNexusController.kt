@@ -5,8 +5,12 @@ import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.nexus.nexusContext
 import com.liyaqa.zatca.dto.OnboardingRequest
 import com.liyaqa.zatca.dto.OnboardingStatusResponse
+import com.liyaqa.zatca.dto.ZatcaFailedInvoiceResponse
+import com.liyaqa.zatca.dto.ZatcaHealthSummary
 import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
+import com.liyaqa.zatca.service.ZatcaHealthService
 import com.liyaqa.zatca.service.ZatcaOnboardingService
+import com.liyaqa.zatca.service.ZatcaRetryService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -29,6 +33,8 @@ import java.util.UUID
 @Validated
 class ZatcaNexusController(
     private val onboardingService: ZatcaOnboardingService,
+    private val healthService: ZatcaHealthService,
+    private val retryService: ZatcaRetryService,
     private val certRepository: ClubZatcaCertificateRepository,
     private val clubRepository: ClubRepository,
 ) {
@@ -100,5 +106,45 @@ class ZatcaNexusController(
         authentication.nexusContext()
         onboardingService.renewClubCsid(clubPublicId, request.otp)
         return ResponseEntity.ok(mapOf("message" to "CSID renewed successfully"))
+    }
+
+    @GetMapping("/health")
+    @Operation(summary = "Get ZATCA platform health summary")
+    @PreAuthorize("hasPermission(null, 'zatca:read')")
+    fun getHealthSummary(authentication: Authentication): ResponseEntity<ZatcaHealthSummary> {
+        authentication.nexusContext()
+        return ResponseEntity.ok(healthService.getHealthSummary())
+    }
+
+    @GetMapping("/invoices/failed")
+    @Operation(summary = "List permanently failed ZATCA invoices")
+    @PreAuthorize("hasPermission(null, 'zatca:read')")
+    fun getFailedInvoices(authentication: Authentication): ResponseEntity<List<ZatcaFailedInvoiceResponse>> {
+        authentication.nexusContext()
+        return ResponseEntity.ok(healthService.getFailedInvoices())
+    }
+
+    @PostMapping("/invoices/{invoicePublicId}/retry")
+    @Operation(summary = "Retry a permanently failed ZATCA invoice")
+    @PreAuthorize("hasPermission(null, 'zatca:retry')")
+    fun retryInvoice(
+        @PathVariable invoicePublicId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<Map<String, String>> {
+        authentication.nexusContext()
+        retryService.retryInvoice(invoicePublicId)
+        return ResponseEntity.ok(mapOf("message" to "Invoice queued for retry"))
+    }
+
+    @PostMapping("/clubs/{clubPublicId}/retry-all")
+    @Operation(summary = "Retry all failed ZATCA invoices for a club")
+    @PreAuthorize("hasPermission(null, 'zatca:retry')")
+    fun retryAllFailedForClub(
+        @PathVariable clubPublicId: UUID,
+        authentication: Authentication,
+    ): ResponseEntity<Map<String, String>> {
+        authentication.nexusContext()
+        retryService.retryAllFailedForClub(clubPublicId)
+        return ResponseEntity.ok(mapOf("message" to "All failed invoices queued for retry"))
     }
 }

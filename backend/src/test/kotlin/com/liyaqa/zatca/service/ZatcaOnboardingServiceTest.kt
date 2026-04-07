@@ -1,6 +1,7 @@
 package com.liyaqa.zatca.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.liyaqa.audit.AuditService
 import com.liyaqa.club.Club
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
@@ -33,6 +34,8 @@ class ZatcaOnboardingServiceTest {
 
     @Mock lateinit var apiClient: ZatcaApiClient
 
+    @Mock lateinit var auditService: AuditService
+
     private lateinit var service: ZatcaOnboardingService
     private val objectMapper = ObjectMapper()
 
@@ -43,7 +46,7 @@ class ZatcaOnboardingServiceTest {
         service =
             ZatcaOnboardingService(
                 clubRepository, certRepository, cryptoService,
-                encryptionService, xmlService, apiClient, "sandbox",
+                encryptionService, xmlService, apiClient, auditService, "sandbox",
             )
     }
 

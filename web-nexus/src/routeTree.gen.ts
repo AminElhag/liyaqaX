@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ZatcaRouteImport } from './routes/zatca'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RolesIndexRouteImport } from './routes/roles/index'
@@ -21,6 +22,11 @@ import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as OrganizationsOrgIdClubsClubIdRouteImport } from './routes/organizations/$orgId.clubs.$clubId'
 import { Route as OrganizationsOrgIdClubsClubIdBranchesBranchIdRouteImport } from './routes/organizations/$orgId.clubs.$clubId.branches.$branchId'
 
+const ZatcaRoute = ZatcaRouteImport.update({
+  id: '/zatca',
+  path: '/zatca',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -82,6 +88,7 @@ const OrganizationsOrgIdClubsClubIdBranchesBranchIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/zatca': typeof ZatcaRoute
   '/auth/login': typeof AuthLoginRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
@@ -95,6 +102,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/zatca': typeof ZatcaRoute
   '/auth/login': typeof AuthLoginRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/zatca': typeof ZatcaRoute
   '/auth/login': typeof AuthLoginRoute
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/audit'
+    | '/zatca'
     | '/auth/login'
     | '/members/$memberId'
     | '/organizations/$orgId'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/audit'
+    | '/zatca'
     | '/auth/login'
     | '/members/$memberId'
     | '/organizations/$orgId'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/audit'
+    | '/zatca'
     | '/auth/login'
     | '/members/$memberId'
     | '/organizations/$orgId'
@@ -164,6 +176,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
+  ZatcaRoute: typeof ZatcaRoute
   AuthLoginRoute: typeof AuthLoginRoute
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRouteWithChildren
@@ -175,6 +188,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/zatca': {
+      id: '/zatca'
+      path: '/zatca'
+      fullPath: '/zatca'
+      preLoaderRoute: typeof ZatcaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/audit': {
       id: '/audit'
       path: '/audit'
@@ -285,6 +305,7 @@ const OrganizationsOrgIdRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
+  ZatcaRoute: ZatcaRoute,
   AuthLoginRoute: AuthLoginRoute,
   MembersMemberIdRoute: MembersMemberIdRoute,
   OrganizationsOrgIdRoute: OrganizationsOrgIdRouteWithChildren,

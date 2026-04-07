@@ -148,4 +148,5 @@ object PermissionConstants {
     // ── ZATCA ─────────────────────────────────────────────────────────────────
     const val ZATCA_ONBOARD = "zatca:onboard"
     const val ZATCA_READ = "zatca:read"
+    const val ZATCA_RETRY = "zatca:retry"
 }

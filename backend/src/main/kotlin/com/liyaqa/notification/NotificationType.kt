@@ -65,4 +65,14 @@ enum class NotificationType(
         "notification.low_gx_spots.body",
         false,
     ),
+    ZATCA_CSID_EXPIRING_SOON(
+        "notification.zatca_csid_expiring.title",
+        "notification.zatca_csid_expiring.body",
+        false,
+    ),
+    ZATCA_INVOICE_DEADLINE_AT_RISK(
+        "notification.zatca_invoice_deadline.title",
+        "notification.zatca_invoice_deadline.body",
+        false,
+    ),
 }

@@ -1,1360 +1,114 @@
-# Plan 23 — ZATCA Phase 2 Integration (Fatoora API)
+# Plan 31 — ZATCA Health Dashboard & CSID Expiry Alerts
 
 ## Overview
 
-Integrate Liyaqa's backend with the ZATCA FATOORA platform to comply with Phase 2 of Saudi Arabia's e-invoicing mandate. Gym membership payments are B2C transactions, which means they are **Simplified Tax Invoices** using the **Reporting model** — sign locally with the club's Production CSID, share with buyer, then report to ZATCA within 24 hours.
+Plan 23 built the full ZATCA Phase 2 integration. This plan adds the operational safety net: proactive alerts when CSIDs are about to expire, alerts when invoices are approaching the 24-hour ZATCA reporting deadline without being reported, and a health dashboard in web-nexus that gives platform admins full visibility into every club's ZATCA status. It also adds a manual retry mechanism for permanently failed invoices.
 
-Phase 1 is already complete: invoices are generated, stored in UBL XML format, and have their `invoice_counter_value`, `previous_invoice_hash`, `zatca_uuid`, `zatca_hash`, `zatca_qr_code` fields populated. Phase 2 builds on top of that.
+**No new Flyway migration.** Everything in this plan reads from and writes to tables and columns that already exist: `club_zatca_certificates`, `invoices`, `notifications`, `audit_logs`.
 
-**Key blocker:** Each club must obtain a **Production CSID** from ZATCA before any real invoices can be reported. This requires the club's owner/accountant to log into the FATOORA Portal (via ERAD SSO) and generate a one-time OTP. The OTP is then entered into the Liyaqa admin UI to trigger the automated onboarding flow. Without a valid Production CSID per club, no invoices can be submitted.
+## What Gets Built
 
-## Architecture Summary
+### Backend
 
-```
-Club Owner  →  FATOORA Portal  →  generates OTP (one-time)
-                                              ↓
-web-nexus admin  →  enters OTP  →  liyaqa-api onboarding
-                                              ↓
-                              generates CSR (ECDSA secp256k1)
-                                              ↓
-                              POST /compliance  →  Compliance CSID
-                                              ↓
-                              POST /compliance/invoices  (3 compliance checks)
-                                              ↓
-                              POST /production/csids  →  Production CSID stored
-                                              ↓
-Invoice created  →  sign XML with CSID  →  build 9-tag QR
-                                              ↓
-                      @Scheduled job  →  POST /invoices/reporting/single
-                                              ↓
-                              zatcaStatus: reported / failed
-```
+1. **Two new scheduler jobs** added to the existing `ZatcaReportingScheduler`
+2. **`ZatcaHealthService`** — aggregates health statistics across all clubs
+3. **`ZatcaRetryService`** — resets failed invoices for manual retry
+4. **Two new endpoints** on `ZatcaNexusController` — health summary + failed invoice list + retry action
+5. **One new notification type**: `ZATCA_CSID_EXPIRING_SOON`
+6. **Two new audit actions**: `ZATCA_CSID_RENEWED` (already planned, wire it here), `ZATCA_INVOICE_RETRY_REQUESTED`
+7. **One new permission**: `zatca:retry`
 
-## ZATCA API Endpoints (Sandbox: `https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal`)
+### Frontend (web-nexus only)
 
-| API | Method | Path | Auth |
-|-----|--------|------|------|
-| Compliance CSID | POST | `/compliance` | OTP + CSR (Basic: sandbox dummy) |
-| Compliance Invoice Check | POST | `/compliance/invoices` | Basic: binarySecurityToken:secret |
-| Production CSID (Onboarding) | POST | `/production/csids` | Basic: binarySecurityToken:secret (from compliance) |
-| Production CSID (Renewal) | PATCH | `/production/csids` | Basic: binarySecurityToken:secret |
-| Reporting (Simplified) | POST | `/invoices/reporting/single` | Basic: binarySecurityToken:secret (from production) |
-| Clearance (Standard, NOT used) | POST | `/invoices/clearance/single` | — |
-
-All API calls require headers:
-- `Accept-Version: V2` (required — only valid version)
-- `Accept-Language: en` or `ar`
-
-For Reporting/Clearance: `Clearance-Status: 0` (disabled) for simplified invoices.
-
-## What Changes in Each Layer
-
-### Database (new migration: V15)
-
-**New table: `club_zatca_certificates`**
-```sql
-CREATE TABLE club_zatca_certificates (
-    id                     BIGSERIAL PRIMARY KEY,
-    public_id              UUID NOT NULL UNIQUE,
-    club_id                BIGINT NOT NULL UNIQUE REFERENCES clubs(id),
-    environment            VARCHAR(20) NOT NULL DEFAULT 'sandbox', -- 'sandbox' | 'production'
-    csr_pem                TEXT,          -- base64 PEM of the CSR (for reference)
-    private_key_encrypted  TEXT NOT NULL, -- AES-256 encrypted PKCS8 private key
-    compliance_request_id  VARCHAR(255),  -- requestID from /compliance response
-    compliance_binary_token TEXT,         -- binarySecurityToken from /compliance (used for compliance checks)
-    compliance_secret      VARCHAR(255),  -- secret from /compliance response
-    production_request_id  VARCHAR(255),  -- requestID from /production/csids
-    production_binary_token TEXT,         -- binarySecurityToken from /production/csids (used for reporting)
-    production_secret      VARCHAR(255),  -- secret from /production/csids
-    certificate_pem        TEXT,          -- full X.509 certificate PEM (decoded from binarySecurityToken)
-    serial_number          VARCHAR(255),
-    onboarding_status      VARCHAR(50) NOT NULL DEFAULT 'pending',
-                                         -- 'pending' | 'compliance_issued' | 'compliance_checked' | 'active' | 'expired' | 'revoked'
-    csid_expires_at        TIMESTAMP WITH TIME ZONE,
-    created_at             TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at             TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    deleted_at             TIMESTAMP WITH TIME ZONE
-);
-```
-
-**Modify `invoices` table** — add ZATCA Phase 2 status tracking:
-```sql
-ALTER TABLE invoices
-    ADD COLUMN zatca_status       VARCHAR(50)  DEFAULT 'generated',
-    -- 'generated' | 'signed' | 'reported' | 'failed' | 'skipped'
-    ADD COLUMN zatca_signed_xml   TEXT,        -- base64 signed XML (after ECDSA stamp)
-    ADD COLUMN zatca_reported_at  TIMESTAMP WITH TIME ZONE,
-    ADD COLUMN zatca_report_response TEXT,     -- raw JSON from ZATCA reporting API
-    ADD COLUMN zatca_retry_count  INT          DEFAULT 0,
-    ADD COLUMN zatca_last_error   TEXT;        -- last error message for diagnosis
-```
-
-> Note: `zatca_hash`, `zatca_qr_code`, `invoice_counter_value`, `previous_invoice_hash` already exist from Phase 1.
-
-### Backend — New Package `com.liyaqa.zatca`
-
-All ZATCA logic lives in a dedicated package. Never mix into existing membership/invoice packages.
-
-**Package structure:**
-```
-com.liyaqa.zatca/
-  entity/
-    ClubZatcaCertificate.kt
-  dto/
-    OnboardingRequest.kt          -- club publicId + OTP from FATOORA Portal
-    OnboardingStatusResponse.kt
-    ZatcaInvoiceReportResult.kt
-  repository/
-    ClubZatcaCertificateRepository.kt
-  service/
-    ZatcaCryptoService.kt         -- key generation, CSR building, signing
-    ZatcaXmlService.kt            -- UBL XML generation + signing
-    ZatcaQrService.kt             -- 9-tag TLV QR code builder
-    ZatcaOnboardingService.kt     -- orchestrates /compliance + /production/csids
-    ZatcaReportingService.kt      -- submits invoices to FATOORA
-    ZatcaEncryptionService.kt     -- AES-256 encryption for private key at rest
-  client/
-    ZatcaApiClient.kt             -- HTTP client wrapping FATOORA APIs
-  scheduler/
-    ZatcaReportingScheduler.kt    -- @Scheduled job: report pending invoices
-  controller/
-    ZatcaNexusController.kt       -- web-nexus endpoints (admin/platform)
-    ZatcaPulseController.kt       -- web-pulse endpoints (club staff view)
-```
+8. **ZATCA screen redesigned** — adds health summary cards at the top, color-coded status on the club table, new "Failed Invoices" tab
 
 ---
 
 ## Implementation Steps
 
-### Step 1 — Database Migration V15
+### Step 1 — New Notification Type
 
-**File:** `src/main/resources/db/migration/V15__zatca_phase2.sql`
+In `NotificationType.kt` (or wherever the enum/constants live), add:
 
-```sql
--- New table for per-club ZATCA certificates
-CREATE TABLE club_zatca_certificates (
-    id                      BIGSERIAL PRIMARY KEY,
-    public_id               UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    club_id                 BIGINT NOT NULL UNIQUE REFERENCES clubs(id),
-    environment             VARCHAR(20) NOT NULL DEFAULT 'sandbox',
-    csr_pem                 TEXT,
-    private_key_encrypted   TEXT NOT NULL DEFAULT '',
-    compliance_request_id   VARCHAR(255),
-    compliance_binary_token TEXT,
-    compliance_secret       VARCHAR(255),
-    production_request_id   VARCHAR(255),
-    production_binary_token TEXT,
-    production_secret       VARCHAR(255),
-    certificate_pem         TEXT,
-    serial_number           VARCHAR(255),
-    onboarding_status       VARCHAR(50) NOT NULL DEFAULT 'pending',
-    csid_expires_at         TIMESTAMP WITH TIME ZONE,
-    created_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    deleted_at              TIMESTAMP WITH TIME ZONE
-);
-
--- Extend invoices table for Phase 2
-ALTER TABLE invoices
-    ADD COLUMN IF NOT EXISTS zatca_status       VARCHAR(50) DEFAULT 'generated',
-    ADD COLUMN IF NOT EXISTS zatca_signed_xml   TEXT,
-    ADD COLUMN IF NOT EXISTS zatca_reported_at  TIMESTAMP WITH TIME ZONE,
-    ADD COLUMN IF NOT EXISTS zatca_report_response TEXT,
-    ADD COLUMN IF NOT EXISTS zatca_retry_count  INT DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS zatca_last_error   TEXT;
-
--- Index for the scheduler query (find unreported invoices)
-CREATE INDEX idx_invoices_zatca_status ON invoices(zatca_status)
-    WHERE deleted_at IS NULL;
-
-CREATE INDEX idx_club_zatca_certificates_club_id ON club_zatca_certificates(club_id)
-    WHERE deleted_at IS NULL;
+```kotlin
+ZATCA_CSID_EXPIRING_SOON,   // CSID expires within 30 days
+ZATCA_INVOICE_DEADLINE_AT_RISK, // invoice unreported and within 1 hour of 24h deadline
 ```
 
-**No Flyway in dev** — `ddl-auto: create-drop` in dev. Migration is for staging/prod only.
+In `NotificationTriggerService` (or `ZatcaHealthService` — see Step 2), these notifications target the **platform admin user(s)** — not club staff, not members. The notification `userId` should be set to all platform users with the `zatca:read` permission.
+
+No new `@EventListener` needed — these are **proactive scheduler-driven** notifications, same pattern as `MEMBERSHIP_EXPIRING_SOON`.
 
 ---
 
-### Step 2 — Entity and Repository
+### Step 2 — ZatcaHealthService
 
-**`ClubZatcaCertificate.kt`** — extends `AuditEntity` (gets id, publicId, timestamps, deletedAt automatically):
-
-```kotlin
-package com.liyaqa.zatca.entity
-
-import com.liyaqa.common.entity.AuditEntity
-import com.liyaqa.club.entity.Club
-import jakarta.persistence.*
-
-@Entity
-@Table(name = "club_zatca_certificates")
-class ClubZatcaCertificate(
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "club_id", nullable = false, unique = true)
-    var club: Club,
-
-    @Column(name = "environment", nullable = false)
-    var environment: String = "sandbox",
-
-    @Column(name = "csr_pem", columnDefinition = "TEXT")
-    var csrPem: String? = null,
-
-    @Column(name = "private_key_encrypted", columnDefinition = "TEXT", nullable = false)
-    var privateKeyEncrypted: String = "",
-
-    @Column(name = "compliance_request_id")
-    var complianceRequestId: String? = null,
-
-    @Column(name = "compliance_binary_token", columnDefinition = "TEXT")
-    var complianceBinaryToken: String? = null,
-
-    @Column(name = "compliance_secret")
-    var complianceSecret: String? = null,
-
-    @Column(name = "production_request_id")
-    var productionRequestId: String? = null,
-
-    @Column(name = "production_binary_token", columnDefinition = "TEXT")
-    var productionBinaryToken: String? = null,
-
-    @Column(name = "production_secret")
-    var productionSecret: String? = null,
-
-    @Column(name = "certificate_pem", columnDefinition = "TEXT")
-    var certificatePem: String? = null,
-
-    @Column(name = "serial_number")
-    var serialNumber: String? = null,
-
-    @Column(name = "onboarding_status", nullable = false)
-    var onboardingStatus: String = "pending",
-
-    @Column(name = "csid_expires_at")
-    var csidExpiresAt: java.time.Instant? = null,
-
-) : AuditEntity()
-```
-
-**`ClubZatcaCertificateRepository.kt`**:
-```kotlin
-package com.liyaqa.zatca.repository
-
-import com.liyaqa.zatca.entity.ClubZatcaCertificate
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Query
-import java.util.Optional
-import java.util.UUID
-
-interface ClubZatcaCertificateRepository : JpaRepository<ClubZatcaCertificate, Long> {
-
-    fun findByClubIdAndDeletedAtIsNull(clubId: Long): Optional<ClubZatcaCertificate>
-
-    fun findByPublicIdAndDeletedAtIsNull(publicId: UUID): Optional<ClubZatcaCertificate>
-
-    @Query(
-        value = """
-            SELECT czc.* FROM club_zatca_certificates czc
-            WHERE czc.onboarding_status = 'active'
-              AND czc.deleted_at IS NULL
-        """,
-        nativeQuery = true
-    )
-    fun findAllActive(): List<ClubZatcaCertificate>
-
-    @Query(
-        value = """
-            SELECT czc.* FROM club_zatca_certificates czc
-            WHERE czc.onboarding_status = 'active'
-              AND czc.csid_expires_at < :expiryThreshold
-              AND czc.deleted_at IS NULL
-        """,
-        nativeQuery = true
-    )
-    fun findExpiringSoon(expiryThreshold: java.time.Instant): List<ClubZatcaCertificate>
-}
-```
-
----
-
-### Step 3 — ZATCA Crypto Service
-
-**`ZatcaEncryptionService.kt`** — AES-256-GCM encryption for private keys at rest:
+**`ZatcaHealthService.kt`** in `com.liyaqa.zatca.service`:
 
 ```kotlin
 package com.liyaqa.zatca.service
 
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.stereotype.Service
-import java.util.Base64
-import javax.crypto.Cipher
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.SecretKeySpec
-import java.security.SecureRandom
-
-@Service
-class ZatcaEncryptionService(
-    @Value("\${zatca.encryption.key}") private val encryptionKeyBase64: String
-) {
-    private val GCM_TAG_LENGTH = 128
-    private val GCM_IV_LENGTH = 12
-
-    private fun getKey(): SecretKeySpec {
-        val keyBytes = Base64.getDecoder().decode(encryptionKeyBase64)
-        require(keyBytes.size == 32) { "ZATCA encryption key must be 256 bits (32 bytes)" }
-        return SecretKeySpec(keyBytes, "AES")
-    }
-
-    fun encrypt(plaintext: String): String {
-        val iv = ByteArray(GCM_IV_LENGTH).also { SecureRandom().nextBytes(it) }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, getKey(), GCMParameterSpec(GCM_TAG_LENGTH, iv))
-        val ciphertext = cipher.doFinal(plaintext.toByteArray())
-        val combined = iv + ciphertext
-        return Base64.getEncoder().encodeToString(combined)
-    }
-
-    fun decrypt(encrypted: String): String {
-        val combined = Base64.getDecoder().decode(encrypted)
-        val iv = combined.copyOfRange(0, GCM_IV_LENGTH)
-        val ciphertext = combined.copyOfRange(GCM_IV_LENGTH, combined.size)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, getKey(), GCMParameterSpec(GCM_TAG_LENGTH, iv))
-        return String(cipher.doFinal(ciphertext))
-    }
-}
-```
-
-**`ZatcaCryptoService.kt`** — key pair generation and CSR building:
-
-```kotlin
-package com.liyaqa.zatca.service
-
-import org.bouncycastle.asn1.x500.X500Name
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.openssl.jcajce.JcaPEMWriter
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder
-import org.springframework.stereotype.Service
-import java.io.StringWriter
-import java.security.KeyFactory
-import java.security.KeyPair
-import java.security.KeyPairGenerator
-import java.security.Security
-import java.security.interfaces.ECPrivateKey
-import java.security.spec.ECGenParameterSpec
-import java.security.spec.PKCS8EncodedKeySpec
-import java.util.Base64
-
-@Service
-class ZatcaCryptoService {
-
-    init {
-        if (Security.getProvider("BC") == null) {
-            Security.addProvider(BouncyCastleProvider())
-        }
-    }
-
-    /**
-     * Generates an ECDSA secp256k1 key pair — required by ZATCA.
-     */
-    fun generateKeyPair(): KeyPair {
-        val kpg = KeyPairGenerator.getInstance("EC", "BC")
-        kpg.initialize(ECGenParameterSpec("secp256k1"))
-        return kpg.generateKeyPair()
-    }
-
-    /**
-     * Exports private key as Base64 PKCS8 string for encryption and storage.
-     */
-    fun exportPrivateKeyBase64(keyPair: KeyPair): String =
-        Base64.getEncoder().encodeToString(keyPair.private.encoded)
-
-    /**
-     * Imports private key from stored Base64 PKCS8 string.
-     */
-    fun importPrivateKeyFromBase64(base64: String): ECPrivateKey {
-        val keyBytes = Base64.getDecoder().decode(base64)
-        val keySpec = PKCS8EncodedKeySpec(keyBytes)
-        return KeyFactory.getInstance("EC", "BC").generatePrivate(keySpec) as ECPrivateKey
-    }
-
-    /**
-     * Builds a ZATCA-compliant CSR.
-     * Subject fields must match exactly what is registered in FATOORA.
-     *
-     * @param vatNumber      Club's 15-digit VAT registration number
-     * @param egsSerialNumber Unique EGS unit serial number for this club (e.g. "1-Liyaqa|2-{clubPublicId}|3-gym")
-     * @param organizationName Club trade name
-     * @param countryCode    "SA"
-     * @param invoiceType    "1000" for simplified invoices (B2C)
-     */
-    fun buildCsr(
-        keyPair: KeyPair,
-        vatNumber: String,
-        egsSerialNumber: String,
-        organizationName: String,
-        countryCode: String = "SA",
-        invoiceType: String = "1000"
-    ): String {
-        // ZATCA requires specific OIDs in the CSR subject
-        // 2.16.840.1.114412.1.1 = EGS Serial Number
-        // 2.16.840.1.114412.1.5 = VAT Category
-        val subject = X500Name(
-            "CN=$egsSerialNumber,O=$organizationName,C=$countryCode," +
-            "OU=$invoiceType,2.16.840.1.114412.1.1=$egsSerialNumber," +
-            "2.16.840.1.114412.1.5=$vatNumber"
-        )
-
-        val csrBuilder = JcaPKCS10CertificationRequestBuilder(
-            subject,
-            keyPair.public
-        )
-
-        val signer = JcaContentSignerBuilder("SHA256withECDSA")
-            .setProvider("BC")
-            .build(keyPair.private)
-
-        val csr = csrBuilder.build(signer)
-
-        val sw = StringWriter()
-        JcaPEMWriter(sw).use { writer ->
-            writer.writeObject(csr)
-        }
-        return sw.toString()
-    }
-
-    /**
-     * Signs data with the club's private key using SHA256withECDSA.
-     * Used for the invoice digital signature.
-     */
-    fun signData(privateKeyBase64: String, data: ByteArray): ByteArray {
-        val privateKey = importPrivateKeyFromBase64(privateKeyBase64)
-        val signer = java.security.Signature.getInstance("SHA256withECDSA", "BC")
-        signer.initSign(privateKey)
-        signer.update(data)
-        return signer.sign()
-    }
-}
-```
-
-> **Dependency to add to `build.gradle.kts`:**
-> ```kotlin
-> implementation("org.bouncycastle:bcprov-jdk15on:1.70")
-> implementation("org.bouncycastle:bcpkix-jdk15on:1.70")
-> ```
-
----
-
-### Step 4 — ZATCA API Client
-
-**`ZatcaApiClient.kt`** — wraps all FATOORA REST calls:
-
-```kotlin
-package com.liyaqa.zatca.client
-
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.*
-import org.springframework.stereotype.Component
-import org.springframework.web.client.RestTemplate
-import java.util.Base64
-
-@Component
-class ZatcaApiClient(
-    private val objectMapper: ObjectMapper,
-    @Value("\${zatca.api.base-url}") private val baseUrl: String
-) {
-    private val restTemplate = RestTemplate()
-
-    /**
-     * POST /compliance — issues a Compliance CSID.
-     * Auth: sandbox uses dummy credentials; production uses actual ERAD OTP.
-     * Body: { "csr": "<base64 PEM CSR>" }
-     * Response: { requestID, binarySecurityToken, secret, ... }
-     */
-    fun issuanceComplianceCsid(csrBase64: String, otp: String): JsonNode {
-        val headers = buildHeaders(null, null, otp)
-        val body = mapOf("csr" to csrBase64)
-        return post("$baseUrl/compliance", headers, body)
-    }
-
-    /**
-     * POST /compliance/invoices — compliance check (run 3 times with different invoice types).
-     * Auth: binarySecurityToken:secret from compliance step.
-     */
-    fun complianceInvoiceCheck(
-        binarySecurityToken: String,
-        secret: String,
-        invoiceHash: String,
-        uuid: String,
-        invoiceBase64: String
-    ): JsonNode {
-        val headers = buildHeaders(binarySecurityToken, secret, null)
-        val body = mapOf(
-            "invoiceHash" to invoiceHash,
-            "uuid" to uuid,
-            "invoice" to invoiceBase64
-        )
-        return post("$baseUrl/compliance/invoices", headers, body)
-    }
-
-    /**
-     * POST /production/csids — issues a Production CSID.
-     * Auth: binarySecurityToken:secret from compliance step.
-     * Body: { "compliance_request_id": "<requestID from compliance>" }
-     */
-    fun issuanceProductionCsid(
-        complianceBinaryToken: String,
-        complianceSecret: String,
-        complianceRequestId: String
-    ): JsonNode {
-        val headers = buildHeaders(complianceBinaryToken, complianceSecret, null)
-        val body = mapOf("compliance_request_id" to complianceRequestId)
-        return post("$baseUrl/production/csids", headers, body)
-    }
-
-    /**
-     * PATCH /production/csids — renews an existing Production CSID.
-     */
-    fun renewProductionCsid(
-        complianceBinaryToken: String,
-        complianceSecret: String,
-        otp: String,
-        csrBase64: String
-    ): JsonNode {
-        val headers = buildHeaders(complianceBinaryToken, complianceSecret, otp)
-        val body = mapOf("csr" to csrBase64)
-        return patch("$baseUrl/production/csids", headers, body)
-    }
-
-    /**
-     * POST /invoices/reporting/single — reports a simplified invoice.
-     * Auth: binarySecurityToken:secret from Production CSID.
-     * Clearance-Status: 0 (disabled) for simplified B2C invoices.
-     */
-    fun reportSimplifiedInvoice(
-        productionBinaryToken: String,
-        productionSecret: String,
-        invoiceHash: String,
-        uuid: String,
-        invoiceBase64: String
-    ): JsonNode {
-        val headers = buildHeaders(productionBinaryToken, productionSecret, null)
-        headers["Clearance-Status"] = listOf("0")  // 0 = reporting (simplified), 1 = clearance (standard)
-        val body = mapOf(
-            "invoiceHash" to invoiceHash,
-            "uuid" to uuid,
-            "invoice" to invoiceBase64
-        )
-        return post("$baseUrl/invoices/reporting/single", headers, body)
-    }
-
-    private fun buildHeaders(
-        binaryToken: String?,
-        secret: String?,
-        otp: String?
-    ): HttpHeaders {
-        val headers = HttpHeaders()
-        headers.contentType = MediaType.APPLICATION_JSON
-        headers["Accept-Version"] = listOf("V2")
-        headers["Accept-Language"] = listOf("en")
-
-        if (binaryToken != null && secret != null) {
-            val credentials = "$binaryToken:$secret"
-            val encoded = Base64.getEncoder().encodeToString(credentials.toByteArray())
-            headers["Authorization"] = listOf("Basic $encoded")
-        }
-        if (otp != null) {
-            headers["OTP"] = listOf(otp)
-        }
-        return headers
-    }
-
-    private fun post(url: String, headers: HttpHeaders, body: Any): JsonNode {
-        val entity = HttpEntity(objectMapper.writeValueAsString(body), headers)
-        val response = restTemplate.exchange(url, HttpMethod.POST, entity, String::class.java)
-        return objectMapper.readTree(response.body)
-    }
-
-    private fun patch(url: String, headers: HttpHeaders, body: Any): JsonNode {
-        val entity = HttpEntity(objectMapper.writeValueAsString(body), headers)
-        val response = restTemplate.exchange(url, HttpMethod.PATCH, entity, String::class.java)
-        return objectMapper.readTree(response.body)
-    }
-}
-```
-
----
-
-### Step 5 — Onboarding Service
-
-**`ZatcaOnboardingService.kt`** — orchestrates the full onboarding flow:
-
-```kotlin
-package com.liyaqa.zatca.service
-
-import com.liyaqa.common.exception.ArenaException
-import com.liyaqa.zatca.client.ZatcaApiClient
-import com.liyaqa.zatca.entity.ClubZatcaCertificate
+import com.liyaqa.zatca.dto.ZatcaHealthSummary
+import com.liyaqa.zatca.dto.ZatcaFailedInvoiceResponse
 import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
-import com.liyaqa.club.repository.ClubRepository
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.HttpStatus
+import com.liyaqa.invoice.repository.InvoiceRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import java.util.Base64
-import java.util.UUID
+import java.time.temporal.ChronoUnit
 
 @Service
-class ZatcaOnboardingService(
-    private val clubRepository: ClubRepository,
+@Transactional(readOnly = true)
+class ZatcaHealthService(
     private val certRepository: ClubZatcaCertificateRepository,
-    private val cryptoService: ZatcaCryptoService,
-    private val encryptionService: ZatcaEncryptionService,
-    private val xmlService: ZatcaXmlService,
-    private val apiClient: ZatcaApiClient,
-    @Value("\${zatca.environment}") private val environment: String  // "sandbox" | "production"
+    private val invoiceRepository: InvoiceRepository
 ) {
 
     /**
-     * Full onboarding: generates keys, builds CSR, calls /compliance,
-     * runs compliance checks, calls /production/csids.
-     *
-     * Called by the platform admin from web-nexus after the club owner
-     * generates an OTP on the FATOORA Portal.
+     * Returns a platform-wide health summary across all clubs.
      */
-    @Transactional
-    fun onboardClub(clubPublicId: UUID, otp: String) {
-        val club = clubRepository.findByPublicIdAndDeletedAtIsNull(clubPublicId)
-            ?: throw ArenaException("Club not found", HttpStatus.NOT_FOUND)
+    fun getHealthSummary(): ZatcaHealthSummary {
+        val now = Instant.now()
+        val thirtyDaysFromNow = now.plus(30, ChronoUnit.DAYS)
 
-        // Prevent double onboarding
-        certRepository.findByClubIdAndDeletedAtIsNull(club.id!!).ifPresent { existing ->
-            if (existing.onboardingStatus == "active") {
-                throw ArenaException("Club already has an active CSID", HttpStatus.CONFLICT)
-            }
-        }
-
-        // 1. Generate ECDSA secp256k1 key pair
-        val keyPair = cryptoService.generateKeyPair()
-        val privateKeyBase64 = cryptoService.exportPrivateKeyBase64(keyPair)
-        val privateKeyEncrypted = encryptionService.encrypt(privateKeyBase64)
-
-        // 2. Build EGS serial number (unique per club unit)
-        // Format: "1-{solutionName}|2-{vatNumber}|3-{unitIdentifier}"
-        val egsSerialNumber = "1-Liyaqa|2-${club.vatNumber}|3-gym-${club.publicId}"
-
-        // 3. Build CSR
-        val csrPem = cryptoService.buildCsr(
-            keyPair = keyPair,
-            vatNumber = club.vatNumber ?: throw ArenaException("Club VAT number is required", HttpStatus.BAD_REQUEST),
-            egsSerialNumber = egsSerialNumber,
-            organizationName = club.nameEn ?: club.nameAr
-        )
-        val csrBase64 = Base64.getEncoder().encodeToString(csrPem.toByteArray())
-
-        // 4. Save preliminary record
-        val cert = certRepository.findByClubIdAndDeletedAtIsNull(club.id!!).orElse(
-            ClubZatcaCertificate(club = club, environment = environment)
-        ).apply {
-            this.csrPem = csrPem
-            this.privateKeyEncrypted = privateKeyEncrypted
-            this.onboardingStatus = "pending"
-        }
-        certRepository.save(cert)
-
-        // 5. Call /compliance — issue Compliance CSID
-        val complianceResponse = apiClient.issuanceComplianceCsid(csrBase64, otp)
-        val complianceRequestId = complianceResponse.get("requestID").asText()
-        val complianceBinaryToken = complianceResponse.get("binarySecurityToken").asText()
-        val complianceSecret = complianceResponse.get("secret").asText()
-
-        cert.complianceRequestId = complianceRequestId
-        cert.complianceBinaryToken = complianceBinaryToken
-        cert.complianceSecret = complianceSecret
-        cert.onboardingStatus = "compliance_issued"
-        certRepository.save(cert)
-
-        // 6. Run 3 compliance invoice checks
-        // ZATCA requires submitting: 1 standard, 1 simplified, 1 credit/debit note
-        // We generate dummy compliance invoices using the XML service
-        runComplianceChecks(cert, club, complianceBinaryToken, complianceSecret, keyPair, privateKeyBase64)
-
-        cert.onboardingStatus = "compliance_checked"
-        certRepository.save(cert)
-
-        // 7. Call /production/csids — issue Production CSID
-        val productionResponse = apiClient.issuanceProductionCsid(
-            complianceBinaryToken = complianceBinaryToken,
-            complianceSecret = complianceSecret,
-            complianceRequestId = complianceRequestId
+        val totalActive = certRepository.countByOnboardingStatusAndDeletedAtIsNull("active")
+        val expiringSoon = certRepository.countExpiringSoon(thirtyDaysFromNow)
+        val notOnboarded = certRepository.countByOnboardingStatusNotAndDeletedAtIsNull("active")
+        val pendingInvoices = invoiceRepository.countPendingZatcaReporting()
+        val failedInvoices = invoiceRepository.countFailedZatcaReporting()
+        val deadlineAtRisk = invoiceRepository.countInvoicesApproachingDeadline(
+            now.minus(23, ChronoUnit.HOURS)
         )
 
-        val productionBinaryToken = productionResponse.get("binarySecurityToken").asText()
-        val productionSecret = productionResponse.get("secret").asText()
-        val productionRequestId = productionResponse.get("requestID").asText()
-
-        // Parse certificate for expiry date
-        val certPem = String(Base64.getDecoder().decode(productionBinaryToken))
-        val expiryDate = parseCertificateExpiry(certPem)
-
-        cert.productionRequestId = productionRequestId
-        cert.productionBinaryToken = productionBinaryToken
-        cert.productionSecret = productionSecret
-        cert.certificatePem = certPem
-        cert.csidExpiresAt = expiryDate
-        cert.onboardingStatus = "active"
-        certRepository.save(cert)
+        return ZatcaHealthSummary(
+            totalActiveCsids = totalActive,
+            csidsExpiringSoon = expiringSoon,
+            clubsNotOnboarded = notOnboarded,
+            invoicesPending = pendingInvoices,
+            invoicesFailed = failedInvoices,
+            invoicesDeadlineAtRisk = deadlineAtRisk
+        )
     }
 
-    private fun runComplianceChecks(
-        cert: ClubZatcaCertificate,
-        club: com.liyaqa.club.entity.Club,
-        binaryToken: String,
-        secret: String,
-        keyPair: java.security.KeyPair,
-        privateKeyBase64: String
-    ) {
-        // Generate 3 dummy compliance invoices (simplified, standard, credit note)
-        // These are test invoices ONLY — not real invoices, not stored in the invoice table
-        val complianceInvoices = xmlService.generateComplianceInvoices(club, keyPair, privateKeyBase64)
-        complianceInvoices.forEach { (invoiceHash, uuid, invoiceBase64) ->
-            val result = apiClient.complianceInvoiceCheck(binaryToken, secret, invoiceHash, uuid, invoiceBase64)
-            val status = result.get("validationResults")?.get("status")?.asText()
-            if (status != "PASS") {
-                throw ArenaException(
-                    "ZATCA compliance check failed: ${result.toPrettyString()}",
-                    HttpStatus.BAD_REQUEST
+    /**
+     * Returns list of permanently failed invoices with enough detail for
+     * platform admin to diagnose and retry.
+     */
+    fun getFailedInvoices(): List<ZatcaFailedInvoiceResponse> {
+        return invoiceRepository.findFailedZatcaInvoicesWithClub()
+            .map { row ->
+                ZatcaFailedInvoiceResponse(
+                    invoicePublicId = row.invoicePublicId,
+                    invoiceNumber = row.invoiceNumber,
+                    clubName = row.clubName,
+                    memberName = row.memberName,
+                    amountSar = "%.2f".format(row.amountHalalas / 100.0),
+                    createdAt = row.createdAt.toString(),
+                    zatcaRetryCount = row.zatcaRetryCount,
+                    zatcaLastError = row.zatcaLastError,
+                    zatcaStatus = row.zatcaStatus
                 )
             }
-        }
-    }
-
-    private fun parseCertificateExpiry(certPem: String): Instant {
-        // Parse X.509 certificate to extract notAfter date
-        val certFactory = java.security.cert.CertificateFactory.getInstance("X.509")
-        val cert = certFactory.generateCertificate(certPem.byteInputStream())
-                as java.security.cert.X509Certificate
-        return cert.notAfter.toInstant()
-    }
-
-    /**
-     * Renew a CSID that is expiring or expired.
-     * Requires a new OTP from FATOORA Portal.
-     */
-    @Transactional
-    fun renewClubCsid(clubPublicId: UUID, otp: String) {
-        val club = clubRepository.findByPublicIdAndDeletedAtIsNull(clubPublicId)
-            ?: throw ArenaException("Club not found", HttpStatus.NOT_FOUND)
-
-        val cert = certRepository.findByClubIdAndDeletedAtIsNull(club.id!!)
-            .orElseThrow { ArenaException("No CSID found for club", HttpStatus.NOT_FOUND) }
-
-        // Generate new key pair and CSR for renewal
-        val newKeyPair = cryptoService.generateKeyPair()
-        val newPrivateKeyBase64 = cryptoService.exportPrivateKeyBase64(newKeyPair)
-        val egsSerialNumber = "1-Liyaqa|2-${club.vatNumber}|3-gym-${club.publicId}"
-        val csrPem = cryptoService.buildCsr(newKeyPair, club.vatNumber!!, egsSerialNumber, club.nameEn ?: club.nameAr)
-        val csrBase64 = Base64.getEncoder().encodeToString(csrPem.toByteArray())
-
-        val renewalResponse = apiClient.renewProductionCsid(
-            complianceBinaryToken = cert.complianceBinaryToken!!,
-            complianceSecret = cert.complianceSecret!!,
-            otp = otp,
-            csrBase64 = csrBase64
-        )
-
-        val newBinaryToken = renewalResponse.get("binarySecurityToken").asText()
-        val newSecret = renewalResponse.get("secret").asText()
-        val certPem = String(Base64.getDecoder().decode(newBinaryToken))
-
-        cert.privateKeyEncrypted = encryptionService.encrypt(newPrivateKeyBase64)
-        cert.csrPem = csrPem
-        cert.productionBinaryToken = newBinaryToken
-        cert.productionSecret = newSecret
-        cert.certificatePem = certPem
-        cert.csidExpiresAt = parseCertificateExpiry(certPem)
-        cert.onboardingStatus = "active"
-        certRepository.save(cert)
-    }
-}
-```
-
----
-
-### Step 6 — XML and QR Code Service
-
-**`ZatcaXmlService.kt`** — generates and signs UBL XML invoices:
-
-The XML structure is a UBL 2.1 document. For Phase 2 Simplified Tax Invoices, the key changes vs Phase 1:
-- Add `<cac:Signature>` element with ECDSA signature
-- Embed `<cac:SignatoryParty>` with club's X.509 certificate
-- Include `<ds:SignatureValue>` with the ECDSA signature over the invoice hash
-
-```kotlin
-package com.liyaqa.zatca.service
-
-import org.springframework.stereotype.Service
-import java.security.KeyPair
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Base64
-import java.util.UUID
-
-@Service
-class ZatcaXmlService(
-    private val cryptoService: ZatcaCryptoService
-) {
-
-    /**
-     * Generates the signed UBL XML for a real invoice.
-     * Signs the invoice hash with the club's private key.
-     * Returns base64-encoded signed XML.
-     */
-    fun signInvoiceXml(
-        invoiceXml: String,        // The Phase 1 generated XML
-        invoiceHash: String,       // SHA-256 hash from Phase 1 (hex string)
-        privateKeyBase64: String,  // Decrypted private key
-        certificatePem: String     // Club's X.509 PEM certificate
-    ): String {
-        // Convert hash from hex to bytes, sign with private key
-        val hashBytes = invoiceHash.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val signatureBytes = cryptoService.signData(privateKeyBase64, hashBytes)
-        val signatureBase64 = Base64.getEncoder().encodeToString(signatureBytes)
-
-        // Embed signature into XML (inject into existing <cac:Signature> placeholder)
-        val certBase64 = Base64.getEncoder().encodeToString(
-            certificatePem.replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
-                .replace("\n", "")
-                .toByteArray()
-        )
-
-        val signedXml = invoiceXml
-            .replace("{{SIGNATURE_VALUE}}", signatureBase64)
-            .replace("{{CERTIFICATE}}", certBase64)
-
-        return Base64.getEncoder().encodeToString(signedXml.toByteArray())
-    }
-
-    /**
-     * Generates 3 dummy compliance invoices required by ZATCA onboarding.
-     * Returns list of (invoiceHash, uuid, base64XML) triples.
-     */
-    fun generateComplianceInvoices(
-        club: com.liyaqa.club.entity.Club,
-        keyPair: KeyPair,
-        privateKeyBase64: String
-    ): List<Triple<String, String, String>> {
-        return listOf(
-            generateComplianceInvoice(club, "388", keyPair, privateKeyBase64),  // Simplified Tax Invoice
-            generateComplianceInvoice(club, "383", keyPair, privateKeyBase64),  // Credit Note
-            generateComplianceInvoice(club, "381", keyPair, privateKeyBase64)   // Standard Tax Invoice
-        )
-    }
-
-    private fun generateComplianceInvoice(
-        club: com.liyaqa.club.entity.Club,
-        invoiceTypeCode: String,
-        keyPair: KeyPair,
-        privateKeyBase64: String
-    ): Triple<String, String, String> {
-        val uuid = UUID.randomUUID().toString()
-        val now = ZonedDateTime.now()
-        val dateStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-        val timeStr = now.format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-
-        // Build minimal compliant UBL XML for compliance checking
-        // In production this is identical structure to the real invoice XML
-        val xml = buildMinimalComplianceXml(
-            uuid = uuid,
-            invoiceTypeCode = invoiceTypeCode,
-            issueDate = dateStr,
-            issueTime = timeStr,
-            vatNumber = club.vatNumber ?: "300000000000003",
-            sellerName = club.nameEn ?: club.nameAr,
-            subtotalHalalas = 10000L,  // 100 SAR dummy amount
-            vatHalalas = 1500L,        // 15 SAR = 15% VAT
-            totalHalalas = 11500L
-        )
-
-        // Hash and sign
-        val xmlBytes = xml.toByteArray()
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(xmlBytes)
-        val hashBase64 = Base64.getEncoder().encodeToString(hashBytes)
-        val xmlBase64 = Base64.getEncoder().encodeToString(xmlBytes)
-
-        return Triple(hashBase64, uuid, xmlBase64)
-    }
-
-    private fun buildMinimalComplianceXml(
-        uuid: String,
-        invoiceTypeCode: String,
-        issueDate: String,
-        issueTime: String,
-        vatNumber: String,
-        sellerName: String,
-        subtotalHalalas: Long,
-        vatHalalas: Long,
-        totalHalalas: Long
-    ): String {
-        val subtotalSar = "%.2f".format(subtotalHalalas / 100.0)
-        val vatSar = "%.2f".format(vatHalalas / 100.0)
-        val totalSar = "%.2f".format(totalHalalas / 100.0)
-
-        // Minimal UBL 2.1 XML — full implementation must follow ZATCA XML Implementation Standard
-        // All required namespaces, elements, and field values per ZATCA Data Dictionary
-        return """<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
-         xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"
-         xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
-  <cbc:ProfileID>reporting:1.0</cbc:ProfileID>
-  <cbc:ID>COMPLIANCE-$uuid</cbc:ID>
-  <cbc:UUID>$uuid</cbc:UUID>
-  <cbc:IssueDate>$issueDate</cbc:IssueDate>
-  <cbc:IssueTime>$issueTime</cbc:IssueTime>
-  <cbc:InvoiceTypeCode name="0200000">$invoiceTypeCode</cbc:InvoiceTypeCode>
-  <cbc:DocumentCurrencyCode>SAR</cbc:DocumentCurrencyCode>
-  <cbc:TaxCurrencyCode>SAR</cbc:TaxCurrencyCode>
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID schemeID="CRN">$vatNumber</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PostalAddress>
-        <cbc:StreetName>Main Street</cbc:StreetName>
-        <cbc:CityName>Riyadh</cbc:CityName>
-        <cac:Country><cbc:IdentificationCode>SA</cbc:IdentificationCode></cac:Country>
-      </cac:PostalAddress>
-      <cac:PartyTaxScheme>
-        <cbc:CompanyID>$vatNumber</cbc:CompanyID>
-        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
-      </cac:PartyTaxScheme>
-      <cac:PartyLegalEntity><cbc:RegistrationName>$sellerName</cbc:RegistrationName></cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-  <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="SAR">$vatSar</cbc:TaxAmount>
-  </cac:TaxTotal>
-  <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="SAR">$subtotalSar</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="SAR">$subtotalSar</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="SAR">$totalSar</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="SAR">$totalSar</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-</Invoice>"""
-    }
-}
-```
-
-**`ZatcaQrService.kt`** — builds the 9-tag TLV QR code for Phase 2:
-
-```kotlin
-package com.liyaqa.zatca.service
-
-import org.springframework.stereotype.Service
-import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
-import java.util.Base64
-
-@Service
-class ZatcaQrService {
-
-    /**
-     * Builds the 9-tag TLV QR code for Phase 2 Simplified Tax Invoices.
-     *
-     * Phase 1 had 5 tags. Phase 2 adds:
-     * Tag 6: Digital signature (ECDSA signature of invoice hash)
-     * Tag 7: Public key (DER encoded)
-     * Tag 8: Certificate hash (SHA-256 of the certificate)
-     * Tag 9: Certificate raw (the Compliance Stamp — PIH signing chain)  [optional]
-     */
-    fun buildPhase2QrCode(
-        sellerName: String,
-        vatNumber: String,
-        timestamp: String,       // ISO format: "2021-01-01T00:00:00Z"
-        totalWithVat: String,    // "250.00" (SAR decimal)
-        vatAmount: String,       // "32.61"
-        digitalSignatureBase64: String,
-        publicKeyDerBase64: String,
-        certificatePem: String
-    ): String {
-        val baos = ByteArrayOutputStream()
-
-        // Tag 1: Seller name
-        writeTlv(baos, 1, sellerName.toByteArray(Charsets.UTF_8))
-        // Tag 2: VAT Registration Number
-        writeTlv(baos, 2, vatNumber.toByteArray(Charsets.UTF_8))
-        // Tag 3: Timestamp
-        writeTlv(baos, 3, timestamp.toByteArray(Charsets.UTF_8))
-        // Tag 4: Invoice total with VAT
-        writeTlv(baos, 4, totalWithVat.toByteArray(Charsets.UTF_8))
-        // Tag 5: VAT amount
-        writeTlv(baos, 5, vatAmount.toByteArray(Charsets.UTF_8))
-        // Tag 6: Digital signature (ECDSA)
-        writeTlv(baos, 6, Base64.getDecoder().decode(digitalSignatureBase64))
-        // Tag 7: Public key (DER)
-        writeTlv(baos, 7, Base64.getDecoder().decode(publicKeyDerBase64))
-        // Tag 8: Certificate SHA-256 hash
-        val certBytes = certificatePem.toByteArray()
-        val certHash = MessageDigest.getInstance("SHA-256").digest(certBytes)
-        writeTlv(baos, 8, certHash)
-
-        return Base64.getEncoder().encodeToString(baos.toByteArray())
-    }
-
-    private fun writeTlv(baos: ByteArrayOutputStream, tag: Int, value: ByteArray) {
-        baos.write(tag)
-        baos.write(value.size)
-        baos.write(value)
-    }
-}
-```
-
----
-
-### Step 7 — Reporting Service and Scheduler
-
-**`ZatcaReportingService.kt`**:
-
-```kotlin
-package com.liyaqa.zatca.service
-
-import com.liyaqa.invoice.repository.InvoiceRepository
-import com.liyaqa.zatca.client.ZatcaApiClient
-import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
-import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
-
-@Service
-class ZatcaReportingService(
-    private val invoiceRepository: InvoiceRepository,
-    private val certRepository: ClubZatcaCertificateRepository,
-    private val xmlService: ZatcaXmlService,
-    private val qrService: ZatcaQrService,
-    private val encryptionService: ZatcaEncryptionService,
-    private val apiClient: ZatcaApiClient
-) {
-    private val log = LoggerFactory.getLogger(ZatcaReportingService::class.java)
-    private val MAX_RETRIES = 5
-
-    /**
-     * Reports a single invoice to ZATCA.
-     * Called by the scheduler for pending invoices.
-     */
-    @Transactional
-    fun reportInvoice(invoiceId: Long) {
-        val invoice = invoiceRepository.findById(invoiceId).orElseThrow {
-            IllegalStateException("Invoice not found: $invoiceId")
-        }
-
-        if (invoice.zatcaStatus == "reported") return
-
-        val club = invoice.membership?.plan?.club
-            ?: throw IllegalStateException("Invoice has no associated club: $invoiceId")
-
-        val cert = certRepository.findByClubIdAndDeletedAtIsNull(club.id!!)
-            .orElse(null)
-
-        if (cert == null || cert.onboardingStatus != "active") {
-            // Club not onboarded yet — skip gracefully
-            invoice.zatcaStatus = "skipped"
-            invoice.zatcaLastError = "Club not onboarded for ZATCA Phase 2"
-            invoiceRepository.save(invoice)
-            return
-        }
-
-        try {
-            // Decrypt private key
-            val privateKeyBase64 = encryptionService.decrypt(cert.privateKeyEncrypted)
-
-            // Build signed XML (Phase 1 XML already exists in invoice.zatcaXml or regenerate)
-            val signedXmlBase64 = xmlService.signInvoiceXml(
-                invoiceXml = invoice.zatcaXml ?: generateInvoiceXml(invoice),
-                invoiceHash = invoice.zatcaHash ?: "",
-                privateKeyBase64 = privateKeyBase64,
-                certificatePem = cert.certificatePem ?: ""
-            )
-            invoice.zatcaSignedXml = signedXmlBase64
-            invoice.zatcaStatus = "signed"
-            invoiceRepository.save(invoice)
-
-            // Submit to ZATCA
-            val response = apiClient.reportSimplifiedInvoice(
-                productionBinaryToken = cert.productionBinaryToken!!,
-                productionSecret = cert.productionSecret!!,
-                invoiceHash = invoice.zatcaHash ?: "",
-                uuid = invoice.zatcaUuid ?: invoice.publicId.toString(),
-                invoiceBase64 = signedXmlBase64
-            )
-
-            val reportingStatus = response.get("reportingStatus")?.asText()
-            val validationStatus = response.get("validationResults")?.get("status")?.asText()
-
-            if (reportingStatus == "REPORTED" || validationStatus == "PASS") {
-                invoice.zatcaStatus = "reported"
-                invoice.zatcaReportedAt = Instant.now()
-                invoice.zatcaReportResponse = response.toString()
-                log.info("Invoice {} reported to ZATCA successfully", invoice.publicId)
-            } else {
-                throw RuntimeException("ZATCA returned non-success: ${response.toPrettyString()}")
-            }
-
-        } catch (ex: Exception) {
-            invoice.zatcaRetryCount = (invoice.zatcaRetryCount ?: 0) + 1
-            invoice.zatcaLastError = ex.message?.take(1000)
-            invoice.zatcaStatus = if ((invoice.zatcaRetryCount ?: 0) >= MAX_RETRIES) "failed" else "generated"
-            log.error("ZATCA reporting failed for invoice {}: {}", invoice.publicId, ex.message)
-        }
-
-        invoiceRepository.save(invoice)
-    }
-
-    private fun generateInvoiceXml(invoice: com.liyaqa.invoice.entity.Invoice): String {
-        // Re-generate invoice XML if not stored from Phase 1
-        // This is a fallback — Phase 1 should already store zatcaXml
-        throw IllegalStateException("Invoice XML not found for invoice ${invoice.publicId}. Phase 1 must store zatcaXml.")
-    }
-}
-```
-
-**`ZatcaReportingScheduler.kt`**:
-
-```kotlin
-package com.liyaqa.zatca.scheduler
-
-import com.liyaqa.invoice.repository.InvoiceRepository
-import com.liyaqa.zatca.service.ZatcaReportingService
-import org.slf4j.LoggerFactory
-import org.springframework.scheduling.annotation.Scheduled
-import org.springframework.stereotype.Component
-
-@Component
-class ZatcaReportingScheduler(
-    private val invoiceRepository: InvoiceRepository,
-    private val reportingService: ZatcaReportingService
-) {
-    private val log = LoggerFactory.getLogger(ZatcaReportingScheduler::class.java)
-
-    /**
-     * Every 5 minutes: report any invoices that are signed but not yet reported.
-     * Also retries failed invoices (up to MAX_RETRIES).
-     *
-     * ZATCA requires simplified invoices to be reported within 24 hours of issuance.
-     * Running every 5 minutes gives ample time for retries while meeting the deadline.
-     */
-    @Scheduled(fixedDelay = 5 * 60 * 1000) // every 5 minutes
-    fun reportPendingInvoices() {
-        val pending = invoiceRepository.findPendingZatcaReporting()
-        if (pending.isEmpty()) return
-
-        log.info("ZATCA scheduler: {} invoices pending reporting", pending.size)
-        pending.forEach { invoiceId ->
-            try {
-                reportingService.reportInvoice(invoiceId)
-            } catch (ex: Exception) {
-                log.error("Unexpected error reporting invoice {}: {}", invoiceId, ex.message)
-            }
-        }
-    }
-
-    /**
-     * Daily at 6am: alert on invoices that failed all retries.
-     * These need manual intervention.
-     */
-    @Scheduled(cron = "0 0 6 * * *")
-    fun alertFailedInvoices() {
-        val failed = invoiceRepository.findFailedZatcaReporting()
-        if (failed.isNotEmpty()) {
-            log.error("ZATCA ALERT: {} invoices permanently failed reporting. Manual review required.", failed.size)
-            // TODO: integrate with notification system (Plan 21) when notification types are expanded
-        }
-    }
-}
-```
-
-**Add to `InvoiceRepository.kt`** (CRITICAL — use `nativeQuery = true`):
-
-```kotlin
-// In InvoiceRepository, add these two queries
-
-@Query(
-    value = """
-        SELECT i.id FROM invoices i
-        WHERE i.zatca_status IN ('generated', 'signed')
-          AND i.zatca_retry_count < 5
-          AND i.deleted_at IS NULL
-        ORDER BY i.created_at ASC
-        LIMIT 100
-    """,
-    nativeQuery = true
-)
-fun findPendingZatcaReporting(): List<Long>
-
-@Query(
-    value = """
-        SELECT i.id FROM invoices i
-        WHERE i.zatca_status = 'failed'
-          AND i.deleted_at IS NULL
-        ORDER BY i.updated_at DESC
-    """,
-    nativeQuery = true
-)
-fun findFailedZatcaReporting(): List<Long>
-```
-
-Enable scheduling in the main application class:
-```kotlin
-@EnableScheduling
-@SpringBootApplication
-class LiyaqaApplication
-```
-
----
-
-### Step 8 — Controllers
-
-**`ZatcaNexusController.kt`** — platform admin endpoints:
-
-```kotlin
-package com.liyaqa.zatca.controller
-
-import com.liyaqa.zatca.dto.OnboardingRequest
-import com.liyaqa.zatca.dto.OnboardingStatusResponse
-import com.liyaqa.zatca.service.ZatcaOnboardingService
-import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.web.bind.annotation.*
-import java.util.UUID
-
-@RestController
-@RequestMapping("/api/v1/zatca")
-@Tag(name = "ZATCA (Nexus)", description = "ZATCA Phase 2 onboarding management (platform admin)")
-class ZatcaNexusController(
-    private val onboardingService: ZatcaOnboardingService,
-    private val certRepository: ClubZatcaCertificateRepository
-) {
-
-    /**
-     * Initiates the ZATCA onboarding flow for a club.
-     * The club owner must first generate an OTP on the FATOORA Portal.
-     * The platform admin enters that OTP here to trigger automated onboarding.
-     */
-    @PostMapping("/clubs/{clubPublicId}/onboard")
-    @Operation(summary = "Onboard club to ZATCA Phase 2")
-    @PreAuthorize("hasPermission(null, 'zatca:onboard')")
-    fun onboardClub(
-        @PathVariable clubPublicId: UUID,
-        @RequestBody request: OnboardingRequest
-    ): ResponseEntity<Map<String, String>> {
-        onboardingService.onboardClub(clubPublicId, request.otp)
-        return ResponseEntity.ok(mapOf("message" to "Club onboarded successfully to ZATCA Phase 2"))
-    }
-
-    /**
-     * Get the current ZATCA onboarding status for a club.
-     */
-    @GetMapping("/clubs/{clubPublicId}/status")
-    @Operation(summary = "Get ZATCA onboarding status for a club")
-    @PreAuthorize("hasPermission(null, 'zatca:read')")
-    fun getClubStatus(@PathVariable clubPublicId: UUID): ResponseEntity<OnboardingStatusResponse> {
-        val cert = certRepository.findAll().find { it.club.publicId == clubPublicId && it.deletedAt == null }
-        return if (cert == null) {
-            ResponseEntity.ok(OnboardingStatusResponse(
-                status = "not_onboarded",
-                environment = null,
-                csidExpiresAt = null,
-                onboardingStatus = "pending"
-            ))
-        } else {
-            ResponseEntity.ok(OnboardingStatusResponse(
-                status = cert.onboardingStatus,
-                environment = cert.environment,
-                csidExpiresAt = cert.csidExpiresAt?.toString(),
-                onboardingStatus = cert.onboardingStatus
-            ))
-        }
-    }
-
-    /**
-     * List all clubs and their ZATCA onboarding status.
-     */
-    @GetMapping("/clubs")
-    @Operation(summary = "List all clubs with ZATCA status")
-    @PreAuthorize("hasPermission(null, 'zatca:read')")
-    fun listClubsZatcaStatus(): ResponseEntity<List<OnboardingStatusResponse>> {
-        val certs = certRepository.findAll().filter { it.deletedAt == null }
-        return ResponseEntity.ok(certs.map { cert ->
-            OnboardingStatusResponse(
-                status = cert.onboardingStatus,
-                environment = cert.environment,
-                csidExpiresAt = cert.csidExpiresAt?.toString(),
-                onboardingStatus = cert.onboardingStatus
-            )
-        })
-    }
-
-    /**
-     * Renew a club's CSID (requires new OTP from FATOORA Portal).
-     */
-    @PostMapping("/clubs/{clubPublicId}/renew")
-    @Operation(summary = "Renew club CSID")
-    @PreAuthorize("hasPermission(null, 'zatca:onboard')")
-    fun renewClubCsid(
-        @PathVariable clubPublicId: UUID,
-        @RequestBody request: OnboardingRequest
-    ): ResponseEntity<Map<String, String>> {
-        onboardingService.renewClubCsid(clubPublicId, request.otp)
-        return ResponseEntity.ok(mapOf("message" to "CSID renewed successfully"))
-    }
-}
-```
-
-**`ZatcaPulseController.kt`** — club staff view (read-only status):
-
-```kotlin
-package com.liyaqa.zatca.controller
-
-import com.liyaqa.zatca.dto.OnboardingStatusResponse
-import com.liyaqa.zatca.repository.ClubZatcaCertificateRepository
-import com.liyaqa.common.security.TenantContext
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.tags.Tag
-import org.springframework.http.ResponseEntity
-import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.web.bind.annotation.*
-
-@RestController
-@RequestMapping("/api/v1/pulse/zatca")
-@Tag(name = "ZATCA (Pulse)", description = "ZATCA integration status for club staff")
-class ZatcaPulseController(
-    private val certRepository: ClubZatcaCertificateRepository,
-    private val tenantContext: TenantContext
-) {
-
-    @GetMapping("/status")
-    @Operation(summary = "Get this club's ZATCA integration status")
-    @PreAuthorize("hasPermission(null, 'zatca:read')")
-    fun getMyClubZatcaStatus(): ResponseEntity<OnboardingStatusResponse> {
-        val clubId = tenantContext.currentClubId()
-        val cert = certRepository.findByClubIdAndDeletedAtIsNull(clubId).orElse(null)
-        return ResponseEntity.ok(
-            if (cert == null) OnboardingStatusResponse("not_onboarded", null, null, "pending")
-            else OnboardingStatusResponse(cert.onboardingStatus, cert.environment, cert.csidExpiresAt?.toString(), cert.onboardingStatus)
-        )
     }
 }
 ```
@@ -1362,273 +116,598 @@ class ZatcaPulseController(
 **DTOs:**
 
 ```kotlin
-// OnboardingRequest.kt
-data class OnboardingRequest(val otp: String)
+// ZatcaHealthSummary.kt
+data class ZatcaHealthSummary(
+    val totalActiveCsids: Long,
+    val csidsExpiringSoon: Long,
+    val clubsNotOnboarded: Long,
+    val invoicesPending: Long,
+    val invoicesFailed: Long,
+    val invoicesDeadlineAtRisk: Long
+)
 
-// OnboardingStatusResponse.kt
-data class OnboardingStatusResponse(
-    val status: String,
-    val environment: String?,
-    val csidExpiresAt: String?,
-    val onboardingStatus: String
+// ZatcaFailedInvoiceResponse.kt
+data class ZatcaFailedInvoiceResponse(
+    val invoicePublicId: java.util.UUID,
+    val invoiceNumber: String?,
+    val clubName: String,
+    val memberName: String,
+    val amountSar: String,
+    val createdAt: String,
+    val zatcaRetryCount: Int,
+    val zatcaLastError: String?,
+    val zatcaStatus: String
 )
 ```
 
-**Permissions to register:**
-- `zatca:onboard` — platform admin only (NexusAdmin role)
-- `zatca:read` — club owner + platform admin
+---
+
+### Step 3 — ZatcaRetryService
+
+**`ZatcaRetryService.kt`** in `com.liyaqa.zatca.service`:
+
+```kotlin
+package com.liyaqa.zatca.service
+
+import com.liyaqa.common.exception.ArenaException
+import com.liyaqa.invoice.repository.InvoiceRepository
+import com.liyaqa.audit.service.AuditService
+import com.liyaqa.audit.model.AuditAction
+import org.springframework.http.HttpStatus
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
+
+@Service
+class ZatcaRetryService(
+    private val invoiceRepository: InvoiceRepository,
+    private val auditService: AuditService
+) {
+
+    /**
+     * Resets a permanently failed invoice so the scheduler will pick it
+     * up again on the next run.
+     *
+     * Business rules:
+     * - Invoice must currently have zatcaStatus = 'failed'
+     * - Resets zatcaRetryCount to 0
+     * - Resets zatcaStatus to 'generated'
+     * - Clears zatcaLastError
+     * - Does NOT re-submit immediately — the scheduler handles submission
+     */
+    @Transactional
+    fun retryInvoice(invoicePublicId: UUID) {
+        val invoice = invoiceRepository.findByPublicIdAndDeletedAtIsNull(invoicePublicId)
+            ?: throw ArenaException("Invoice not found", HttpStatus.NOT_FOUND)
+
+        if (invoice.zatcaStatus != "failed") {
+            throw ArenaException(
+                "Invoice is not in failed state (current: ${invoice.zatcaStatus})",
+                HttpStatus.CONFLICT
+            )
+        }
+
+        invoice.zatcaRetryCount = 0
+        invoice.zatcaStatus = "generated"
+        invoice.zatcaLastError = null
+        invoiceRepository.save(invoice)
+
+        auditService.log(
+            action = AuditAction.ZATCA_INVOICE_RETRY_REQUESTED,
+            entityType = "Invoice",
+            entityId = invoice.publicId.toString(),
+            changes = mapOf("invoicePublicId" to invoicePublicId.toString())
+        )
+    }
+
+    /**
+     * Bulk retry — resets all permanently failed invoices for a specific club.
+     * Used when a club had a temporary CSID issue and all their invoices failed.
+     */
+    @Transactional
+    fun retryAllFailedForClub(clubPublicId: UUID) {
+        val invoiceIds = invoiceRepository.findFailedZatcaReportingByClub(clubPublicId)
+        invoiceIds.forEach { invoiceId ->
+            val invoice = invoiceRepository.findById(invoiceId).orElse(null) ?: return@forEach
+            invoice.zatcaRetryCount = 0
+            invoice.zatcaStatus = "generated"
+            invoice.zatcaLastError = null
+            invoiceRepository.save(invoice)
+        }
+        auditService.log(
+            action = AuditAction.ZATCA_INVOICE_RETRY_REQUESTED,
+            entityType = "Club",
+            entityId = clubPublicId.toString(),
+            changes = mapOf("count" to invoiceIds.size.toString(), "clubPublicId" to clubPublicId.toString())
+        )
+    }
+}
+```
 
 ---
 
-### Step 9 — Configuration
+### Step 4 — New Repository Queries
 
-Add to `application.yml`:
+Add to **`ClubZatcaCertificateRepository`**:
 
-```yaml
-zatca:
-  environment: sandbox  # Change to 'production' for live
-  api:
-    base-url: https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal
-    # Sandbox: https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal
-    # Production: https://gw-apic-gov.gazt.gov.sa/e-invoicing/core
-  encryption:
-    key: ${ZATCA_ENCRYPTION_KEY}  # 32-byte base64 key — set in env, NEVER in source
+```kotlin
+@Query(
+    value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status = :status AND deleted_at IS NULL",
+    nativeQuery = true
+)
+fun countByOnboardingStatusAndDeletedAtIsNull(status: String): Long
+
+@Query(
+    value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status != 'active' AND deleted_at IS NULL",
+    nativeQuery = true
+)
+fun countByOnboardingStatusNotAndDeletedAtIsNull(status: String): Long
+
+@Query(
+    value = """
+        SELECT COUNT(*) FROM club_zatca_certificates
+        WHERE onboarding_status = 'active'
+          AND csid_expires_at < :threshold
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun countExpiringSoon(threshold: java.time.Instant): Long
 ```
 
-Add to `application-dev.yml`:
-```yaml
-zatca:
-  environment: sandbox
-  api:
-    base-url: https://gw-apic-gov.gazt.gov.sa/e-invoicing/developer-portal
-  encryption:
-    key: "aaaabbbbccccddddeeeeffffgggghhhh"  # dev-only dummy key, not used in prod
+Add to **`InvoiceRepository`**:
+
+```kotlin
+@Query(
+    value = """
+        SELECT COUNT(*) FROM invoices
+        WHERE zatca_status IN ('generated', 'signed')
+          AND zatca_retry_count < 5
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun countPendingZatcaReporting(): Long
+
+@Query(
+    value = """
+        SELECT COUNT(*) FROM invoices
+        WHERE zatca_status = 'failed'
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun countFailedZatcaReporting(): Long
+
+/**
+ * Invoices that are still unreported and were created more than 23 hours ago.
+ * These are approaching ZATCA's 24-hour reporting deadline.
+ */
+@Query(
+    value = """
+        SELECT COUNT(*) FROM invoices
+        WHERE zatca_status IN ('generated', 'signed')
+          AND created_at < :threshold
+          AND deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun countInvoicesApproachingDeadline(threshold: java.time.Instant): Long
+
+/**
+ * Returns failed invoice details joined to club and member info.
+ * Uses an interface projection to avoid loading full entities.
+ */
+@Query(
+    value = """
+        SELECT
+            i.public_id        AS invoicePublicId,
+            i.invoice_number   AS invoiceNumber,
+            c.name_en          AS clubName,
+            m.name_en          AS memberName,
+            i.total_halalas    AS amountHalalas,
+            i.created_at       AS createdAt,
+            i.zatca_retry_count AS zatcaRetryCount,
+            i.zatca_last_error  AS zatcaLastError,
+            i.zatca_status      AS zatcaStatus
+        FROM invoices i
+        JOIN memberships ms ON ms.id = i.membership_id
+        JOIN membership_plans mp ON mp.id = ms.membership_plan_id
+        JOIN clubs c ON c.id = mp.club_id
+        JOIN members m ON m.id = ms.member_id
+        WHERE i.zatca_status = 'failed'
+          AND i.deleted_at IS NULL
+        ORDER BY i.created_at DESC
+        LIMIT 500
+    """,
+    nativeQuery = true
+)
+fun findFailedZatcaInvoicesWithClub(): List<FailedZatcaInvoiceProjection>
+
+@Query(
+    value = """
+        SELECT i.id FROM invoices i
+        JOIN memberships ms ON ms.id = i.membership_id
+        JOIN membership_plans mp ON mp.id = ms.membership_plan_id
+        JOIN clubs c ON c.id = mp.club_id
+        WHERE i.zatca_status = 'failed'
+          AND c.public_id = :clubPublicId
+          AND i.deleted_at IS NULL
+    """,
+    nativeQuery = true
+)
+fun findFailedZatcaReportingByClub(clubPublicId: java.util.UUID): List<Long>
 ```
 
-**Never commit the production encryption key.** Store in environment variables or a secrets manager. Add `ZATCA_ENCRYPTION_KEY` to `.env.example` with a note to generate with `openssl rand -base64 32`.
+**Interface projection** (in `com.liyaqa.invoice.repository`):
+
+```kotlin
+interface FailedZatcaInvoiceProjection {
+    val invoicePublicId: java.util.UUID
+    val invoiceNumber: String?
+    val clubName: String
+    val memberName: String
+    val amountHalalas: Long
+    val createdAt: java.time.Instant
+    val zatcaRetryCount: Int
+    val zatcaLastError: String?
+    val zatcaStatus: String
+}
+```
 
 ---
 
-### Step 10 — Frontend — web-nexus ZATCA Management Screen
+### Step 5 — Extend ZatcaReportingScheduler
 
-**Route:** `/zatca` (platform admin only)
+Add two new scheduled methods to the existing `ZatcaReportingScheduler`:
+
+```kotlin
+/**
+ * Daily at 07:00 Riyadh (04:00 UTC): check for CSIDs expiring within 30 days.
+ * Creates a ZATCA_CSID_EXPIRING_SOON notification for each platform admin
+ * who has zatca:read permission.
+ */
+@Scheduled(cron = "0 0 4 * * *")  // 04:00 UTC = 07:00 Riyadh
+fun alertExpiringCsids() {
+    val threshold = Instant.now().plus(30, ChronoUnit.DAYS)
+    val expiring = certRepository.findExpiringSoon(threshold)
+    if (expiring.isEmpty()) return
+
+    log.warn("ZATCA: {} CSIDs expiring within 30 days", expiring.size)
+
+    expiring.forEach { cert ->
+        val daysUntilExpiry = ChronoUnit.DAYS.between(Instant.now(), cert.csidExpiresAt)
+        notificationService.createForPlatformAdmins(
+            type = "ZATCA_CSID_EXPIRING_SOON",
+            titleAr = "شهادة زاتكا تنتهي قريباً",
+            titleEn = "ZATCA Certificate Expiring Soon",
+            bodyAr = "شهادة نادي ${cert.club.nameAr} ستنتهي خلال $daysUntilExpiry يوم. يرجى التجديد.",
+            bodyEn = "CSID for ${cert.club.nameEn} expires in $daysUntilExpiry days. Please renew.",
+            entityId = cert.club.publicId.toString(),
+            entityType = "Club"
+        )
+    }
+}
+
+/**
+ * Every hour: check for invoices that are unreported and older than 23 hours.
+ * ZATCA requires reporting within 24 hours — these are at risk.
+ */
+@Scheduled(fixedDelay = 60 * 60 * 1000)  // every hour
+fun alertInvoicesApproachingDeadline() {
+    val threshold = Instant.now().minus(23, ChronoUnit.HOURS)
+    val count = invoiceRepository.countInvoicesApproachingDeadline(threshold)
+    if (count == 0L) return
+
+    log.error(
+        "ZATCA DEADLINE RISK: {} invoices unreported and older than 23 hours. " +
+        "ZATCA requires reporting within 24 hours.",
+        count
+    )
+
+    notificationService.createForPlatformAdmins(
+        type = "ZATCA_INVOICE_DEADLINE_AT_RISK",
+        titleAr = "تحذير: فواتير لم يتم إرسالها لزاتكا",
+        titleEn = "ZATCA Reporting Deadline At Risk",
+        bodyAr = "$count فاتورة لم يتم إرسالها وقاربت على انتهاء المهلة (24 ساعة).",
+        bodyEn = "$count invoice(s) unreported and approaching the 24-hour ZATCA deadline.",
+        entityId = null,
+        entityType = "Invoice"
+    )
+}
+```
+
+Add a helper to `NotificationService` (or create `ZatcaNotificationHelper`) to create notifications for all platform users with `zatca:read` permission:
+
+```kotlin
+fun createForPlatformAdmins(
+    type: String,
+    titleAr: String,
+    titleEn: String,
+    bodyAr: String,
+    bodyEn: String,
+    entityId: String?,
+    entityType: String
+) {
+    // Find all platform users who have zatca:read permission
+    val adminUserIds = userRepository.findPlatformUsersWithPermission("zatca:read")
+    adminUserIds.forEach { userId ->
+        createNotification(
+            userId = userId,
+            type = type,
+            titleAr = titleAr,
+            titleEn = titleEn,
+            bodyAr = bodyAr,
+            bodyEn = bodyEn,
+            entityId = entityId,
+            entityType = entityType
+        )
+    }
+}
+```
+
+---
+
+### Step 6 — New Audit Actions
+
+Add to `AuditAction.kt` (or wherever the enum/constants live):
+
+```kotlin
+ZATCA_CSID_RENEWED,
+ZATCA_INVOICE_RETRY_REQUESTED,
+```
+
+Wire `ZATCA_CSID_RENEWED` into `ZatcaOnboardingService.renewClubCsid()` — it was planned in Plan 23 but was listed as a future action. Add the audit call at the end of the renewal method:
+
+```kotlin
+auditService.log(
+    action = AuditAction.ZATCA_CSID_RENEWED,
+    entityType = "ClubZatcaCertificate",
+    entityId = cert.publicId.toString(),
+    changes = mapOf("clubId" to club.publicId.toString())
+)
+```
+
+---
+
+### Step 7 — New Permission
+
+Add to permission constants and seed data:
+
+```kotlin
+// Permission code
+const val ZATCA_RETRY = "zatca:retry"
+```
+
+Seed to: **NexusAdmin** role only (platform admin can reset failed invoices; club owners cannot).
+
+---
+
+### Step 8 — New Controller Endpoints
+
+Add to **`ZatcaNexusController`**:
+
+```kotlin
+/**
+ * GET /api/v1/zatca/health
+ * Platform-wide ZATCA health summary: KPI cards for the dashboard header.
+ */
+@GetMapping("/health")
+@Operation(summary = "Get ZATCA platform health summary")
+@PreAuthorize("hasPermission(null, 'zatca:read')")
+fun getHealthSummary(): ResponseEntity<ZatcaHealthSummary> =
+    ResponseEntity.ok(healthService.getHealthSummary())
+
+/**
+ * GET /api/v1/zatca/invoices/failed
+ * List of permanently failed invoices with error detail.
+ */
+@GetMapping("/invoices/failed")
+@Operation(summary = "List permanently failed ZATCA invoices")
+@PreAuthorize("hasPermission(null, 'zatca:read')")
+fun getFailedInvoices(): ResponseEntity<List<ZatcaFailedInvoiceResponse>> =
+    ResponseEntity.ok(healthService.getFailedInvoices())
+
+/**
+ * POST /api/v1/zatca/invoices/{invoicePublicId}/retry
+ * Reset a single failed invoice for the scheduler to retry.
+ */
+@PostMapping("/invoices/{invoicePublicId}/retry")
+@Operation(summary = "Retry a permanently failed ZATCA invoice")
+@PreAuthorize("hasPermission(null, 'zatca:retry')")
+fun retryInvoice(
+    @PathVariable invoicePublicId: UUID
+): ResponseEntity<Map<String, String>> {
+    retryService.retryInvoice(invoicePublicId)
+    return ResponseEntity.ok(mapOf("message" to "Invoice queued for retry"))
+}
+
+/**
+ * POST /api/v1/zatca/clubs/{clubPublicId}/retry-all
+ * Reset all failed invoices for a specific club.
+ */
+@PostMapping("/clubs/{clubPublicId}/retry-all")
+@Operation(summary = "Retry all failed ZATCA invoices for a club")
+@PreAuthorize("hasPermission(null, 'zatca:retry')")
+fun retryAllFailedForClub(
+    @PathVariable clubPublicId: UUID
+): ResponseEntity<Map<String, String>> {
+    retryService.retryAllFailedForClub(clubPublicId)
+    return ResponseEntity.ok(mapOf("message" to "All failed invoices queued for retry"))
+}
+```
+
+---
+
+### Step 9 — Frontend: web-nexus ZATCA Screen Redesign
+
+The existing ZATCA management screen (from Plan 23) shows a plain club table. This step adds health cards at the top and a second tab for failed invoices.
 
 **File:** `apps/web-nexus/src/routes/zatca/index.tsx`
 
-The screen shows:
-- Table of all clubs with their ZATCA onboarding status
-- Color-coded status badge: `pending` (grey), `compliance_issued` (yellow), `active` (green), `expired` (red), `failed` (red)
-- Per-club action buttons: "Onboard" (for pending clubs) or "Renew" (for active/expired clubs)
-- OTP entry dialog — triggered when admin clicks Onboard or Renew
-- CSID expiry date display
-- Environment badge (sandbox / production)
+The redesigned screen has two tabs:
+- **Tab 1: Clubs** — the existing onboarding table (unchanged), with color-coded row backgrounds based on status
+- **Tab 2: Failed Invoices** — new table of permanently failed invoices with retry actions
 
-**Key i18n strings:**
+**Health summary cards** (above the tabs, always visible):
+
+| Card | Value | Color |
+|------|-------|-------|
+| Active CSIDs | `totalActiveCsids` | green |
+| Expiring Soon (30 days) | `csidsExpiringSoon` | amber if > 0, grey if 0 |
+| Not Onboarded | `clubsNotOnboarded` | red if > 0, grey if 0 |
+| Invoices Pending | `invoicesPending` | blue |
+| Invoices Failed | `invoicesFailed` | red if > 0, grey if 0 |
+| Deadline At Risk | `invoicesDeadlineAtRisk` | red if > 0, grey if 0 |
+
+**Failed Invoices tab** columns:
+- Invoice # (or UUID if no number)
+- Club Name
+- Member Name
+- Amount (SAR)
+- Created At (relative time — "2 hours ago")
+- Retry Count
+- Last Error (truncated to 80 chars, tooltip for full text)
+- Actions: "Retry" button (calls `POST /invoices/{id}/retry`, permission-gated to `zatca:retry`)
+
+Each club row in the Clubs tab gets a "Retry All" button in the actions column if that club has failed invoices (`invoicesFailed > 0` from per-club status).
+
+**New API calls (TanStack Query):**
+
 ```ts
-// Arabic (ar):
-zatca: {
-  title: "إعداد الفواتير الإلكترونية (زاتكا - المرحلة الثانية)",
-  status: {
-    not_onboarded: "غير مُفعّل",
-    pending: "قيد الانتظار",
-    compliance_issued: "تم إصدار شهادة الامتثال",
-    compliance_checked: "تم التحقق من الامتثال",
-    active: "نشط",
-    expired: "منتهي الصلاحية",
-    failed: "فشل"
-  },
-  otp_dialog: {
-    title: "إدخال كود OTP",
-    description: "قم بتسجيل الدخول إلى بوابة فاتورة وأنشئ رمز OTP لهذا النادي، ثم أدخله هنا.",
-    otp_label: "رمز OTP",
-    submit: "بدء الإعداد",
-  }
-}
-
-// English (en):
-zatca: {
-  title: "E-Invoicing (ZATCA Phase 2)",
-  status: {
-    not_onboarded: "Not Onboarded",
-    pending: "Pending",
-    compliance_issued: "Compliance CSID Issued",
-    compliance_checked: "Compliance Checked",
-    active: "Active",
-    expired: "Expired",
-    failed: "Failed"
-  },
-  otp_dialog: {
-    title: "Enter OTP",
-    description: "Log into the FATOORA Portal and generate an OTP for this club, then enter it here.",
-    otp_label: "OTP Code",
-    submit: "Start Onboarding",
-  }
-}
+// GET /api/v1/zatca/health
+// GET /api/v1/zatca/invoices/failed
+// POST /api/v1/zatca/invoices/{invoicePublicId}/retry
+// POST /api/v1/zatca/clubs/{clubPublicId}/retry-all
 ```
 
-**API calls:**
-```ts
-// GET /api/v1/zatca/clubs — list all clubs with ZATCA status
-// POST /api/v1/zatca/clubs/{clubPublicId}/onboard — { otp: string }
-// POST /api/v1/zatca/clubs/{clubPublicId}/renew — { otp: string }
+Auto-refresh: health summary cards refresh every 60 seconds (same pattern as Plan 22 pending badge).
+
+**New i18n strings** (add to `ar.json` and `en.json`):
+
+```
+zatca.health.title
+zatca.health.active_csids
+zatca.health.expiring_soon
+zatca.health.not_onboarded
+zatca.health.invoices_pending
+zatca.health.invoices_failed
+zatca.health.deadline_at_risk
+zatca.tabs.clubs
+zatca.tabs.failed_invoices
+zatca.failed_invoices.invoice_number
+zatca.failed_invoices.club
+zatca.failed_invoices.member
+zatca.failed_invoices.amount
+zatca.failed_invoices.created_at
+zatca.failed_invoices.retry_count
+zatca.failed_invoices.last_error
+zatca.failed_invoices.retry
+zatca.failed_invoices.retry_all
+zatca.failed_invoices.retry_success
+zatca.failed_invoices.empty
 ```
 
 ---
 
-### Step 11 — Frontend — web-pulse ZATCA Status Widget
-
-**Route:** `/settings/zatca` (club staff — read-only)
-
-A simple status card showing:
-- Current onboarding status with icon
-- CSID expiry date
-- Instructions to contact platform admin if not onboarded
-
-**File:** `apps/web-pulse/src/routes/settings/zatca/index.tsx`
-
----
-
-### Step 12 — Tests
+### Step 10 — Tests
 
 #### Unit Tests
 
-**`ZatcaCryptoServiceTest.kt`**:
-- `generates valid secp256k1 key pair`
-- `exports and imports private key round-trip`
-- `builds CSR with correct subject fields`
-- `signs and verifies data with generated key pair`
+**`ZatcaHealthServiceTest`**:
+- `getHealthSummary returns correct counts from repository mocks`
+- `getFailedInvoices maps projection to DTO correctly`
+- `expiring soon count is 0 when no CSIDs near threshold`
 
-**`ZatcaEncryptionServiceTest.kt`**:
-- `encrypts and decrypts private key correctly`
-- `different IV produces different ciphertext`
-- `throws on wrong key`
+**`ZatcaRetryServiceTest`**:
+- `retryInvoice resets zatcaRetryCount to 0 and status to generated`
+- `retryInvoice throws NOT_FOUND when invoice does not exist`
+- `retryInvoice throws CONFLICT when invoice status is not failed`
+- `retryInvoice clears zatcaLastError`
+- `retryAllFailedForClub resets all failed invoices for that club`
+- `retryAllFailedForClub does nothing when no failed invoices`
 
-**`ZatcaQrServiceTest.kt`**:
-- `builds 9-tag TLV with correct tag order`
-- `base64 output is valid`
-- `tags 1-5 match Phase 1 content`
-- `tag 6 contains digital signature bytes`
+**`ZatcaSchedulerAlertTest`**:
+- `alertExpiringCsids creates notification for each expiring certificate`
+- `alertExpiringCsids skips when no expiring CSIDs`
+- `alertInvoicesApproachingDeadline creates notification when count > 0`
+- `alertInvoicesApproachingDeadline skips when count is 0`
 
-**`ZatcaApiClientTest.kt`** (mock RestTemplate):
-- `compliance CSID request includes OTP header`
-- `reporting request sets Clearance-Status: 0`
-- `authorization header is correct Basic encoding`
-- `accept-version is V2`
+#### Integration Tests (Testcontainers)
 
-**`ZatcaReportingServiceTest.kt`**:
-- `skips invoice when club has no active CSID`
-- `marks invoice as reported on success`
-- `increments retry count on API failure`
-- `marks as failed when retry count reaches MAX_RETRIES`
-- `does not re-report already-reported invoices`
+**`ZatcaHealthControllerIntegrationTest`**:
+- `GET /api/v1/zatca/health returns 200 with correct shape`
+- `GET /api/v1/zatca/invoices/failed returns 200 with list`
+- `GET /api/v1/zatca/health returns 403 without zatca:read permission`
+- `POST /api/v1/zatca/invoices/{id}/retry returns 200 and resets invoice`
+- `POST /api/v1/zatca/invoices/{id}/retry returns 403 without zatca:retry permission`
+- `POST /api/v1/zatca/invoices/{id}/retry returns 409 when invoice is not in failed state`
+- `POST /api/v1/zatca/clubs/{id}/retry-all resets all failed invoices for the club`
 
-#### Integration Tests
+#### Frontend Tests
 
-**`ZatcaOnboardingIntegrationTest.kt`** (Testcontainers):
-- Mocks the ZATCA API (WireMock) — do not call real ZATCA in tests
-- `full onboarding flow saves certificate correctly`
-- `duplicate onboarding of active club throws CONFLICT`
-- `onboarding rolls back on compliance check failure`
-- `renewal updates existing certificate record`
-
-**`ZatcaReportingSchedulerIntegrationTest.kt`**:
-- `scheduler picks up pending invoices from database`
-- `reported invoices are not picked up again`
-- `failed invoices after MAX_RETRIES are not retried`
-
-> **Testing rule**: Always use `const val TEST_PASSWORD = "Test@12345678"` for any auth in tests.
-
-> **Note on WireMock**: Add WireMock to test dependencies:
-> ```kotlin
-> testImplementation("com.github.tomakehurst:wiremock-jre8:2.35.0")
-> ```
-> Mock all ZATCA API calls — never hit the real sandbox in automated tests.
+**`zatca-health.test.tsx`**:
+- renders health summary cards with correct values
+- "Deadline At Risk" card is red when count > 0
+- "Failed Invoices" tab renders failed invoice table
+- "Retry" button calls retry endpoint and invalidates query
+- empty state shown when no failed invoices
 
 ---
 
-## Permissions Required
+## New Endpoints Summary
 
-Add to the database permissions seed / migration:
-
-| Permission Code | Description |
-|----------------|-------------|
-| `zatca:onboard` | Trigger ZATCA onboarding/renewal for a club |
-| `zatca:read` | View ZATCA status |
-
-Assign `zatca:onboard` to: NexusAdmin role only
-Assign `zatca:read` to: NexusAdmin, ClubOwner roles
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| GET | `/api/v1/zatca/health` | `zatca:read` | Platform health summary KPIs |
+| GET | `/api/v1/zatca/invoices/failed` | `zatca:read` | List permanently failed invoices |
+| POST | `/api/v1/zatca/invoices/{id}/retry` | `zatca:retry` | Reset single failed invoice |
+| POST | `/api/v1/zatca/clubs/{id}/retry-all` | `zatca:retry` | Reset all failed invoices for a club |
 
 ---
 
-## Configuration Checklist (Before Going Live)
+## Business Rules
 
-Before switching from `sandbox` to `production`:
-
-1. Each club's owner must log into https://fatoora.zatca.gov.sa/ with their ERAD credentials
-2. Club owner navigates to: E-Invoicing Devices → EGS Units → Add New Unit
-3. Club owner generates an OTP (valid for a short window — coordinate timing with platform admin)
-4. Platform admin enters OTP in web-nexus ZATCA screen immediately
-5. System completes automated onboarding (generates keys, gets Compliance CSID, passes compliance checks, gets Production CSID)
-6. Verify `onboarding_status = 'active'` in the database
-7. Switch `zatca.environment: production` and `zatca.api.base-url` to production URL
-8. Ensure `ZATCA_ENCRYPTION_KEY` is set in production environment variables (NOT sandbox key)
-9. Run first invoice report manually and verify `zatca_status = 'reported'`
+1. Only invoices with `zatcaStatus = 'failed'` can be retried — any other status returns `409 Conflict`
+2. Retrying resets `zatcaRetryCount = 0` and `zatcaStatus = 'generated'` — the scheduler picks it up within 5 minutes
+3. `zatcaLastError` is cleared on retry so the error field reflects the outcome of the next attempt
+4. The retry action does NOT immediately re-submit — it queues for the existing `@Scheduled` job
+5. `ZATCA_CSID_EXPIRING_SOON` notifications are sent to all platform users with `zatca:read` — not to club staff
+6. `ZATCA_INVOICE_DEADLINE_AT_RISK` fires hourly — deduplication check ensures only one notification per hour per state (same pattern as existing notification deduplication: check last 1 hour for same type)
+7. `alertExpiringCsids` uses the same `findExpiringSoon` query already in `ClubZatcaCertificateRepository` — no new queries needed for that method
+8. The "Retry All" action for a club requires the same `zatca:retry` permission as single retry
 
 ---
 
-## What Was Already Done in Phase 1 (Do Not Redo)
+## What Is NOT in Scope
 
-- ✅ Invoice entity has: `invoice_counter_value`, `previous_invoice_hash`, `zatca_uuid`, `zatca_hash`, `zatca_qr_code`
-- ✅ PIH hash chain is maintained
-- ✅ 5-tag TLV QR code is generated
-- ✅ `zatcaStatus = "generated"` is set on invoice creation
-
-Phase 2 upgrades the QR to 9 tags and adds the reporting submission. The `zatcaStatus` field transitions from `generated` → `signed` → `reported`.
+- Automatic CSID renewal — renewal still requires a human to generate an OTP from the FATOORA Portal (same flow as Plan 23). This plan only adds the alert, not automation.
+- Email notifications for CSID expiry — the notification system (Plan 21) already handles bell + drawer. Email for `ZATCA_CSID_EXPIRING_SOON` is not added here; that can be wired later.
+- Reporting for club owners — the ZATCA health data is platform-admin-only. The `ZatcaPulseController` status endpoint from Plan 23 remains the only club-facing ZATCA view.
+- Clearing `zatca_report_response` on retry — it is preserved so admins can see what ZATCA last returned even after a retry is requested.
 
 ---
 
-## Constraints and Rules Enforced
+## Definition of Done
 
-- All `@Query` on the InvoiceRepository for ZATCA use `nativeQuery = true` (SQL column names, not JPQL)
-- All monetary values remain in halalas internally
-- Private keys are AES-256-GCM encrypted before storing in the database
-- `ZATCA_ENCRYPTION_KEY` is never in source code or git history
-- No hardcoded test passwords — `TEST_PASSWORD = "Test@12345678"` only
-- Internal PKs (`Long`) never exposed in API — only `UUID` publicIds
-- Every controller endpoint has `@Operation` and `@PreAuthorize`
-- Package: `com.liyaqa.zatca` — never `com.arena.*`
-- Entity `ClubZatcaCertificate` extends `AuditEntity`
-- ZATCA logic is fully isolated in the `zatca` package — no bleed into membership/invoice packages
-- `@Transactional(readOnly = true)` on service class, `@Transactional` override on write methods
+- [ ] `ZATCA_CSID_EXPIRING_SOON` and `ZATCA_INVOICE_DEADLINE_AT_RISK` added to notification types
+- [ ] `ZatcaHealthService` compiles, all methods return correct data
+- [ ] `ZatcaRetryService` resets invoices correctly with audit logging
+- [ ] 6 new native queries added to `ClubZatcaCertificateRepository` and `InvoiceRepository` — all use `nativeQuery = true`
+- [ ] `FailedZatcaInvoiceProjection` interface defined and used by repository
+- [ ] Two new scheduler jobs in `ZatcaReportingScheduler` (expiry alert at 04:00 UTC, deadline check every hour)
+- [ ] `ZATCA_CSID_RENEWED` audit action wired into `ZatcaOnboardingService.renewClubCsid()`
+- [ ] `ZATCA_INVOICE_RETRY_REQUESTED` audit action wired into both retry methods
+- [ ] `zatca:retry` permission seeded for NexusAdmin role
+- [ ] 4 new endpoints on `ZatcaNexusController` — all with `@Operation` and `@PreAuthorize`
+- [ ] web-nexus ZATCA screen: 6 health cards visible above tabs
+- [ ] web-nexus ZATCA screen: "Failed Invoices" tab with retry buttons
+- [ ] Health cards auto-refresh every 60 seconds
+- [ ] All i18n strings added in Arabic and English
+- [ ] All unit and integration tests pass
+- [ ] Backend builds with `./gradlew build` — no warnings
+- [ ] `PROJECT-STATE.md` updated: Plan 31 complete, test counts updated
+- [ ] `PLAN-zatca-health.md` deleted before merging
 
----
-
-## Flyway Migration File
-
-```
-V15__zatca_phase2.sql
-```
-
-This is migration #15, following V14 from the member self-registration plan. Do NOT run Flyway in dev (`ddl-auto: create-drop` handles dev schema).
-
----
-
-## Summary
-
-| What | Count |
-|------|-------|
-| New migration files | 1 (V15) |
-| New entities | 1 (ClubZatcaCertificate) |
-| New repositories | 1 |
-| New services | 5 (Crypto, Xml, Qr, Onboarding, Reporting) |
-| New clients | 1 (ZatcaApiClient) |
-| New schedulers | 1 |
-| New controllers | 2 (Nexus + Pulse) |
-| New frontend routes | 2 (web-nexus ZATCA mgmt + web-pulse status widget) |
-| New permissions | 2 (zatca:onboard, zatca:read) |
-| New unit tests (est.) | 25+ |
-| New integration tests (est.) | 10+ |
-| Estimated total backend tests after | 493+ |
-
-**Critical blocker**: Club owners must generate OTPs on the FATOORA Portal before any real invoices can be reported. The sandbox environment is fully testable without this — use the dummy credentials provided by the ZATCA Developer Portal.
+When all items are checked, confirm: **"Plan 31 — ZATCA Health Dashboard complete. X backend tests, Y frontend tests."**
 

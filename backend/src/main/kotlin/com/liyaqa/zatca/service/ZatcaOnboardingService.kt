@@ -1,5 +1,7 @@
 package com.liyaqa.zatca.service
 
+import com.liyaqa.audit.AuditAction
+import com.liyaqa.audit.AuditService
 import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.zatca.client.ZatcaApiClient
@@ -22,6 +24,7 @@ class ZatcaOnboardingService(
     private val encryptionService: ZatcaEncryptionService,
     private val xmlService: ZatcaXmlService,
     private val apiClient: ZatcaApiClient,
+    private val auditService: AuditService,
     @Value("\${zatca.environment}") private val environment: String,
 ) {
     @Transactional
@@ -162,6 +165,13 @@ class ZatcaOnboardingService(
         cert.csidExpiresAt = parseCertificateExpiry(certPem)
         cert.onboardingStatus = "active"
         certRepository.save(cert)
+
+        auditService.logFromContext(
+            action = AuditAction.ZATCA_CSID_RENEWED,
+            entityType = "ClubZatcaCertificate",
+            entityId = club.publicId.toString(),
+            changesJson = """{"clubPublicId":"${club.publicId}"}""",
+        )
     }
 
     private fun runComplianceChecks(

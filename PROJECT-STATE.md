@@ -205,7 +205,7 @@ All seeded roles have `isSystem = true` — cannot be deleted via UI.
 | Scheduled Reports | ReportSchedule | CRUD /api/v1/report-templates/{id}/schedule, GET /export/pdf |
 | Notifications | Notification | GET /api/v1/pulse/notifications, /arena/notifications, /coach/notifications + mark-read, mark-all-read, unread-count |
 
-**Current test count: 437+ backend tests + 143 frontend tests (web-pulse)**
+**Current test count: 502+ backend tests + 143 frontend tests (web-pulse) + 18 frontend tests (web-nexus)**
 **Current Flyway migrations: V1 through V13** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules, V13 = notifications)
 ⚠️ NOTE: V7 was skipped — next plan uses V14.
 
@@ -427,6 +427,20 @@ Root package.json must NOT have a `workspaces` field.
 - Email sent for MEMBERSHIP_EXPIRING_SOON, PAYMENT_COLLECTED, PT_SESSION_REMINDER via JavaMailSender (reused from Plan 20)
 - Frontend: bell + drawer in web-pulse and web-coach; bell → full-page /notifications in web-arena; 30-second polling
 - 12 new backend tests (7 service + 5 trigger) — 437+ total; 8 new frontend tests in web-pulse — 143 total
+- 1 pre-existing flaky test in AuditNexusControllerTest (not introduced by this plan)
+
+### ✅ Plan 31 — ZATCA Health Dashboard & CSID Expiry Alerts — COMPLETE (all 10 steps done)
+- 2 new notification types: `ZATCA_CSID_EXPIRING_SOON`, `ZATCA_INVOICE_DEADLINE_AT_RISK` — scheduler-driven, platform admins only
+- `ZatcaHealthService` — aggregates 6 health KPIs across all clubs (active CSIDs, expiring, not onboarded, pending, failed, deadline-at-risk)
+- `ZatcaRetryService` — resets failed invoices (status → generated, retryCount → 0, lastError → null) with audit logging
+- `FailedZatcaInvoiceProjection` — interface projection for efficient multi-table join queries
+- 8 new native queries across `ClubZatcaCertificateRepository` and `InvoiceRepository` — all `nativeQuery = true`
+- 2 new scheduler jobs in `ZatcaReportingScheduler`: CSID expiry alert (daily 04:00 UTC), deadline risk alert (hourly)
+- `ZATCA_CSID_RENEWED` + `ZATCA_INVOICE_RETRY_REQUESTED` audit actions, CSID renewal wired into `ZatcaOnboardingService`
+- `zatca:retry` permission seeded for Super Admin (NexusAdmin) only
+- 4 new endpoints on `ZatcaNexusController`: GET /health, GET /invoices/failed, POST /invoices/{id}/retry, POST /clubs/{id}/retry-all
+- web-nexus: 6 health cards (color-coded, 60s auto-refresh), tab layout (Clubs + Failed Invoices), retry buttons with permission gate
+- 19 new backend tests (3 unit classes + 1 integration class), 5 new frontend tests — 502+ backend tests, 18 frontend tests
 - 1 pre-existing flaky test in AuditNexusControllerTest (not introduced by this plan)
 
 ### Next — Remaining roadmap

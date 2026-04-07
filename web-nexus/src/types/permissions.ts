@@ -21,6 +21,7 @@ export const Permission = {
   ROLE_DELETE: 'role:delete',
   ZATCA_ONBOARD: 'zatca:onboard',
   ZATCA_READ: 'zatca:read',
+  ZATCA_RETRY: 'zatca:retry',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

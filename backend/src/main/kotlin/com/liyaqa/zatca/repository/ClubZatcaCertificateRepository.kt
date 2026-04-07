@@ -31,4 +31,27 @@ interface ClubZatcaCertificateRepository : JpaRepository<ClubZatcaCertificate, L
         nativeQuery = true,
     )
     fun findExpiringSoon(expiryThreshold: Instant): List<ClubZatcaCertificate>
+
+    @Query(
+        value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status = :status AND deleted_at IS NULL",
+        nativeQuery = true,
+    )
+    fun countByStatusAndNotDeleted(status: String): Long
+
+    @Query(
+        value = "SELECT COUNT(*) FROM club_zatca_certificates WHERE onboarding_status != :status AND deleted_at IS NULL",
+        nativeQuery = true,
+    )
+    fun countByStatusNotAndNotDeleted(status: String): Long
+
+    @Query(
+        value = """
+            SELECT COUNT(*) FROM club_zatca_certificates
+            WHERE onboarding_status = 'active'
+              AND csid_expires_at < :threshold
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countExpiringSoon(threshold: Instant): Long
 }

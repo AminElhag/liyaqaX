@@ -183,4 +183,6 @@ private val SCHEDULER_TYPES =
         NotificationType.PT_SESSION_REMINDER,
         NotificationType.LOW_GX_SPOTS,
         NotificationType.GX_CLASS_REMINDER,
+        NotificationType.ZATCA_CSID_EXPIRING_SOON,
+        NotificationType.ZATCA_INVOICE_DEADLINE_AT_RISK,
     )
