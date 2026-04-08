@@ -4,7 +4,6 @@ import com.liyaqa.club.dto.ClubResponse
 import com.liyaqa.club.dto.CreateClubRequest
 import com.liyaqa.club.dto.UpdateClubRequest
 import com.liyaqa.common.dto.PageResponse
-import com.liyaqa.security.Roles
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -32,7 +31,7 @@ class ClubController(
     private val clubService: ClubService,
 ) {
     @PostMapping
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'club:create')")
     @Operation(summary = "Create a new club under an organization")
     fun create(
         @PathVariable orgId: UUID,
@@ -40,7 +39,7 @@ class ClubController(
     ): ResponseEntity<ClubResponse> = ResponseEntity.status(HttpStatus.CREATED).body(clubService.create(orgId, request))
 
     @GetMapping
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'club:read')")
     @Operation(summary = "List all clubs for an organization")
     fun getAll(
         @PathVariable orgId: UUID,
@@ -48,7 +47,7 @@ class ClubController(
     ): ResponseEntity<PageResponse<ClubResponse>> = ResponseEntity.ok(clubService.getAll(orgId, pageable))
 
     @GetMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_READ)
+    @PreAuthorize("hasPermission(null, 'club:read')")
     @Operation(summary = "Get a club by ID")
     fun getById(
         @PathVariable orgId: UUID,
@@ -56,7 +55,7 @@ class ClubController(
     ): ResponseEntity<ClubResponse> = ResponseEntity.ok(clubService.getByPublicId(orgId, id))
 
     @PatchMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'club:update')")
     @Operation(summary = "Update a club")
     fun update(
         @PathVariable orgId: UUID,
@@ -65,7 +64,7 @@ class ClubController(
     ): ResponseEntity<ClubResponse> = ResponseEntity.ok(clubService.update(orgId, id, request))
 
     @DeleteMapping("/{id}")
-    @PreAuthorize(Roles.NEXUS_WRITE)
+    @PreAuthorize("hasPermission(null, 'club:delete')")
     @Operation(summary = "Soft-delete a club")
     fun delete(
         @PathVariable orgId: UUID,

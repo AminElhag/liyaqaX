@@ -137,6 +137,11 @@ Follow the **test pyramid**:
 - Mock external dependencies at the service boundary in unit tests.
 - Integration tests must use a **real database** (via Testcontainers), not H2 in production-database mode.
 - Every bug fix ships with a regression test.
+- Test files must never contain hardcoded passwords, JWT secrets, API keys, or any credential strings. Use one of these patterns instead:
+  - A companion object constant with an obviously fake value: `const val TEST_PASSWORD = "Test@12345678"`
+  - A `@Value` annotation reading from test `application.yml`
+  - A test-specific `application-test.yml` file
+- `application-test.yml` is gitignored. Real credentials never appear in any `.kt` test file.
 
 ---
 

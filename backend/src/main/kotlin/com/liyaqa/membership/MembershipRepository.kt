@@ -1,0 +1,202 @@
+package com.liyaqa.membership
+
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import org.springframework.stereotype.Repository
+import java.time.LocalDate
+import java.util.Optional
+import java.util.UUID
+
+@Repository
+interface MembershipRepository : JpaRepository<Membership, Long> {
+    fun findByPublicIdAndOrganizationIdAndDeletedAtIsNull(
+        publicId: UUID,
+        organizationId: Long,
+    ): Optional<Membership>
+
+    fun findAllByMemberIdAndDeletedAtIsNull(
+        memberId: Long,
+        pageable: Pageable,
+    ): Page<Membership>
+
+    fun countByMembershipStatusAndDeletedAtIsNull(membershipStatus: String): Long
+
+    fun findByMemberIdAndMembershipStatusInAndDeletedAtIsNull(
+        memberId: Long,
+        statuses: List<String>,
+    ): Optional<Membership>
+
+    fun findByMemberIdAndMembershipStatusAndDeletedAtIsNull(
+        memberId: Long,
+        membershipStatus: String,
+    ): Optional<Membership>
+
+    fun existsByMemberIdAndMembershipStatusInAndDeletedAtIsNull(
+        memberId: Long,
+        statuses: List<String>,
+    ): Boolean
+
+    fun findAllByEndDateAndMembershipStatusAndDeletedAtIsNull(
+        endDate: LocalDate,
+        membershipStatus: String,
+    ): List<Membership>
+
+    @Query(
+        value = """
+            SELECT * FROM memberships m
+            WHERE m.membership_status IN :statuses
+              AND m.deleted_at IS NULL
+              AND (
+                  (m.grace_end_date IS NOT NULL AND m.grace_end_date < :today)
+                  OR (m.grace_end_date IS NULL AND m.end_date < :today)
+              )
+        """,
+        nativeQuery = true,
+    )
+    fun findOverdueMemberships(
+        @Param("statuses") statuses: List<String>,
+        @Param("today") today: LocalDate,
+    ): List<Membership>
+
+    @Query(
+        value = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN mp.duration_days <= 31 THEN mp.price_halalas
+                    WHEN mp.duration_days <= 93 THEN mp.price_halalas / 3
+                    ELSE mp.price_halalas / 12
+                END
+            ), 0)
+            FROM memberships m
+            JOIN membership_plans mp ON m.plan_id = mp.id
+            WHERE m.club_id = :clubId
+              AND m.membership_status = 'active'
+              AND m.deleted_at IS NULL
+              AND mp.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun estimateMrrHalalasForClub(
+        @Param("clubId") clubId: Long,
+    ): Long
+
+    @Query(
+        value = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN mp.duration_days <= 31 THEN mp.price_halalas
+                    WHEN mp.duration_days <= 93 THEN mp.price_halalas / 3
+                    ELSE mp.price_halalas / 12
+                END
+            ), 0)
+            FROM memberships m
+            JOIN membership_plans mp ON m.plan_id = mp.id
+            WHERE m.membership_status = 'active'
+              AND m.deleted_at IS NULL
+              AND mp.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun estimateTotalMrrHalalas(): Long
+
+    @Query(
+        value = """
+            SELECT * FROM memberships m
+            WHERE m.organization_id = :orgId
+              AND m.club_id = :clubId
+              AND m.membership_status IN :statuses
+              AND m.deleted_at IS NULL
+              AND m.end_date >= :today
+              AND m.end_date <= :cutoffDate
+            ORDER BY m.end_date ASC
+        """,
+        countQuery = """
+            SELECT COUNT(*) FROM memberships m
+            WHERE m.organization_id = :orgId
+              AND m.club_id = :clubId
+              AND m.membership_status IN :statuses
+              AND m.deleted_at IS NULL
+              AND m.end_date >= :today
+              AND m.end_date <= :cutoffDate
+        """,
+        nativeQuery = true,
+    )
+    fun findExpiringMemberships(
+        @Param("orgId") orgId: Long,
+        @Param("clubId") clubId: Long,
+        @Param("statuses") statuses: List<String>,
+        @Param("today") today: LocalDate,
+        @Param("cutoffDate") cutoffDate: LocalDate,
+        pageable: Pageable,
+    ): Page<Membership>
+
+    @Query(
+        value = """
+            SELECT ms.* FROM memberships ms
+            JOIN members m ON m.id = ms.member_id
+            WHERE ms.end_date < :today
+              AND ms.membership_status = 'active'
+              AND m.membership_status = 'active'
+              AND ms.deleted_at IS NULL
+              AND m.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun findExpiredActiveMemberships(
+        @Param("today") today: LocalDate,
+    ): List<Membership>
+
+    @Query(
+        value = """
+            SELECT COUNT(*) FROM memberships
+            WHERE member_id = :memberId
+              AND membership_status = 'active'
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countActiveMembershipsByMemberId(
+        @Param("memberId") memberId: Long,
+    ): Long
+
+    @Modifying
+    @Query(
+        value = """
+            UPDATE memberships
+            SET membership_status = 'active',
+                start_date = :startDate,
+                end_date = :endDate
+            WHERE id = :membershipId
+        """,
+        nativeQuery = true,
+    )
+    fun activateMembership(
+        @Param("membershipId") membershipId: Long,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate,
+    )
+
+    @Query(
+        value = """
+            SELECT ms.id, ms.public_id AS publicId, ms.membership_status AS status,
+                   ms.start_date AS startDate, ms.end_date AS endDate,
+                   ms.created_at AS createdAt, ms.updated_at AS updatedAt,
+                   mp.name_en AS planNameEn, mp.name_ar AS planNameAr
+            FROM memberships ms
+            JOIN membership_plans mp ON mp.id = ms.plan_id
+            WHERE ms.member_id = :memberId
+              AND ms.deleted_at IS NULL
+            ORDER BY ms.created_at DESC
+            LIMIT :limit
+        """,
+        nativeQuery = true,
+    )
+    fun findByMemberIdForTimeline(
+        @Param("memberId") memberId: Long,
+        @Param("limit") limit: Int,
+    ): List<MembershipTimelineProjection>
+}

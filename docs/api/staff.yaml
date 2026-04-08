@@ -1,0 +1,640 @@
+paths:
+
+  # ── Nexus-facing endpoints ──────────────────────────────────────────────────
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff:
+    post:
+      summary: Create a staff member (Nexus)
+      operationId: createStaffMemberNexus
+      tags: [Staff (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:create
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStaffMemberRequest'
+      responses:
+        '201':
+          description: Staff member created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+    get:
+      summary: List staff for a club (Nexus)
+      operationId: listStaffMembersNexus
+      tags: [Staff (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:read
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+      responses:
+        '200':
+          description: Paginated list of staff members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberSummaryPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/organizations/{orgId}/clubs/{clubId}/staff/{id}:
+    get:
+      summary: Get a staff member by ID (Nexus)
+      operationId: getStaffMemberByIdNexus
+      tags: [Staff (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:read
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/StaffIdPath'
+      responses:
+        '200':
+          description: Staff member found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a staff member (Nexus)
+      operationId: updateStaffMemberNexus
+      tags: [Staff (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:update
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/StaffIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStaffMemberRequest'
+      responses:
+        '200':
+          description: Staff member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+    delete:
+      summary: Soft-delete a staff member (Nexus)
+      operationId: deleteStaffMemberNexus
+      tags: [Staff (Nexus)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:delete
+      parameters:
+        - $ref: '#/components/parameters/OrgIdPath'
+        - $ref: '#/components/parameters/ClubIdPath'
+        - $ref: '#/components/parameters/StaffIdPath'
+      responses:
+        '204':
+          description: Staff member deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  # ── Pulse-facing endpoints ──────────────────────────────────────────────────
+
+  /api/v1/staff:
+    post:
+      summary: Create a staff member
+      description: |
+        Creates a new staff member and their User account in one transaction.
+        Organization and club are derived from the caller's JWT claims.
+      operationId: createStaffMember
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStaffMemberRequest'
+      responses:
+        '201':
+          description: Staff member created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+    get:
+      summary: List staff for the caller's club
+      operationId: listStaffMembers
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:read
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/SizeQuery'
+        - $ref: '#/components/parameters/SortQuery'
+        - $ref: '#/components/parameters/OrderQuery'
+      responses:
+        '200':
+          description: Paginated list of staff members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberSummaryPageResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+
+  /api/v1/staff/{id}:
+    get:
+      summary: Get a staff member by ID
+      operationId: getStaffMemberById
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:read
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+      responses:
+        '200':
+          description: Staff member found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+    patch:
+      summary: Update a staff member
+      operationId: updateStaffMember
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:update
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStaffMemberRequest'
+      responses:
+        '200':
+          description: Staff member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMemberResponse'
+        '400':
+          $ref: './shared-schemas.yaml#/components/responses/ValidationFailed'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+    delete:
+      summary: Soft-delete a staff member
+      operationId: deleteStaffMember
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:delete
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+      responses:
+        '204':
+          description: Staff member deleted
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+  # ── Branch assignment endpoints (Pulse) ─────────────────────────────────────
+
+  /api/v1/staff/{id}/branches:
+    get:
+      summary: List branch assignments for a staff member
+      operationId: listStaffBranches
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:read
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+      responses:
+        '200':
+          description: List of assigned branches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StaffBranchResponse'
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+
+  /api/v1/staff/{id}/branches/{branchId}:
+    post:
+      summary: Assign a staff member to a branch
+      operationId: assignStaffBranch
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:update
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Branch assigned
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '409':
+          $ref: './shared-schemas.yaml#/components/responses/Conflict'
+
+    delete:
+      summary: Remove a branch assignment from a staff member
+      operationId: removeStaffBranch
+      tags: [Staff (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: staff:update
+      parameters:
+        - $ref: '#/components/parameters/StaffIdPath'
+        - name: branchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Branch assignment removed
+        '401':
+          $ref: './shared-schemas.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: './shared-schemas.yaml#/components/responses/Forbidden'
+        '404':
+          $ref: './shared-schemas.yaml#/components/responses/NotFound'
+        '422':
+          $ref: './shared-schemas.yaml#/components/responses/BusinessRuleViolation'
+
+# ── Reusable parameters ────────────────────────────────────────────────────────
+
+components:
+  parameters:
+    OrgIdPath:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClubIdPath:
+      name: clubId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StaffIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PageQuery:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+    SizeQuery:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+    SortQuery:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: createdAt
+    OrderQuery:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+  schemas:
+
+    CreateStaffMemberRequest:
+      type: object
+      required: [email, password, firstNameAr, firstNameEn, lastNameAr, lastNameEn, roleId, branchIds, joinedAt]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+        firstNameAr:
+          type: string
+          maxLength: 100
+        firstNameEn:
+          type: string
+          maxLength: 100
+        lastNameAr:
+          type: string
+          maxLength: 100
+        lastNameEn:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+        nationalId:
+          type: string
+          maxLength: 50
+          nullable: true
+        roleId:
+          type: string
+          format: uuid
+          description: Must be a club-scoped role belonging to the same club
+        branchIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+          description: At least one branch required
+        employmentType:
+          type: string
+          enum: [full-time, part-time, contractor]
+          default: full-time
+        joinedAt:
+          type: string
+          format: date
+          example: "2025-01-15"
+
+    UpdateStaffMemberRequest:
+      type: object
+      properties:
+        firstNameAr:
+          type: string
+          maxLength: 100
+        firstNameEn:
+          type: string
+          maxLength: 100
+        lastNameAr:
+          type: string
+          maxLength: 100
+        lastNameEn:
+          type: string
+          maxLength: 100
+        phone:
+          type: string
+          maxLength: 50
+          nullable: true
+        nationalId:
+          type: string
+          maxLength: 50
+          nullable: true
+        roleId:
+          type: string
+          format: uuid
+        employmentType:
+          type: string
+          enum: [full-time, part-time, contractor]
+        isActive:
+          type: boolean
+
+    StaffMemberResponse:
+      type: object
+      required:
+        - id
+        - userId
+        - organizationId
+        - clubId
+        - firstNameAr
+        - firstNameEn
+        - lastNameAr
+        - lastNameEn
+        - email
+        - role
+        - branches
+        - employmentType
+        - joinedAt
+        - isActive
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        clubId:
+          type: string
+          format: uuid
+        firstNameAr:
+          type: string
+        firstNameEn:
+          type: string
+        lastNameAr:
+          type: string
+        lastNameEn:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        nationalId:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/StaffRoleSummary'
+        branches:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffBranchResponse'
+        employmentType:
+          type: string
+          enum: [full-time, part-time, contractor]
+        joinedAt:
+          type: string
+          format: date
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    StaffMemberSummaryResponse:
+      type: object
+      required: [id, firstNameAr, firstNameEn, lastNameAr, lastNameEn, email, role, isActive]
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstNameAr:
+          type: string
+        firstNameEn:
+          type: string
+        lastNameAr:
+          type: string
+        lastNameEn:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/StaffRoleSummary'
+        isActive:
+          type: boolean
+
+    StaffRoleSummary:
+      type: object
+      required: [id, nameAr, nameEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+
+    StaffBranchResponse:
+      type: object
+      required: [id, nameAr, nameEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameAr:
+          type: string
+        nameEn:
+          type: string
+
+    StaffMemberSummaryPageResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffMemberSummaryResponse'
+        pagination:
+          $ref: './shared-schemas.yaml#/components/schemas/Pagination'

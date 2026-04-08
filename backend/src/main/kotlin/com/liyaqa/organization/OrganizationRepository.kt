@@ -19,4 +19,33 @@ interface OrganizationRepository : JpaRepository<Organization, Long> {
         email: String,
         id: Long,
     ): Boolean
+
+    @org.springframework.data.jpa.repository.Query(
+        value = """
+            SELECT * FROM organizations
+            WHERE deleted_at IS NULL
+              AND (LOWER(name_en) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(name_ar) LIKE LOWER(CONCAT('%', :q, '%')))
+        """,
+        countQuery = """
+            SELECT COUNT(*) FROM organizations
+            WHERE deleted_at IS NULL
+              AND (LOWER(name_en) LIKE LOWER(CONCAT('%', :q, '%'))
+                   OR LOWER(name_ar) LIKE LOWER(CONCAT('%', :q, '%')))
+        """,
+        nativeQuery = true,
+    )
+    fun findAllByDeletedAtIsNullAndNameSearch(
+        @org.springframework.data.repository.query.Param("q") q: String,
+        pageable: Pageable,
+    ): Page<Organization>
+
+    fun countByDeletedAtIsNull(): Long
+
+    fun existsByNameEnAndDeletedAtIsNull(nameEn: String): Boolean
+
+    fun existsByNameEnAndDeletedAtIsNullAndIdNot(
+        nameEn: String,
+        id: Long,
+    ): Boolean
 }

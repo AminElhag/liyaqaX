@@ -1,1 +1,92 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "Sign in to Coach",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "error": "Invalid email or password",
+      "scopeError": "This app is for trainers only"
+    },
+    "logout": "Logout"
+  },
+  "nav": {
+    "schedule": "Schedule",
+    "pt": "PT Sessions",
+    "gx": "GX Classes",
+    "profile": "Profile"
+  },
+  "schedule": {
+    "title": "Today's Schedule",
+    "empty": "No sessions or classes today",
+    "pt_session": "PT Session"
+  },
+  "pt": {
+    "title": "PT Sessions",
+    "upcoming": "Upcoming",
+    "past": "Past",
+    "mark_attended": "Mark Attended",
+    "mark_missed": "Mark Missed",
+    "empty": "No sessions found"
+  },
+  "gx": {
+    "title": "GX Classes",
+    "bookings": "Bookings",
+    "save_attendance": "Save Attendance",
+    "class_not_started": "Class hasn't started yet",
+    "empty": "No classes found"
+  },
+  "profile": {
+    "title": "Profile",
+    "certifications": "Certifications",
+    "expires_soon": "Expires soon",
+    "trainer_type": {
+      "pt": "Personal Trainer",
+      "gx": "Group Exercise Instructor"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications"
+  },
+  "notification.membership_expiring.title": "Membership expiring soon",
+  "notification.membership_expiring.body": "Your {{planName}} membership expires in {{daysRemaining}} days.",
+  "notification.membership_assigned.title": "Membership assigned",
+  "notification.membership_assigned.body": "You have been assigned a {{planName}} membership.",
+  "notification.membership_frozen.title": "Membership frozen",
+  "notification.membership_frozen.body": "Your membership has been frozen until {{freezeEndDate}}.",
+  "notification.payment_collected.title": "Payment received",
+  "notification.payment_collected.body": "A payment of {{amountSar}} SAR has been collected.",
+  "notification.gx_booked.title": "Class booked",
+  "notification.gx_booked.body": "You are booked for {{className}} on {{classDate}}.",
+  "notification.gx_cancelled.title": "Booking cancelled",
+  "notification.gx_cancelled.body": "Your booking for {{className}} on {{classDate}} has been cancelled.",
+  "notification.gx_reminder.title": "Class reminder",
+  "notification.gx_reminder.body": "Your {{className}} class starts in 2 hours.",
+  "notification.pt_session_reminder.title": "PT session tomorrow",
+  "notification.pt_session_reminder.body": "Your PT session with {{trainerName}} is tomorrow at {{time}}.",
+  "notification.pt_attendance_marked.title": "PT attendance marked",
+  "notification.pt_attendance_marked.body": "Your PT session with {{trainerName}} has been marked as {{status}}.",
+  "notification.lead_assigned.title": "New lead assigned",
+  "notification.lead_assigned.body": "{{leadName}} has been assigned to you.",
+  "notification.new_member_registered.title": "New member registered",
+  "notification.new_member_registered.body": "{{memberName}} has just registered.",
+  "notification.low_gx_spots.title": "Low spots alert",
+  "notification.low_gx_spots.body": "Only {{spotsRemaining}} spots left for your upcoming class.",
+  "notes.tab_title": "Notes",
+  "notes.add_button": "Add Note",
+  "notes.type.general": "General",
+  "notes.type.health": "Health",
+  "notes.type.complaint": "Complaint",
+  "notes.type.follow_up": "Follow-up",
+  "notes.type.rejection": "Rejection",
+  "notes.empty": "No notes yet",
+  "common": {
+    "forbidden": "Access Denied",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "cancel": "Cancel",
+    "save": "Save"
+  }
+}

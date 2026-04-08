@@ -18,4 +18,23 @@ interface ClubRepository : JpaRepository<Club, Long> {
         organizationId: Long,
         pageable: Pageable,
     ): Page<Club>
+
+    fun findAllByOrganizationIdAndDeletedAtIsNull(organizationId: Long): List<Club>
+
+    fun countByDeletedAtIsNull(): Long
+
+    fun countByOrganizationIdAndDeletedAtIsNull(organizationId: Long): Long
+
+    fun existsByOrganizationIdAndNameEnAndDeletedAtIsNull(
+        organizationId: Long,
+        nameEn: String,
+    ): Boolean
+
+    fun existsByOrganizationIdAndNameEnAndDeletedAtIsNullAndIdNot(
+        organizationId: Long,
+        nameEn: String,
+        id: Long,
+    ): Boolean
+
+    fun findByPublicIdAndDeletedAtIsNull(publicId: UUID): Optional<Club>
 }

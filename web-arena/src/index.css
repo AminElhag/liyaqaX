@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', 'Noto Sans Arabic', sans-serif;
+  --color-primary: var(--color-primary, #6366F1);
+  --color-secondary: var(--color-secondary, #F1F5F9);
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+
+  [dir='rtl'] {
+    font-feature-settings: 'ss01';
+  }
+}

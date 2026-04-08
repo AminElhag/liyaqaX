@@ -1,1 +1,92 @@
-{}
+{
+  "auth": {
+    "login": {
+      "title": "تسجيل الدخول إلى كوتش",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "submit": "تسجيل الدخول",
+      "error": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+      "scopeError": "هذا التطبيق مخصص للمدربين فقط"
+    },
+    "logout": "تسجيل الخروج"
+  },
+  "nav": {
+    "schedule": "الجدول",
+    "pt": "جلسات التدريب الشخصي",
+    "gx": "الحصص الجماعية",
+    "profile": "الملف الشخصي"
+  },
+  "schedule": {
+    "title": "جدول اليوم",
+    "empty": "لا توجد جلسات أو حصص اليوم",
+    "pt_session": "جلسة تدريب شخصي"
+  },
+  "pt": {
+    "title": "جلسات التدريب الشخصي",
+    "upcoming": "القادمة",
+    "past": "السابقة",
+    "mark_attended": "تسجيل حضور",
+    "mark_missed": "تسجيل غياب",
+    "empty": "لا توجد جلسات"
+  },
+  "gx": {
+    "title": "الحصص الجماعية",
+    "bookings": "الحجوزات",
+    "save_attendance": "حفظ الحضور",
+    "class_not_started": "لم تبدأ الحصة بعد",
+    "empty": "لا توجد حصص"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "certifications": "الشهادات",
+    "expires_soon": "تنتهي قريباً",
+    "trainer_type": {
+      "pt": "مدرب شخصي",
+      "gx": "مدرب حصص جماعية"
+    }
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "markAllRead": "تحديد الكل كمقروء",
+    "empty": "لا توجد إشعارات"
+  },
+  "notification.membership_expiring.title": "العضوية تنتهي قريباً",
+  "notification.membership_expiring.body": "ستنتهي عضويتك {{planName}} خلال {{daysRemaining}} أيام.",
+  "notification.membership_assigned.title": "تم تعيين العضوية",
+  "notification.membership_assigned.body": "تم تعيين عضوية {{planName}} لك.",
+  "notification.membership_frozen.title": "تم تجميد العضوية",
+  "notification.membership_frozen.body": "تم تجميد عضويتك حتى {{freezeEndDate}}.",
+  "notification.payment_collected.title": "تم استلام الدفعة",
+  "notification.payment_collected.body": "تم تحصيل دفعة بمبلغ {{amountSar}} ريال.",
+  "notification.gx_booked.title": "تم حجز الحصة",
+  "notification.gx_booked.body": "تم حجزك في {{className}} بتاريخ {{classDate}}.",
+  "notification.gx_cancelled.title": "تم إلغاء الحجز",
+  "notification.gx_cancelled.body": "تم إلغاء حجزك في {{className}} بتاريخ {{classDate}}.",
+  "notification.gx_reminder.title": "تذكير بالحصة",
+  "notification.gx_reminder.body": "حصة {{className}} تبدأ خلال ساعتين.",
+  "notification.pt_session_reminder.title": "تذكير بجلسة التدريب الشخصي",
+  "notification.pt_session_reminder.body": "جلسة التدريب مع {{trainerName}} غداً الساعة {{time}}.",
+  "notification.pt_attendance_marked.title": "تم تسجيل الحضور",
+  "notification.pt_attendance_marked.body": "تم تسجيل حضور جلستك مع {{trainerName}} كـ {{status}}.",
+  "notification.lead_assigned.title": "عميل محتمل جديد",
+  "notification.lead_assigned.body": "تم تعيين {{leadName}} لك.",
+  "notification.new_member_registered.title": "عضو جديد مسجل",
+  "notification.new_member_registered.body": "تم تسجيل {{memberName}} للتو.",
+  "notification.low_gx_spots.title": "تنبيه أماكن قليلة",
+  "notification.low_gx_spots.body": "بقي {{spotsRemaining}} أماكن فقط في حصتك القادمة.",
+  "notes.tab_title": "الملاحظات",
+  "notes.add_button": "إضافة ملاحظة",
+  "notes.type.general": "عامة",
+  "notes.type.health": "صحية",
+  "notes.type.complaint": "شكوى",
+  "notes.type.follow_up": "متابعة",
+  "notes.type.rejection": "رفض",
+  "notes.empty": "لا توجد ملاحظات بعد",
+  "common": {
+    "forbidden": "الوصول مرفوض",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "cancel": "إلغاء",
+    "save": "حفظ"
+  }
+}

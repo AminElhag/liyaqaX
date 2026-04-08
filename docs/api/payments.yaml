@@ -1,0 +1,92 @@
+paths:
+
+  /api/v1/members/{memberId}/payments:
+    get:
+      summary: Get payment history for a member
+      operationId: getMemberPayments
+      tags: [Payments (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: payment:read
+      parameters:
+        - $ref: './shared-schemas.yaml#/components/parameters/MemberIdPath'
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+  /api/v1/payments:
+    get:
+      summary: List all payments (branch-scoped, paginated)
+      operationId: getAllPayments
+      tags: [Payments (Pulse)]
+      security:
+        - bearerAuth: []
+      x-required-permission: payment:read
+      parameters:
+        - name: branchId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - $ref: './shared-schemas.yaml#/components/parameters/Page'
+        - $ref: './shared-schemas.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Paginated payment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PaymentResponse'
+                  pagination:
+                    $ref: './shared-schemas.yaml#/components/schemas/Pagination'
+
+components:
+  schemas:
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        memberId:
+          type: string
+          format: uuid
+        memberName:
+          type: string
+        amountHalalas:
+          type: integer
+          format: int64
+        amountSar:
+          type: string
+        paymentMethod:
+          type: string
+        referenceNumber:
+          type: string
+          nullable: true
+        invoiceNumber:
+          type: string
+          nullable: true
+        collectedBy:
+          type: string
+        paidAt:
+          type: string
+          format: date-time

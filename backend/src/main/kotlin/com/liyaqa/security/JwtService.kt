@@ -27,10 +27,41 @@ class JwtService(
             .signWith(key)
             .compact()
 
+    fun generateRegistrationToken(
+        phone: String,
+        clubId: Long,
+    ): String =
+        Jwts.builder()
+            .subject(phone)
+            .claims(
+                mapOf(
+                    "scope" to "registration",
+                    "phone" to phone,
+                    "clubId" to clubId,
+                ),
+            )
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(REGISTRATION_TOKEN_TTL_SECONDS)))
+            .signWith(key)
+            .compact()
+
     fun parseToken(token: String): Claims =
         Jwts.parser()
             .verifyWith(key)
             .build()
             .parseSignedClaims(token)
             .payload
+
+    fun parseRegistrationToken(token: String): Claims {
+        val claims = parseToken(token)
+        val scope = claims["scope"] as? String
+        if (scope != "registration") {
+            throw io.jsonwebtoken.JwtException("Invalid token scope")
+        }
+        return claims
+    }
+
+    companion object {
+        private const val REGISTRATION_TOKEN_TTL_SECONDS = 900L // 15 minutes
+    }
 }
