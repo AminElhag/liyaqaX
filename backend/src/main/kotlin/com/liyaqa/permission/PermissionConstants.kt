@@ -150,4 +150,10 @@ object PermissionConstants {
     const val ZATCA_ONBOARD = "zatca:onboard"
     const val ZATCA_READ = "zatca:read"
     const val ZATCA_RETRY = "zatca:retry"
+
+    // ── Member Note ──────────────────────────────────────────────────────────
+    const val MEMBER_NOTE_CREATE = "member-note:create"
+    const val MEMBER_NOTE_READ = "member-note:read"
+    const val MEMBER_NOTE_DELETE = "member-note:delete"
+    const val MEMBER_NOTE_FOLLOW_UP_READ = "member-note:follow-up:read"
 }

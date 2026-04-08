@@ -74,9 +74,19 @@
   "notification.new_member_registered.body": "تم تسجيل {{memberName}} للتو.",
   "notification.low_gx_spots.title": "تنبيه أماكن قليلة",
   "notification.low_gx_spots.body": "بقي {{spotsRemaining}} أماكن فقط في حصتك القادمة.",
+  "notes.tab_title": "الملاحظات",
+  "notes.add_button": "إضافة ملاحظة",
+  "notes.type.general": "عامة",
+  "notes.type.health": "صحية",
+  "notes.type.complaint": "شكوى",
+  "notes.type.follow_up": "متابعة",
+  "notes.type.rejection": "رفض",
+  "notes.empty": "لا توجد ملاحظات بعد",
   "common": {
     "forbidden": "الوصول مرفوض",
     "loading": "جاري التحميل...",
-    "error": "حدث خطأ"
+    "error": "حدث خطأ",
+    "cancel": "إلغاء",
+    "save": "حفظ"
   }
 }

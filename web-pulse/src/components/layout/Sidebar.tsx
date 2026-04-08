@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { hasPermission } from '@/lib/permissions'
+import { Permission } from '@/types/permissions'
 import { getPendingMembers, memberKeys } from '@/api/members'
+import { getFollowUps, memberNoteKeys } from '@/api/memberNotes'
 
 interface NavItem {
   key: string
@@ -20,6 +24,7 @@ const navItems: NavItem[] = [
   { key: 'pt', to: '/pt', icon: '◆' },
   { key: 'gx', to: '/gx', icon: '○' },
   { key: 'leads', to: '/leads', icon: '◐' },
+  { key: 'follow_ups', to: '/follow-ups', icon: '◔' },
   { key: 'cash_drawer', to: '/cash-drawer', icon: '◧' },
   { key: 'reports', to: '/reports', icon: '◑' },
   { key: 'settings', to: '/settings', icon: '◒' },
@@ -31,12 +36,23 @@ export function Sidebar() {
   const matches = useMatches()
   const currentPath = matches[matches.length - 1]?.fullPath ?? '/'
 
+  const permissions = useAuthStore((s) => s.permissions)
+  const canSeeFollowUps = hasPermission(permissions, Permission.MEMBER_NOTE_FOLLOW_UP_READ)
+
   const { data: pendingData } = useQuery({
     queryKey: memberKeys.pendingCount(),
     queryFn: () => getPendingMembers({ page: 0, size: 1 }),
     refetchInterval: 60_000,
   })
   const pendingCount = pendingData?.pagination.totalElements ?? 0
+
+  const { data: followUpData } = useQuery({
+    queryKey: memberNoteKeys.followUps(),
+    queryFn: getFollowUps,
+    enabled: canSeeFollowUps,
+    refetchInterval: 60_000,
+  })
+  const followUpTodayCount = followUpData?.followUps.filter((f) => f.daysUntilDue <= 0).length ?? 0
 
   return (
     <aside
@@ -61,40 +77,52 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto p-2">
         <ul className="space-y-1">
-          {navItems.map((item) => {
-            const isActive =
-              item.to === '/'
-                ? currentPath === '/'
-                : currentPath.startsWith(item.to)
+          {navItems
+            .filter((item) => {
+              if (item.key === 'follow_ups') return canSeeFollowUps
+              return true
+            })
+            .map((item) => {
+              const isActive =
+                item.to === '/'
+                  ? currentPath === '/'
+                  : currentPath.startsWith(item.to)
 
-            return (
-              <li key={item.key}>
-                <Link
-                  to={item.to}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                    isCollapsed && 'justify-center px-2',
-                  )}
-                  title={isCollapsed ? t(`nav.${item.key}`) : undefined}
-                >
-                  <span className="text-base">{item.icon}</span>
-                  {!isCollapsed && (
-                    <span className="flex flex-1 items-center justify-between">
-                      <span>{t(`nav.${item.key}`)}</span>
-                      {item.key === 'members' && pendingCount > 0 && (
-                        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                          {pendingCount}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            )
-          })}
+              const badgeCount =
+                item.key === 'members'
+                  ? pendingCount
+                  : item.key === 'follow_ups'
+                    ? followUpTodayCount
+                    : 0
+
+              return (
+                <li key={item.key}>
+                  <Link
+                    to={item.to}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                      isCollapsed && 'justify-center px-2',
+                    )}
+                    title={isCollapsed ? t(`nav.${item.key}`) : undefined}
+                  >
+                    <span className="text-base">{item.icon}</span>
+                    {!isCollapsed && (
+                      <span className="flex flex-1 items-center justify-between">
+                        <span>{t(`nav.${item.key}`)}</span>
+                        {badgeCount > 0 && (
+                          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                            {badgeCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              )
+            })}
         </ul>
       </nav>
     </aside>

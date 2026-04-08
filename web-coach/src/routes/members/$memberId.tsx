@@ -1,9 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { MemberNotes } from '@/components/members/MemberNotes'
 
 export const Route = createFileRoute('/members/$memberId')({
-  component: RouteComponent,
+  component: MemberDetail,
 })
 
-function RouteComponent() {
-  return <div>Hello "/members/$memberId"!</div>
+function MemberDetail() {
+  const { memberId } = Route.useParams()
+  return (
+    <div className="p-4">
+      <MemberNotes memberId={memberId} />
+    </div>
+  )
 }

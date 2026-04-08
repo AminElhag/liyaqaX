@@ -210,6 +210,10 @@ class DevDataLoader(
             PermissionConstants.PORTAL_SETTINGS_UPDATE,
             PermissionConstants.REPORT_CUSTOM_RUN,
             PermissionConstants.ZATCA_READ,
+            PermissionConstants.MEMBER_NOTE_CREATE,
+            PermissionConstants.MEMBER_NOTE_READ,
+            PermissionConstants.MEMBER_NOTE_DELETE,
+            PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
         )
 
     private val clubBranchManager =
@@ -235,6 +239,10 @@ class DevDataLoader(
             PermissionConstants.CASH_DRAWER_OPEN, PermissionConstants.CASH_DRAWER_CLOSE,
             PermissionConstants.CASH_DRAWER_READ, PermissionConstants.CASH_DRAWER_ENTRY_CREATE,
             PermissionConstants.BRANCH_READ,
+            PermissionConstants.MEMBER_NOTE_CREATE,
+            PermissionConstants.MEMBER_NOTE_READ,
+            PermissionConstants.MEMBER_NOTE_DELETE,
+            PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
         )
 
     private val clubSalesAgent =
@@ -250,6 +258,10 @@ class DevDataLoader(
             PermissionConstants.PAYMENT_COLLECT,
             PermissionConstants.BRANCH_READ,
             PermissionConstants.REPORT_LEADS_VIEW,
+            PermissionConstants.MEMBER_NOTE_CREATE,
+            PermissionConstants.MEMBER_NOTE_READ,
+            PermissionConstants.MEMBER_NOTE_DELETE,
+            PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
         )
 
     private val trainerPt =
@@ -260,6 +272,7 @@ class DevDataLoader(
             PermissionConstants.GX_CLASS_READ, PermissionConstants.GX_CLASS_MARK_ATTENDANCE,
             PermissionConstants.MESSAGE_SEND, PermissionConstants.AVAILABILITY_MANAGE,
             PermissionConstants.PROFILE_UPDATE, PermissionConstants.EARNINGS_READ,
+            PermissionConstants.MEMBER_NOTE_CREATE, PermissionConstants.MEMBER_NOTE_READ,
         )
 
     private val trainerGx =
@@ -271,6 +284,7 @@ class DevDataLoader(
             PermissionConstants.AVAILABILITY_MANAGE,
             PermissionConstants.PROFILE_UPDATE,
             PermissionConstants.EARNINGS_READ,
+            PermissionConstants.MEMBER_NOTE_CREATE, PermissionConstants.MEMBER_NOTE_READ,
         )
 
     private val memberPerms =

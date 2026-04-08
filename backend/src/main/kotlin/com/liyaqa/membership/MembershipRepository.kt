@@ -132,4 +132,24 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
         @Param("cutoffDate") cutoffDate: LocalDate,
         pageable: Pageable,
     ): Page<Membership>
+
+    @Query(
+        value = """
+            SELECT ms.id, ms.public_id AS publicId, ms.membership_status AS status,
+                   ms.start_date AS startDate, ms.end_date AS endDate,
+                   ms.created_at AS createdAt, ms.updated_at AS updatedAt,
+                   mp.name_en AS planNameEn, mp.name_ar AS planNameAr
+            FROM memberships ms
+            JOIN membership_plans mp ON mp.id = ms.plan_id
+            WHERE ms.member_id = :memberId
+              AND ms.deleted_at IS NULL
+            ORDER BY ms.created_at DESC
+            LIMIT :limit
+        """,
+        nativeQuery = true,
+    )
+    fun findByMemberIdForTimeline(
+        @Param("memberId") memberId: Long,
+        @Param("limit") limit: Int,
+    ): List<MembershipTimelineProjection>
 }

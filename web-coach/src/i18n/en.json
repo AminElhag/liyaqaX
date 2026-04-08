@@ -74,9 +74,19 @@
   "notification.new_member_registered.body": "{{memberName}} has just registered.",
   "notification.low_gx_spots.title": "Low spots alert",
   "notification.low_gx_spots.body": "Only {{spotsRemaining}} spots left for your upcoming class.",
+  "notes.tab_title": "Notes",
+  "notes.add_button": "Add Note",
+  "notes.type.general": "General",
+  "notes.type.health": "Health",
+  "notes.type.complaint": "Complaint",
+  "notes.type.follow_up": "Follow-up",
+  "notes.type.rejection": "Rejection",
+  "notes.empty": "No notes yet",
   "common": {
     "forbidden": "Access Denied",
     "loading": "Loading...",
-    "error": "An error occurred"
+    "error": "An error occurred",
+    "cancel": "Cancel",
+    "save": "Save"
   }
 }

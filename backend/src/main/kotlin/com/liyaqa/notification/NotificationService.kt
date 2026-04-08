@@ -185,4 +185,5 @@ private val SCHEDULER_TYPES =
         NotificationType.GX_CLASS_REMINDER,
         NotificationType.ZATCA_CSID_EXPIRING_SOON,
         NotificationType.ZATCA_INVOICE_DEADLINE_AT_RISK,
+        NotificationType.FOLLOW_UP_DUE,
     )

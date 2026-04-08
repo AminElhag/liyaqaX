@@ -18,6 +18,7 @@ import { Route as MembershipsIndexRouteImport } from './routes/memberships/index
 import { Route as MembersIndexRouteImport } from './routes/members/index'
 import { Route as LeadsIndexRouteImport } from './routes/leads/index'
 import { Route as GxIndexRouteImport } from './routes/gx/index'
+import { Route as FollowUpsIndexRouteImport } from './routes/follow-ups/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as CashDrawerIndexRouteImport } from './routes/cash-drawer/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
@@ -53,6 +54,7 @@ import { Route as ReportsBuilderTemplateIdRouteImport } from './routes/reports/b
 import { Route as MembersMemberIdPtRouteImport } from './routes/members/$memberId.pt'
 import { Route as MembersMemberIdPaymentsRouteImport } from './routes/members/$memberId.payments'
 import { Route as MembersMemberIdOverviewRouteImport } from './routes/members/$memberId.overview'
+import { Route as MembersMemberIdNotesRouteImport } from './routes/members/$memberId.notes'
 import { Route as MembersMemberIdMembershipRouteImport } from './routes/members/$memberId.membership'
 import { Route as MembersMemberIdGxRouteImport } from './routes/members/$memberId.gx'
 import { Route as MembersMemberIdBodyMetricsRouteImport } from './routes/members/$memberId.body-metrics'
@@ -100,6 +102,11 @@ const LeadsIndexRoute = LeadsIndexRouteImport.update({
 const GxIndexRoute = GxIndexRouteImport.update({
   id: '/gx/',
   path: '/gx/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowUpsIndexRoute = FollowUpsIndexRouteImport.update({
+  id: '/follow-ups/',
+  path: '/follow-ups/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceIndexRoute = FinanceIndexRouteImport.update({
@@ -278,6 +285,11 @@ const MembersMemberIdOverviewRoute = MembersMemberIdOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => MembersMemberIdRoute,
 } as any)
+const MembersMemberIdNotesRoute = MembersMemberIdNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => MembersMemberIdRoute,
+} as any)
 const MembersMemberIdMembershipRoute =
   MembersMemberIdMembershipRouteImport.update({
     id: '/membership',
@@ -325,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
+  '/follow-ups/': typeof FollowUpsIndexRoute
   '/gx/': typeof GxIndexRoute
   '/leads/': typeof LeadsIndexRoute
   '/members/': typeof MembersIndexRoute
@@ -336,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
+  '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -374,6 +388,7 @@ export interface FileRoutesByTo {
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer': typeof CashDrawerIndexRoute
   '/finance': typeof FinanceIndexRoute
+  '/follow-ups': typeof FollowUpsIndexRoute
   '/gx': typeof GxIndexRoute
   '/leads': typeof LeadsIndexRoute
   '/members': typeof MembersIndexRoute
@@ -385,6 +400,7 @@ export interface FileRoutesByTo {
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
+  '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -424,6 +440,7 @@ export interface FileRoutesById {
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
   '/finance/': typeof FinanceIndexRoute
+  '/follow-ups/': typeof FollowUpsIndexRoute
   '/gx/': typeof GxIndexRoute
   '/leads/': typeof LeadsIndexRoute
   '/members/': typeof MembersIndexRoute
@@ -435,6 +452,7 @@ export interface FileRoutesById {
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
+  '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -475,6 +493,7 @@ export interface FileRouteTypes {
     | '/staff/$staffId'
     | '/cash-drawer/'
     | '/finance/'
+    | '/follow-ups/'
     | '/gx/'
     | '/leads/'
     | '/members/'
@@ -486,6 +505,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/body-metrics'
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
+    | '/members/$memberId/notes'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -524,6 +544,7 @@ export interface FileRouteTypes {
     | '/staff/$staffId'
     | '/cash-drawer'
     | '/finance'
+    | '/follow-ups'
     | '/gx'
     | '/leads'
     | '/members'
@@ -535,6 +556,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/body-metrics'
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
+    | '/members/$memberId/notes'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -573,6 +595,7 @@ export interface FileRouteTypes {
     | '/staff/$staffId'
     | '/cash-drawer/'
     | '/finance/'
+    | '/follow-ups/'
     | '/gx/'
     | '/leads/'
     | '/members/'
@@ -584,6 +607,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/body-metrics'
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
+    | '/members/$memberId/notes'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -623,6 +647,7 @@ export interface RootRouteChildren {
   StaffStaffIdRoute: typeof StaffStaffIdRoute
   CashDrawerIndexRoute: typeof CashDrawerIndexRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
+  FollowUpsIndexRoute: typeof FollowUpsIndexRoute
   GxIndexRoute: typeof GxIndexRoute
   LeadsIndexRoute: typeof LeadsIndexRoute
   MembersIndexRoute: typeof MembersIndexRoute
@@ -701,6 +726,13 @@ declare module '@tanstack/react-router' {
       path: '/gx'
       fullPath: '/gx/'
       preLoaderRoute: typeof GxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/follow-ups/': {
+      id: '/follow-ups/'
+      path: '/follow-ups'
+      fullPath: '/follow-ups/'
+      preLoaderRoute: typeof FollowUpsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/finance/': {
@@ -948,6 +980,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MembersMemberIdOverviewRouteImport
       parentRoute: typeof MembersMemberIdRoute
     }
+    '/members/$memberId/notes': {
+      id: '/members/$memberId/notes'
+      path: '/notes'
+      fullPath: '/members/$memberId/notes'
+      preLoaderRoute: typeof MembersMemberIdNotesRouteImport
+      parentRoute: typeof MembersMemberIdRoute
+    }
     '/members/$memberId/membership': {
       id: '/members/$memberId/membership'
       path: '/membership'
@@ -976,6 +1015,7 @@ interface MembersMemberIdRouteChildren {
   MembersMemberIdBodyMetricsRoute: typeof MembersMemberIdBodyMetricsRoute
   MembersMemberIdGxRoute: typeof MembersMemberIdGxRoute
   MembersMemberIdMembershipRoute: typeof MembersMemberIdMembershipRoute
+  MembersMemberIdNotesRoute: typeof MembersMemberIdNotesRoute
   MembersMemberIdOverviewRoute: typeof MembersMemberIdOverviewRoute
   MembersMemberIdPaymentsRoute: typeof MembersMemberIdPaymentsRoute
   MembersMemberIdPtRoute: typeof MembersMemberIdPtRoute
@@ -985,6 +1025,7 @@ const MembersMemberIdRouteChildren: MembersMemberIdRouteChildren = {
   MembersMemberIdBodyMetricsRoute: MembersMemberIdBodyMetricsRoute,
   MembersMemberIdGxRoute: MembersMemberIdGxRoute,
   MembersMemberIdMembershipRoute: MembersMemberIdMembershipRoute,
+  MembersMemberIdNotesRoute: MembersMemberIdNotesRoute,
   MembersMemberIdOverviewRoute: MembersMemberIdOverviewRoute,
   MembersMemberIdPaymentsRoute: MembersMemberIdPaymentsRoute,
   MembersMemberIdPtRoute: MembersMemberIdPtRoute,
@@ -1023,6 +1064,7 @@ const rootRouteChildren: RootRouteChildren = {
   StaffStaffIdRoute: StaffStaffIdRoute,
   CashDrawerIndexRoute: CashDrawerIndexRoute,
   FinanceIndexRoute: FinanceIndexRoute,
+  FollowUpsIndexRoute: FollowUpsIndexRoute,
   GxIndexRoute: GxIndexRoute,
   LeadsIndexRoute: LeadsIndexRoute,
   MembersIndexRoute: MembersIndexRoute,

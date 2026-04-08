@@ -1,6 +1,7 @@
 package com.liyaqa.notification
 
 import com.liyaqa.gx.GXClassInstanceRepository
+import com.liyaqa.member.MemberNoteRepository
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.membership.MembershipRepository
 import com.liyaqa.pt.PTSessionRepository
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 @Service
@@ -24,6 +27,7 @@ class NotificationSchedulerService(
     private val gxClassInstanceRepository: GXClassInstanceRepository,
     private val trainerRepository: TrainerRepository,
     private val userRepository: UserRepository,
+    private val memberNoteRepository: MemberNoteRepository,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(NotificationSchedulerService::class.java)
@@ -47,6 +51,11 @@ class NotificationSchedulerService(
             generateLowGxSpotsNotifications()
         } catch (e: Exception) {
             log.warn("Error generating low GX spots notifications: {}", e.message)
+        }
+        try {
+            generateFollowUpDueNotifications()
+        } catch (e: Exception) {
+            log.warn("Error generating follow-up due notifications: {}", e.message)
         }
         try {
             cleanupOldNotifications()
@@ -145,6 +154,27 @@ class NotificationSchedulerService(
             )?.let { count++ }
         }
         if (count > 0) log.info("Created {} LOW_GX_SPOTS notifications", count)
+    }
+
+    private fun generateFollowUpDueNotifications() {
+        val today = LocalDate.now(ZoneId.of("Asia/Riyadh"))
+        val dueNotes = memberNoteRepository.findFollowUpsDueToday(today)
+        var count = 0
+        for (note in dueNotes) {
+            val member = memberRepository.findById(note.memberId).orElse(null) ?: continue
+            val memberName = "${member.firstNameEn} ${member.lastNameEn}".trim()
+            val truncatedContent = note.content.take(80)
+
+            notificationService.create(
+                recipientUserId = note.createdByUserId,
+                recipientScope = "club",
+                type = NotificationType.FOLLOW_UP_DUE,
+                paramsJson = """{"memberName":"$memberName","noteContent":"$truncatedContent"}""",
+                entityType = "MemberNote",
+                entityId = note.publicId.toString(),
+            )?.let { count++ }
+        }
+        if (count > 0) log.info("Created {} FOLLOW_UP_DUE notifications", count)
     }
 
     private fun cleanupOldNotifications() {

@@ -95,6 +95,12 @@ export const Permission = {
 
   // ZATCA
   ZATCA_READ: 'zatca:read',
+
+  // Member Notes
+  MEMBER_NOTE_CREATE: 'member-note:create',
+  MEMBER_NOTE_READ: 'member-note:read',
+  MEMBER_NOTE_DELETE: 'member-note:delete',
+  MEMBER_NOTE_FOLLOW_UP_READ: 'member-note:follow-up:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

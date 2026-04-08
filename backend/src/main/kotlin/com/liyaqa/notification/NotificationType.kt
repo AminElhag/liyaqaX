@@ -95,4 +95,9 @@ enum class NotificationType(
         "notification.gx_waitlist_confirmed.body",
         false,
     ),
+    FOLLOW_UP_DUE(
+        "notification.follow_up_due.title",
+        "notification.follow_up_due.body",
+        false,
+    ),
 }

@@ -16,6 +16,7 @@ const tabs = [
   { key: 'payments', to: '/members/$memberId/payments' as const },
   { key: 'pt', to: '/members/$memberId/pt' as const },
   { key: 'gx', to: '/members/$memberId/gx' as const },
+  { key: 'notes', to: '/members/$memberId/notes' as const },
 ] as const
 
 function MemberProfileLayout() {
