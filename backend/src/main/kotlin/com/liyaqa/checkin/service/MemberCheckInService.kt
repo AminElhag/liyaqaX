@@ -2,7 +2,6 @@ package com.liyaqa.checkin.service
 
 import com.liyaqa.audit.AuditAction
 import com.liyaqa.audit.AuditService
-import com.liyaqa.branch.Branch
 import com.liyaqa.branch.BranchRepository
 import com.liyaqa.checkin.dto.CheckInResponse
 import com.liyaqa.checkin.dto.RecentCheckInItem
@@ -52,32 +51,37 @@ class MemberCheckInService(
         organizationPublicId: UUID,
         clubPublicId: UUID,
     ): CheckInResponse {
-        val org = organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
+        val org =
+            organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
 
-        val branch = branchRepository.findByPublicIdAndClubIdAndDeletedAtIsNull(branchPublicId, org.id)
-            .orElseGet {
-                branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
-                    .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
-            }
+        val branch =
+            branchRepository.findByPublicIdAndClubIdAndDeletedAtIsNull(branchPublicId, org.id)
+                .orElseGet {
+                    branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
+                        .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
+                }
 
-        val member = memberRepository.findByPublicIdAndDeletedAtIsNull(memberPublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Member not found.") }
+        val member =
+            memberRepository.findByPublicIdAndDeletedAtIsNull(memberPublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Member not found.") }
 
-        val actorUser = userRepository.findByPublicIdAndDeletedAtIsNull(actorUserPublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "User not found.") }
+        val actorUser =
+            userRepository.findByPublicIdAndDeletedAtIsNull(actorUserPublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "User not found.") }
 
         validateMemberStatus(member)
         checkDuplicate(member.id, branch.id)
 
-        val checkIn = checkInRepository.save(
-            MemberCheckIn(
-                memberId = member.id,
-                branchId = branch.id,
-                checkedInByUserId = actorUser.id,
-                method = method,
-            ),
-        )
+        val checkIn =
+            checkInRepository.save(
+                MemberCheckIn(
+                    memberId = member.id,
+                    branchId = branch.id,
+                    checkedInByUserId = actorUser.id,
+                    method = method,
+                ),
+            )
 
         auditService.logFromContext(
             action = AuditAction.MEMBER_CHECKED_IN,
@@ -101,12 +105,17 @@ class MemberCheckInService(
         )
     }
 
-    fun getTodayCount(branchPublicId: UUID, organizationPublicId: UUID): TodayCountResponse {
-        val org = organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
+    fun getTodayCount(
+        branchPublicId: UUID,
+        organizationPublicId: UUID,
+    ): TodayCountResponse {
+        val org =
+            organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
 
-        val branch = branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
+        val branch =
+            branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
 
         val todayRiyadh = LocalDate.now(RIYADH_ZONE)
         val count = checkInRepository.countTodayByBranch(branch.id, todayRiyadh)
@@ -118,25 +127,31 @@ class MemberCheckInService(
         )
     }
 
-    fun getRecent(branchPublicId: UUID, organizationPublicId: UUID): RecentCheckInsResponse {
-        val org = organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
+    fun getRecent(
+        branchPublicId: UUID,
+        organizationPublicId: UUID,
+    ): RecentCheckInsResponse {
+        val org =
+            organizationRepository.findByPublicIdAndDeletedAtIsNull(organizationPublicId)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Organization not found.") }
 
-        val branch = branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
-            .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
+        val branch =
+            branchRepository.findByPublicIdAndOrganizationIdAndDeletedAtIsNull(branchPublicId, org.id)
+                .orElseThrow { ArenaException(HttpStatus.NOT_FOUND, "resource-not-found", "Branch not found.") }
 
         val projections = checkInRepository.findRecentByBranch(branch.id)
 
         return RecentCheckInsResponse(
-            checkIns = projections.map { p ->
-                RecentCheckInItem(
-                    checkInId = p.publicId,
-                    memberName = p.memberNameEn ?: p.memberNameAr,
-                    memberPhone = p.phone,
-                    method = p.method,
-                    checkedInAt = p.checkedInAt,
-                )
-            },
+            checkIns =
+                projections.map { p ->
+                    RecentCheckInItem(
+                        checkInId = p.publicId,
+                        memberName = p.memberNameEn ?: p.memberNameAr,
+                        memberPhone = p.phone,
+                        method = p.method,
+                        checkedInAt = p.checkedInAt,
+                    )
+                },
         )
     }
 
@@ -144,9 +159,11 @@ class MemberCheckInService(
         when (member.membershipStatus) {
             "active" -> return
             "lapsed" -> {
-                val membership = membershipRepository.findByMemberIdAndMembershipStatusAndDeletedAtIsNull(
-                    member.id, "active",
-                ).orElse(null)
+                val membership =
+                    membershipRepository.findByMemberIdAndMembershipStatusAndDeletedAtIsNull(
+                        member.id,
+                        "active",
+                    ).orElse(null)
                 val endDateStr = membership?.endDate?.toString() ?: "N/A"
                 throw ArenaException(
                     status = HttpStatus.CONFLICT,
@@ -163,14 +180,18 @@ class MemberCheckInService(
         }
     }
 
-    private fun checkDuplicate(memberId: Long, branchId: Long) {
+    private fun checkDuplicate(
+        memberId: Long,
+        branchId: Long,
+    ) {
         val threshold = Instant.now().minus(DUPLICATE_WINDOW)
         val recentCount = checkInRepository.countRecentCheckIns(memberId, branchId, threshold)
         if (recentCount > 0) {
             val lastCheckIn = checkInRepository.findTopByMemberIdAndBranchIdOrderByCheckedInAtDesc(memberId, branchId)
-            val minutesAgo = lastCheckIn?.let {
-                Duration.between(it.checkedInAt, Instant.now()).toMinutes()
-            } ?: DUPLICATE_WINDOW.toMinutes()
+            val minutesAgo =
+                lastCheckIn?.let {
+                    Duration.between(it.checkedInAt, Instant.now()).toMinutes()
+                } ?: DUPLICATE_WINDOW.toMinutes()
             throw ArenaException(
                 status = HttpStatus.CONFLICT,
                 errorType = "conflict",
@@ -185,9 +206,10 @@ class MemberCheckInService(
     }
 
     private fun resolveMembershipPlanName(memberId: Long): String? {
-        val membership = membershipRepository.findByMemberIdAndMembershipStatusInAndDeletedAtIsNull(
-            memberId, listOf("active", "frozen"),
-        ).orElse(null) ?: return null
+        val membership =
+            membershipRepository.findByMemberIdAndMembershipStatusInAndDeletedAtIsNull(
+                memberId, listOf("active", "frozen"),
+            ).orElse(null) ?: return null
 
         return membershipPlanRepository.findById(membership.planId)
             .map { it.nameEn }

@@ -10,7 +10,6 @@ import java.time.LocalDate
 
 @Repository
 interface MemberCheckInRepository : JpaRepository<MemberCheckIn, Long> {
-
     @Query(
         value = """
             SELECT COUNT(*) FROM member_check_ins

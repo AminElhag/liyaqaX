@@ -28,6 +28,8 @@ const navItems: NavItem[] = [
   { key: 'gx', to: '/gx', icon: '○' },
   { key: 'leads', to: '/leads', icon: '◐' },
   { key: 'follow_ups', to: '/follow-ups', icon: '◔' },
+  { key: 'schedule', to: '/schedule', icon: '◫' },
+  { key: 'my_shifts', to: '/my-shifts', icon: '◰' },
   { key: 'cash_drawer', to: '/cash-drawer', icon: '◧' },
   { key: 'reports', to: '/reports', icon: '◑' },
   { key: 'settings', to: '/settings', icon: '◒' },
@@ -42,6 +44,8 @@ export function Sidebar() {
   const permissions = useAuthStore((s) => s.permissions)
   const canSeeFollowUps = hasPermission(permissions, Permission.MEMBER_NOTE_FOLLOW_UP_READ)
   const canSeeCheckIn = hasPermission(permissions, Permission.CHECK_IN_READ)
+  const canSeeSchedule = hasPermission(permissions, Permission.SHIFT_MANAGE)
+  const canSeeMyShifts = hasPermission(permissions, Permission.SHIFT_READ)
 
   const { data: pendingData } = useQuery({
     queryKey: memberKeys.pendingCount(),
@@ -92,6 +96,8 @@ export function Sidebar() {
             .filter((item) => {
               if (item.key === 'follow_ups') return canSeeFollowUps
               if (item.key === 'check_in') return canSeeCheckIn
+              if (item.key === 'schedule') return canSeeSchedule
+              if (item.key === 'my_shifts') return canSeeMyShifts
               return true
             })
             .map((item) => {

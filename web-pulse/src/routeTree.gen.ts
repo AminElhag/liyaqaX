@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StaffIndexRouteImport } from './routes/staff/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as ScheduleIndexRouteImport } from './routes/schedule/index'
 import { Route as ReportsIndexRouteImport } from './routes/reports/index'
 import { Route as PtIndexRouteImport } from './routes/pt/index'
+import { Route as MyShiftsIndexRouteImport } from './routes/my-shifts/index'
 import { Route as MembershipsIndexRouteImport } from './routes/memberships/index'
 import { Route as MembersIndexRouteImport } from './routes/members/index'
 import { Route as LeadsIndexRouteImport } from './routes/leads/index'
@@ -77,6 +79,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ScheduleIndexRoute = ScheduleIndexRouteImport.update({
+  id: '/schedule/',
+  path: '/schedule/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsIndexRoute = ReportsIndexRouteImport.update({
   id: '/reports/',
   path: '/reports/',
@@ -85,6 +92,11 @@ const ReportsIndexRoute = ReportsIndexRouteImport.update({
 const PtIndexRoute = PtIndexRouteImport.update({
   id: '/pt/',
   path: '/pt/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyShiftsIndexRoute = MyShiftsIndexRouteImport.update({
+  id: '/my-shifts/',
+  path: '/my-shifts/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembershipsIndexRoute = MembershipsIndexRouteImport.update({
@@ -363,8 +375,10 @@ export interface FileRoutesByFullPath {
   '/leads/': typeof LeadsIndexRoute
   '/members/': typeof MembersIndexRoute
   '/memberships/': typeof MembershipsIndexRoute
+  '/my-shifts/': typeof MyShiftsIndexRoute
   '/pt/': typeof PtIndexRoute
   '/reports/': typeof ReportsIndexRoute
+  '/schedule/': typeof ScheduleIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
@@ -417,8 +431,10 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsIndexRoute
   '/members': typeof MembersIndexRoute
   '/memberships': typeof MembershipsIndexRoute
+  '/my-shifts': typeof MyShiftsIndexRoute
   '/pt': typeof PtIndexRoute
   '/reports': typeof ReportsIndexRoute
+  '/schedule': typeof ScheduleIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/staff': typeof StaffIndexRoute
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
@@ -472,8 +488,10 @@ export interface FileRoutesById {
   '/leads/': typeof LeadsIndexRoute
   '/members/': typeof MembersIndexRoute
   '/memberships/': typeof MembershipsIndexRoute
+  '/my-shifts/': typeof MyShiftsIndexRoute
   '/pt/': typeof PtIndexRoute
   '/reports/': typeof ReportsIndexRoute
+  '/schedule/': typeof ScheduleIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/staff/': typeof StaffIndexRoute
   '/members/$memberId/body-metrics': typeof MembersMemberIdBodyMetricsRoute
@@ -528,8 +546,10 @@ export interface FileRouteTypes {
     | '/leads/'
     | '/members/'
     | '/memberships/'
+    | '/my-shifts/'
     | '/pt/'
     | '/reports/'
+    | '/schedule/'
     | '/settings/'
     | '/staff/'
     | '/members/$memberId/body-metrics'
@@ -582,8 +602,10 @@ export interface FileRouteTypes {
     | '/leads'
     | '/members'
     | '/memberships'
+    | '/my-shifts'
     | '/pt'
     | '/reports'
+    | '/schedule'
     | '/settings'
     | '/staff'
     | '/members/$memberId/body-metrics'
@@ -636,8 +658,10 @@ export interface FileRouteTypes {
     | '/leads/'
     | '/members/'
     | '/memberships/'
+    | '/my-shifts/'
     | '/pt/'
     | '/reports/'
+    | '/schedule/'
     | '/settings/'
     | '/staff/'
     | '/members/$memberId/body-metrics'
@@ -691,8 +715,10 @@ export interface RootRouteChildren {
   LeadsIndexRoute: typeof LeadsIndexRoute
   MembersIndexRoute: typeof MembersIndexRoute
   MembershipsIndexRoute: typeof MembershipsIndexRoute
+  MyShiftsIndexRoute: typeof MyShiftsIndexRoute
   PtIndexRoute: typeof PtIndexRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
+  ScheduleIndexRoute: typeof ScheduleIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   StaffIndexRoute: typeof StaffIndexRoute
   ReportsBuilderTemplateIdRoute: typeof ReportsBuilderTemplateIdRoute
@@ -725,6 +751,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/schedule/': {
+      id: '/schedule/'
+      path: '/schedule'
+      fullPath: '/schedule/'
+      preLoaderRoute: typeof ScheduleIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/': {
       id: '/reports/'
       path: '/reports'
@@ -737,6 +770,13 @@ declare module '@tanstack/react-router' {
       path: '/pt'
       fullPath: '/pt/'
       preLoaderRoute: typeof PtIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-shifts/': {
+      id: '/my-shifts/'
+      path: '/my-shifts'
+      fullPath: '/my-shifts/'
+      preLoaderRoute: typeof MyShiftsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memberships/': {
@@ -1132,8 +1172,10 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsIndexRoute: LeadsIndexRoute,
   MembersIndexRoute: MembersIndexRoute,
   MembershipsIndexRoute: MembershipsIndexRoute,
+  MyShiftsIndexRoute: MyShiftsIndexRoute,
   PtIndexRoute: PtIndexRoute,
   ReportsIndexRoute: ReportsIndexRoute,
+  ScheduleIndexRoute: ScheduleIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   StaffIndexRoute: StaffIndexRoute,
   ReportsBuilderTemplateIdRoute: ReportsBuilderTemplateIdRoute,

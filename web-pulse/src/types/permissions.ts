@@ -111,6 +111,10 @@ export const Permission = {
   // Check-In
   CHECK_IN_CREATE: 'check-in:create',
   CHECK_IN_READ: 'check-in:read',
+
+  // Shift
+  SHIFT_MANAGE: 'shift:manage',
+  SHIFT_READ: 'shift:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

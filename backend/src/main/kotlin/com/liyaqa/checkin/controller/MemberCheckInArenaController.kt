@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/arena")
 @Tag(name = "Arena Check-In QR", description = "Member QR code for check-in")
 class MemberCheckInArenaController {
-
     @GetMapping("/me/qr")
     @Operation(summary = "Get the member's check-in QR code value")
     fun getQrValue(authentication: Authentication): ResponseEntity<Map<String, String>> {

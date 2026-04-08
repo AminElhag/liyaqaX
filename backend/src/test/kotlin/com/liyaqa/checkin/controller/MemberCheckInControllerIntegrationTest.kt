@@ -37,15 +37,22 @@ import java.util.UUID
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class MemberCheckInControllerIntegrationTest {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var jwtService: JwtService
+
     @Autowired lateinit var passwordEncoder: PasswordEncoder
+
     @Autowired lateinit var organizationRepository: OrganizationRepository
+
     @Autowired lateinit var clubRepository: ClubRepository
+
     @Autowired lateinit var branchRepository: BranchRepository
+
     @Autowired lateinit var userRepository: UserRepository
+
     @Autowired lateinit var memberRepository: MemberRepository
+
     @Autowired lateinit var checkInRepository: MemberCheckInRepository
 
     @MockBean lateinit var permissionService: PermissionService
@@ -70,31 +77,34 @@ class MemberCheckInControllerIntegrationTest {
         club = clubRepository.save(Club(organizationId = org.id, nameAr = "نادي", nameEn = "Test Club"))
         branch = branchRepository.save(Branch(organizationId = org.id, clubId = club.id, nameAr = "فرع", nameEn = "Test Branch"))
 
-        staffUser = userRepository.save(
-            User(
-                email = "staff-checkin@test.com",
-                passwordHash = passwordEncoder.encode(TEST_PASSWORD),
-                organizationId = org.id,
-                clubId = club.id,
-            ),
-        )
+        staffUser =
+            userRepository.save(
+                User(
+                    email = "staff-checkin@test.com",
+                    passwordHash = passwordEncoder.encode(TEST_PASSWORD),
+                    organizationId = org.id,
+                    clubId = club.id,
+                ),
+            )
 
-        memberUser = userRepository.save(
-            User(
-                email = "member-checkin@test.com",
-                passwordHash = passwordEncoder.encode(TEST_PASSWORD),
-                organizationId = org.id,
-                clubId = club.id,
-            ),
-        )
+        memberUser =
+            userRepository.save(
+                User(
+                    email = "member-checkin@test.com",
+                    passwordHash = passwordEncoder.encode(TEST_PASSWORD),
+                    organizationId = org.id,
+                    clubId = club.id,
+                ),
+            )
 
-        member = memberRepository.save(
-            Member(
-                organizationId = org.id, clubId = club.id, branchId = branch.id, userId = memberUser.id,
-                firstNameAr = "أحمد", firstNameEn = "Ahmed", lastNameAr = "الرشيدي", lastNameEn = "Al-Rashidi",
-                phone = "+966501234567", membershipStatus = "active",
-            ),
-        )
+        member =
+            memberRepository.save(
+                Member(
+                    organizationId = org.id, clubId = club.id, branchId = branch.id, userId = memberUser.id,
+                    firstNameAr = "أحمد", firstNameEn = "Ahmed", lastNameAr = "الرشيدي", lastNameEn = "Al-Rashidi",
+                    phone = "+966501234567", membershipStatus = "active",
+                ),
+            )
     }
 
     @AfterEach
@@ -111,34 +121,37 @@ class MemberCheckInControllerIntegrationTest {
         permissions.forEach { perm ->
             whenever(permissionService.hasPermission(callerRoleId, perm)).thenReturn(true)
         }
-        val claims = mapOf(
-            "roleId" to callerRoleId.toString(),
-            "scope" to "club",
-            "organizationId" to org.publicId.toString(),
-            "clubId" to club.publicId.toString(),
-            "branchIds" to listOf(branch.publicId.toString()),
-        )
+        val claims =
+            mapOf(
+                "roleId" to callerRoleId.toString(),
+                "scope" to "club",
+                "organizationId" to org.publicId.toString(),
+                "clubId" to club.publicId.toString(),
+                "branchIds" to listOf(branch.publicId.toString()),
+            )
         return "Bearer ${jwtService.generateToken(staffUser.publicId.toString(), claims)}"
     }
 
     private fun forbiddenToken(): String {
-        val claims = mapOf(
-            "roleId" to noPermRoleId.toString(),
-            "scope" to "club",
-            "organizationId" to org.publicId.toString(),
-            "clubId" to club.publicId.toString(),
-            "branchIds" to listOf(branch.publicId.toString()),
-        )
+        val claims =
+            mapOf(
+                "roleId" to noPermRoleId.toString(),
+                "scope" to "club",
+                "organizationId" to org.publicId.toString(),
+                "clubId" to club.publicId.toString(),
+                "branchIds" to listOf(branch.publicId.toString()),
+            )
         return "Bearer ${jwtService.generateToken(UUID.randomUUID().toString(), claims)}"
     }
 
     private fun arenaToken(): String {
-        val claims = mapOf(
-            "scope" to "member",
-            "memberId" to member.publicId.toString(),
-            "organizationId" to org.publicId.toString(),
-            "clubId" to club.publicId.toString(),
-        )
+        val claims =
+            mapOf(
+                "scope" to "member",
+                "memberId" to member.publicId.toString(),
+                "organizationId" to org.publicId.toString(),
+                "clubId" to club.publicId.toString(),
+            )
         return "Bearer ${jwtService.generateToken(memberUser.publicId.toString(), claims)}"
     }
 

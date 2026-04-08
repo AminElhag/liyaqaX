@@ -24,7 +24,9 @@
     "reports": "Reports",
     "settings": "Settings",
     "lapsed": "Lapsed Members",
-    "check_in": "Check-In"
+    "check_in": "Check-In",
+    "schedule": "Schedule",
+    "my_shifts": "My Shifts"
   },
   "branch": {
     "selector": "Branch",
@@ -681,6 +683,42 @@
       "qr_scan": "QR"
     },
     "empty_recent": "No check-ins yet today"
+  },
+  "schedule": {
+    "page_title": "Schedule",
+    "week_of": "Week of",
+    "add_shift": "Add Shift",
+    "shift_modal_title": "Add Shift",
+    "shift_modal_staff": "Staff Member",
+    "shift_modal_date": "Date",
+    "shift_modal_start": "Start Time",
+    "shift_modal_end": "End Time",
+    "shift_modal_notes": "Notes",
+    "overlap_error": "This shift overlaps with an existing shift.",
+    "not_at_branch_error": "Staff member is not assigned to this branch.",
+    "delete_shift_confirm": "Are you sure you want to delete this shift?",
+    "pending_swaps_title": "Pending Swap Requests",
+    "swap_approve": "Approve",
+    "swap_reject": "Reject",
+    "pending_swap_badge": "Pending Swap",
+    "select_branch": "Select a branch to view the schedule.",
+    "staff_col": "Staff",
+    "empty": "No shifts scheduled for this week."
+  },
+  "myshifts": {
+    "page_title": "My Shifts",
+    "no_shifts": "No upcoming shifts in the next 14 days.",
+    "request_swap": "Request Swap",
+    "swap_modal_title": "Request Shift Swap",
+    "swap_modal_target": "Swap With",
+    "swap_modal_note": "Note (optional)",
+    "swap_status": {
+      "pending_acceptance": "Swap Pending — waiting for {{name}} to accept",
+      "pending_approval": "Awaiting manager approval",
+      "approved": "Swap Approved",
+      "declined": "Swap Declined",
+      "cancelled": "Swap Cancelled"
+    }
   },
   "language": {
     "ar": "العربية",

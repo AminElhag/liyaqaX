@@ -1,198 +1,341 @@
-# Plan 27 — Member Check-In & Attendance Tracking
+# Plan 26 — Staff Scheduling & Shifts
 
 ## Status
 Ready for implementation
 
 ## Branch
-`feature/plan-27-checkin`
+`feature/plan-26-shifts`
 
 ## Goal
-Give receptionists a dedicated check-in screen in web-pulse where they can check in members by phone, name, or QR code. Records every visit with branch and method. Blocks lapsed members and duplicate check-ins within 1 hour. Adds a member-facing check-in QR in web-arena and plugs check-in data into the existing Custom Report Builder.
+Give managers a weekly roster grid to schedule staff at their branch. Staff view their own upcoming shifts on a personal screen. Staff can request shift swaps with colleagues; the target colleague must accept, then a manager with `shift:manage` permission approves the transfer.
 
 ## Context
-- `Member`, `Branch` entities already exist
-- `MemberStatus.LAPSED` added in Plan 33 — check-in service must respect it
-- Custom Report Builder (`MetricCatalogue`, `DimensionCatalogue`) already exists from Plan 19 — extend it
-- `MemberNoteService` (Plan 32) already exists — no dependency for this plan
-- Next Flyway migration: **V20**
+- `StaffMember`, `Branch`, `Club` entities already exist
+- Notification system (Plan 21) exists — not used in this plan (no push notifications)
+- Existing permissions seeded in `DevDataLoader` — new permissions added here
+- Next Flyway migration: **V21**
 
 ---
 
 ## Scope — what this plan covers
 
-- [ ] Flyway V20 — `member_check_ins` table
-- [ ] `MemberCheckIn` entity
-- [ ] `MemberCheckInService` — check-in, validation, search, today's count
-- [ ] New audit action: `MEMBER_CHECKED_IN`
-- [ ] New permissions: `check-in:create` (Receptionist, Branch Manager), `check-in:read` (Receptionist, Branch Manager, Owner)
-- [ ] 4 endpoints (3 pulse, 1 arena)
-- [ ] web-pulse: `/check-in` screen — search by phone/name/QR, check-in action, today's counter, recent check-ins list
-- [ ] web-arena: check-in QR code screen (large QR of member publicId)
-- [ ] Extend Custom Report Builder: `check_in_count` metric + `day_of_week` dimension
+- [ ] Flyway V21 — `staff_shifts` + `shift_swap_requests` tables
+- [ ] `StaffShift` entity
+- [ ] `ShiftSwapRequest` entity
+- [ ] `StaffShiftService` — create, update, delete, conflict check
+- [ ] `ShiftSwapService` — request, accept, approve, reject
+- [ ] New permissions: `shift:manage`, `shift:read`
+- [ ] New audit actions: `SHIFT_CREATED`, `SHIFT_UPDATED`, `SHIFT_DELETED`, `SHIFT_SWAP_APPROVED`, `SHIFT_SWAP_REJECTED`
+- [ ] 8 endpoints (pulse only — no arena/coach endpoints)
+- [ ] web-pulse: `/schedule` weekly roster grid — manager view
+- [ ] web-pulse: `/my-shifts` personal schedule — staff view
+- [ ] web-pulse: Swap requests panel (pending swaps requiring manager action)
 - [ ] Tests — unit + integration + frontend
 
 ## Out of scope — do not implement in this plan
 
-- Member-facing visit history in web-arena
-- Automatic check-out / visit duration tracking
-- Turnstile / access control hardware integration
-- Push notification on check-in
-- Check-in via web-coach
+- Notification / push alert on shift assignment
+- Shift reminder the day before
+- Integration with cash drawer sessions
+- Mobile schedule view
+- Recurring shift templates
+- Public holiday detection
 
 ---
 
 ## Decisions already made
 
-- **3 check-in methods**: `staff_phone`, `staff_name`, `qr_scan` — stored on `MemberCheckIn.method`
-- **QR code**: separate from ZATCA invoice QR — encodes member `publicId` as a plain UUID string (no JWT, no expiry); generated client-side in web-arena using a QR library
-- **Duplicate block**: if a check-in record exists for this member at this branch within the last 60 minutes → `409 Conflict` with message "Already checked in N minutes ago"
-- **Lapsed block**: member with `status = LAPSED` → `409 Conflict` with `errorCode: MEMBERSHIP_LAPSED` — same error shape as Plan 33's arena gate
-- **Live counter**: `GET /api/v1/pulse/check-in/today-count` returns today's count for the authenticated staff member's active branch; refreshes on each successful check-in
-- **No member-facing visit history** in web-arena (staff-side only)
-- **Report Builder extension**: `check_in_count` metric (COUNT of check-ins) + `day_of_week` dimension (extracted from `checked_in_at`)
-- **Flyway V20**
+- **Custom start/end times**: no named shift blocks. Each shift is defined by `startAt` (TIMESTAMPTZ) and `endAt` (TIMESTAMPTZ).
+- **Conflict detection**: if a staff member already has a shift that overlaps with the proposed start/end at **any** branch → `409 Conflict` with `errorCode: SHIFT_OVERLAP`. Check performed in service layer before saving.
+- **Swap flow — 3 states**: `PENDING_ACCEPTANCE` (awaiting target) → `PENDING_APPROVAL` (target accepted, awaiting manager) → `APPROVED` / `REJECTED`. If target declines → `DECLINED`. If requester cancels before target accepts → `CANCELLED`.
+- **Swap approval gate**: any user with `shift:manage` permission can approve or reject a swap.
+- **Permissions**: `shift:manage` (create/edit/delete shifts + approve swaps), `shift:read` (view own shifts). Both are unseeded by default — the Owner seeds them to roles they choose via the existing role management UI. DevDataLoader seeds `shift:manage` to Owner and Branch Manager, `shift:read` to all club roles.
+- **Roster scope**: per-branch. Staff member can only be rostered at branches they are assigned to (from `StaffBranchAssignment`). Validation: if a staff member is not assigned to the requested branch → `422`.
+- **Weekly view**: 7-day grid. Default week = current week (Mon–Sun). Prev/Next week navigation.
+- **Flyway V21**
 
 ---
 
 ## Entity design
 
-### MemberCheckIn
+### StaffShift
 
 ```kotlin
 @Entity
-@Table(name = "member_check_ins")
-class MemberCheckIn(
+@Table(name = "staff_shifts")
+class StaffShift(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     val publicId: UUID = UUID.randomUUID(),
 
-    @Column(name = "member_id", nullable = false)
-    val memberId: Long,
+    @Column(name = "staff_member_id", nullable = false)
+    val staffMemberId: Long,
 
     @Column(name = "branch_id", nullable = false)
     val branchId: Long,
 
-    @Column(name = "checked_in_by_user_id", nullable = false)
-    val checkedInByUserId: Long,
+    @Column(name = "start_at", nullable = false)
+    val startAt: Instant,
 
-    // staff_phone | staff_name | qr_scan
-    @Column(name = "method", nullable = false, length = 20)
-    val method: String,
+    @Column(name = "end_at", nullable = false)
+    val endAt: Instant,
 
-    @Column(name = "checked_in_at", nullable = false, updatable = false)
-    val checkedInAt: Instant = Instant.now()
+    @Column(name = "notes", length = 500)
+    val notes: String? = null,
+
+    @Column(name = "created_by_user_id", nullable = false, updatable = false)
+    val createdByUserId: Long,
+
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
 )
 ```
 
-No `deletedAt` — check-in records are immutable. No soft delete.
+### ShiftSwapRequest
+
+```kotlin
+@Entity
+@Table(name = "shift_swap_requests")
+class ShiftSwapRequest(
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
+
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    val publicId: UUID = UUID.randomUUID(),
+
+    // The shift being offered for swap
+    @Column(name = "shift_id", nullable = false, updatable = false)
+    val shiftId: Long,
+
+    // The staff member requesting the swap (owns the shift)
+    @Column(name = "requester_staff_id", nullable = false, updatable = false)
+    val requesterStaffId: Long,
+
+    // The staff member being asked to take the shift
+    @Column(name = "target_staff_id", nullable = false, updatable = false)
+    val targetStaffId: Long,
+
+    // PENDING_ACCEPTANCE | PENDING_APPROVAL | APPROVED | REJECTED | DECLINED | CANCELLED
+    @Column(name = "status", nullable = false, length = 30)
+    var status: String,
+
+    @Column(name = "requester_note", length = 300)
+    val requesterNote: String? = null,
+
+    @Column(name = "resolved_by_user_id")
+    var resolvedByUserId: Long? = null,
+
+    @Column(name = "resolved_at")
+    var resolvedAt: Instant? = null,
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    val createdAt: Instant = Instant.now()
+)
+```
 
 ---
 
-## Flyway V20
+## Flyway V21
 
 ```sql
--- V20__member_check_ins.sql
+-- V21__staff_shifts.sql
 
-CREATE TABLE member_check_ins (
-    id                    BIGSERIAL PRIMARY KEY,
-    public_id             UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    member_id             BIGINT NOT NULL REFERENCES members(id),
-    branch_id             BIGINT NOT NULL REFERENCES branches(id),
-    checked_in_by_user_id BIGINT NOT NULL REFERENCES users(id),
-    method                VARCHAR(20) NOT NULL,
-    checked_in_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE staff_shifts (
+    id                  BIGSERIAL PRIMARY KEY,
+    public_id           UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    staff_member_id     BIGINT NOT NULL REFERENCES staff_members(id),
+    branch_id           BIGINT NOT NULL REFERENCES branches(id),
+    start_at            TIMESTAMPTZ NOT NULL,
+    end_at              TIMESTAMPTZ NOT NULL,
+    notes               VARCHAR(500),
+    created_by_user_id  BIGINT NOT NULL REFERENCES users(id),
+    deleted_at          TIMESTAMPTZ
 );
 
-CREATE INDEX idx_check_ins_member_id     ON member_check_ins(member_id);
-CREATE INDEX idx_check_ins_branch_date   ON member_check_ins(branch_id, checked_in_at);
-CREATE INDEX idx_check_ins_member_branch ON member_check_ins(member_id, branch_id, checked_in_at DESC);
+CREATE INDEX idx_shifts_staff_member  ON staff_shifts(staff_member_id);
+CREATE INDEX idx_shifts_branch_start  ON staff_shifts(branch_id, start_at);
+CREATE INDEX idx_shifts_staff_range   ON staff_shifts(staff_member_id, start_at, end_at)
+    WHERE deleted_at IS NULL;
+
+CREATE TABLE shift_swap_requests (
+    id                    BIGSERIAL PRIMARY KEY,
+    public_id             UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    shift_id              BIGINT NOT NULL REFERENCES staff_shifts(id),
+    requester_staff_id    BIGINT NOT NULL REFERENCES staff_members(id),
+    target_staff_id       BIGINT NOT NULL REFERENCES staff_members(id),
+    status                VARCHAR(30) NOT NULL DEFAULT 'PENDING_ACCEPTANCE',
+    requester_note        VARCHAR(300),
+    resolved_by_user_id   BIGINT REFERENCES users(id),
+    resolved_at           TIMESTAMPTZ,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_swap_shift          ON shift_swap_requests(shift_id);
+CREATE INDEX idx_swap_requester      ON shift_swap_requests(requester_staff_id);
+CREATE INDEX idx_swap_target         ON shift_swap_requests(target_staff_id);
+CREATE INDEX idx_swap_status         ON shift_swap_requests(status) WHERE status IN ('PENDING_ACCEPTANCE', 'PENDING_APPROVAL');
 ```
+
+**Index rationale:**
+- `idx_shifts_staff_member` — personal schedule queries (load all shifts for a staff member)
+- `idx_shifts_branch_start` — roster grid (all shifts for a branch in a week)
+- `idx_shifts_staff_range` (partial, excludes deleted) — overlap conflict check
+- `idx_swap_status` (partial) — fast lookup of open swap requests needing action
 
 ---
 
 ## Business rules — enforce in service layer
 
-1. **Membership required**: member must have `status = ACTIVE`. If `status = LAPSED` → `409 Conflict` with `errorCode: MEMBERSHIP_LAPSED`, message: "Membership expired on {endDate}. Please renew before checking in." If `status = INACTIVE` or `TERMINATED` → `409 Conflict`, message: "Member account is not active."
-2. **Duplicate block**: check for an existing `MemberCheckIn` where `member_id = ?` AND `branch_id = ?` AND `checked_in_at > now() - 60 minutes`. If found → `409 Conflict`, message: "Already checked in {N} minutes ago at this branch."
-3. **Branch scoping**: `branchId` is taken from the JWT claims (`branchIds[0]` — the staff member's active branch). Staff cannot check in members to a branch they are not assigned to.
-4. **QR code check-in**: the QR value is the member's `publicId` (UUID string). The backend resolves it via `memberRepository.findByPublicId()`. Same business rules 1–3 apply.
-5. **Search scoping**: phone and name search is scoped to the club (`clubId` from JWT). Staff cannot find or check in members from other clubs.
-6. **Audit**: every successful check-in logs `MEMBER_CHECKED_IN` with `entityType = "MemberCheckIn"`, `entityId = checkIn.publicId`, `changes = { memberId, branchId, method }`.
+### Shift creation / update
+1. **Branch assignment check**: staff member must be assigned to the target branch in `StaffBranchAssignment`. If not → `422 Unprocessable Entity`, `errorCode: STAFF_NOT_AT_BRANCH`.
+2. **End after start**: `endAt` must be after `startAt`. If not → `422`, message: "Shift end time must be after start time."
+3. **Overlap check**: query for non-deleted shifts for the same `staffMemberId` where `start_at < :endAt AND end_at > :startAt`. If any exist → `409 Conflict`, `errorCode: SHIFT_OVERLAP`, message: "Staff member already has a shift from {startAt} to {endAt} that overlaps."
+4. **Club scoping**: `branchId` must belong to the authenticated user's club. Staff cannot be scheduled at branches outside their club.
+5. **Audit**: every create/update/delete logs the appropriate audit action.
+
+### Shift deletion
+6. **Open swap block**: if the shift has an open `ShiftSwapRequest` with `status IN (PENDING_ACCEPTANCE, PENDING_APPROVAL)` → `409 Conflict`, `errorCode: SHIFT_HAS_PENDING_SWAP`, message: "Cannot delete a shift with a pending swap request."
+7. **Soft delete**: set `deleted_at = NOW()`. Never hard-delete.
+
+### Shift swap
+8. **Requester owns shift**: only the staff member assigned to the shift can initiate a swap request for it.
+9. **Target is club staff**: `targetStaffId` must be a staff member in the same club.
+10. **No duplicate open request**: if a `PENDING_ACCEPTANCE` or `PENDING_APPROVAL` request already exists for the same shift → `409`, `errorCode: SWAP_ALREADY_PENDING`.
+11. **Target acceptance**: only the target staff member can accept or decline.
+12. **Target overlap check**: when target accepts → re-run overlap check for target's staffMemberId against the shift's time range. If overlap → `409`, `errorCode: SHIFT_OVERLAP`, message: "You already have a shift that overlaps with this one."
+13. **Manager approval**: any user with `shift:manage` permission (scoped to same club) can approve or reject a swap in `PENDING_APPROVAL` state.
+14. **Approved swap transfer**: on approval → update `StaffShift.staffMemberId` to target's staffMemberId, set swap `status = APPROVED`, `resolvedByUserId`, `resolvedAt`.
+15. **Rejected swap**: swap `status = REJECTED`, shift ownership unchanged.
+16. **Cancelled swap**: requester can cancel a `PENDING_ACCEPTANCE` swap → `status = CANCELLED`.
 
 ---
 
 ## API endpoints
 
-| Method | Path | Scope | Permission | Description |
-|--------|------|-------|------------|-------------|
-| `POST` | `/api/v1/pulse/check-in` | club staff | `check-in:create` | Check in a member; body contains `memberPublicId` + `method` |
-| `GET` | `/api/v1/pulse/check-in/today-count` | club staff | `check-in:read` | Today's check-in count for the active branch |
-| `GET` | `/api/v1/pulse/check-in/recent` | club staff | `check-in:read` | Last 20 check-ins at the active branch (newest first) |
-| `GET` | `/api/v1/arena/me/qr` | member | (authenticated member) | Member's check-in QR code data (returns `publicId` as string) |
-
-Search (phone / name) is handled by the existing `GET /api/v1/pulse/members?search=` endpoint — no new search endpoint needed.
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `POST` | `/api/v1/pulse/shifts` | `shift:manage` | Create a shift for a staff member |
+| `PATCH` | `/api/v1/pulse/shifts/{shiftId}` | `shift:manage` | Update shift times or notes |
+| `DELETE` | `/api/v1/pulse/shifts/{shiftId}` | `shift:manage` | Soft-delete a shift |
+| `GET` | `/api/v1/pulse/shifts` | `shift:manage` | Get roster grid for a branch+week |
+| `GET` | `/api/v1/pulse/shifts/my` | `shift:read` | Get own upcoming shifts (next 14 days) |
+| `POST` | `/api/v1/pulse/shifts/{shiftId}/swap-requests` | `shift:read` | Request a swap (requester = caller) |
+| `PATCH` | `/api/v1/pulse/shifts/swap-requests/{swapId}/respond` | `shift:read` | Target accepts or declines (`{ "action": "accept" \| "decline" }`) |
+| `PATCH` | `/api/v1/pulse/shifts/swap-requests/{swapId}/resolve` | `shift:manage` | Manager approves or rejects (`{ "action": "approve" \| "reject" }`) |
+| `GET` | `/api/v1/pulse/shifts/swap-requests/pending` | `shift:manage` | List all pending-approval swaps for the club |
 
 ---
 
 ## Request / Response shapes
 
-### POST /pulse/check-in
-
-Request:
+### POST /pulse/shifts — request
 ```json
 {
-  "memberPublicId": "uuid",
-  "method": "staff_phone"
+  "staffMemberPublicId": "uuid",
+  "branchPublicId": "uuid",
+  "startAt": "2026-04-14T06:00:00Z",
+  "endAt": "2026-04-14T14:00:00Z",
+  "notes": "Opening shift"
 }
 ```
 
-Response `201 Created`:
+### POST /pulse/shifts — response `201 Created`
 ```json
 {
-  "checkInId": "uuid",
-  "memberName": "Ahmed Al-Rashidi",
-  "memberPhone": "+966501234567",
-  "membershipPlan": "Basic Monthly",
-  "checkedInAt": "2026-04-08T07:30:00Z",
+  "shiftId": "uuid",
+  "staffMemberName": "Khalid Al-Otaibi",
   "branchName": "Elixir Gym - Riyadh",
-  "method": "staff_phone",
-  "todayCount": 47
+  "startAt": "2026-04-14T06:00:00Z",
+  "endAt": "2026-04-14T14:00:00Z",
+  "notes": "Opening shift"
 }
 ```
 
-The `todayCount` in the response lets the frontend update the counter without an extra round trip.
-
-### GET /pulse/check-in/today-count
-
-```json
-{ "count": 47, "branchName": "Elixir Gym - Riyadh", "date": "2026-04-08" }
-```
-
-### GET /pulse/check-in/recent
+### GET /pulse/shifts — query params + response
+Query: `?branchPublicId=uuid&weekStart=2026-04-13` (ISO date, Monday of week)
 
 ```json
 {
-  "checkIns": [
+  "branchName": "Elixir Gym - Riyadh",
+  "weekStart": "2026-04-13",
+  "weekEnd": "2026-04-19",
+  "shifts": [
     {
-      "checkInId": "uuid",
-      "memberName": "Ahmed Al-Rashidi",
-      "memberPhone": "+966501234567",
-      "method": "qr_scan",
-      "checkedInAt": "2026-04-08T07:30:00Z"
+      "shiftId": "uuid",
+      "staffMemberId": "uuid",
+      "staffMemberName": "Khalid Al-Otaibi",
+      "startAt": "2026-04-14T06:00:00Z",
+      "endAt": "2026-04-14T14:00:00Z",
+      "notes": "Opening shift",
+      "hasPendingSwap": false
     }
   ]
 }
 ```
 
-### GET /arena/me/qr
-
+### GET /pulse/shifts/my — response
 ```json
-{ "qrValue": "3fa85f64-5717-4562-b3fc-2c963f66afa6" }
+{
+  "shifts": [
+    {
+      "shiftId": "uuid",
+      "branchName": "Elixir Gym - Riyadh",
+      "startAt": "2026-04-14T06:00:00Z",
+      "endAt": "2026-04-14T14:00:00Z",
+      "notes": "Opening shift",
+      "swapRequest": null
+    }
+  ]
+}
 ```
 
-The frontend renders this UUID as a QR image using a QR library (e.g. `qrcode.react`).
+The `swapRequest` field is null if no open swap exists for the shift; otherwise it contains `{ swapId, targetStaffName, status }`.
+
+### POST /pulse/shifts/{shiftId}/swap-requests — request
+```json
+{
+  "targetStaffPublicId": "uuid",
+  "requesterNote": "Can you cover this? I have a doctor appointment"
+}
+```
+
+### PATCH /pulse/shifts/swap-requests/{swapId}/respond — request
+```json
+{ "action": "accept" }
+```
+or
+```json
+{ "action": "decline" }
+```
+
+### PATCH /pulse/shifts/swap-requests/{swapId}/resolve — request
+```json
+{ "action": "approve" }
+```
+or
+```json
+{ "action": "reject" }
+```
+
+### GET /pulse/shifts/swap-requests/pending — response
+```json
+{
+  "swapRequests": [
+    {
+      "swapId": "uuid",
+      "shiftDate": "2026-04-14",
+      "shiftStart": "2026-04-14T06:00:00Z",
+      "shiftEnd": "2026-04-14T14:00:00Z",
+      "requesterName": "Khalid Al-Otaibi",
+      "targetName": "Sara Al-Zahrani",
+      "status": "PENDING_APPROVAL",
+      "requesterNote": "Can you cover this?"
+    }
+  ]
+}
+```
 
 ---
 
@@ -201,152 +344,182 @@ The frontend renders this UUID as a QR image using a QR library (e.g. `qrcode.re
 All must use `nativeQuery = true`:
 
 ```kotlin
-// Duplicate check-in detection
+// Overlap check for a staff member in a time range
 @Query(value = """
-    SELECT COUNT(*) FROM member_check_ins
-    WHERE member_id = :memberId
-      AND branch_id = :branchId
-      AND checked_in_at > :threshold
+    SELECT COUNT(*) FROM staff_shifts
+    WHERE staff_member_id = :staffMemberId
+      AND deleted_at IS NULL
+      AND start_at < :endAt
+      AND end_at > :startAt
+      AND id != :excludeId
 """, nativeQuery = true)
-fun countRecentCheckIns(memberId: Long, branchId: Long, threshold: Instant): Long
+fun countOverlapping(staffMemberId: Long, startAt: Instant, endAt: Instant, excludeId: Long): Long
 
-// Today's count for a branch (Riyadh timezone)
+// Roster grid for a branch in a week
 @Query(value = """
-    SELECT COUNT(*) FROM member_check_ins
-    WHERE branch_id = :branchId
-      AND DATE(checked_in_at AT TIME ZONE 'Asia/Riyadh') = :today
+    SELECT s.*, sm.name_en AS staff_name_en, sm.name_ar AS staff_name_ar
+    FROM staff_shifts s
+    JOIN staff_members sm ON sm.id = s.staff_member_id
+    WHERE s.branch_id = :branchId
+      AND s.start_at >= :weekStart
+      AND s.start_at < :weekEnd
+      AND s.deleted_at IS NULL
+    ORDER BY s.start_at
 """, nativeQuery = true)
-fun countTodayByBranch(branchId: Long, today: java.time.LocalDate): Long
+fun findByBranchAndWeek(branchId: Long, weekStart: Instant, weekEnd: Instant): List<ShiftRosterProjection>
 
-// Recent check-ins for a branch
+// My upcoming shifts (next 14 days)
 @Query(value = """
-    SELECT ci.*, m.name_en AS member_name_en, m.name_ar AS member_name_ar, m.phone
-    FROM member_check_ins ci
-    JOIN members m ON m.id = ci.member_id
-    WHERE ci.branch_id = :branchId
-    ORDER BY ci.checked_in_at DESC
-    LIMIT 20
+    SELECT s.*, b.name AS branch_name
+    FROM staff_shifts s
+    JOIN branches b ON b.id = s.branch_id
+    WHERE s.staff_member_id = :staffMemberId
+      AND s.start_at >= :now
+      AND s.start_at < :until
+      AND s.deleted_at IS NULL
+    ORDER BY s.start_at
 """, nativeQuery = true)
-fun findRecentByBranch(branchId: Long): List<RecentCheckInProjection>
+fun findUpcoming(staffMemberId: Long, now: Instant, until: Instant): List<MyShiftProjection>
 
-// For report builder: count by club + date range + optional day_of_week
+// Check for open swap on a shift
 @Query(value = """
-    SELECT COUNT(*) FROM member_check_ins ci
-    JOIN branches b ON b.id = ci.branch_id
+    SELECT COUNT(*) FROM shift_swap_requests
+    WHERE shift_id = :shiftId
+      AND status IN ('PENDING_ACCEPTANCE', 'PENDING_APPROVAL')
+""", nativeQuery = true)
+fun countOpenSwapsForShift(shiftId: Long): Long
+
+// All pending-approval swaps for a club
+@Query(value = """
+    SELECT sr.*, 
+           sm_req.name_en AS requester_name_en, sm_req.name_ar AS requester_name_ar,
+           sm_tgt.name_en AS target_name_en,    sm_tgt.name_ar AS target_name_ar,
+           s.start_at AS shift_start, s.end_at AS shift_end
+    FROM shift_swap_requests sr
+    JOIN staff_shifts s       ON s.id = sr.shift_id
+    JOIN branches b           ON b.id = s.branch_id
+    JOIN staff_members sm_req ON sm_req.id = sr.requester_staff_id
+    JOIN staff_members sm_tgt ON sm_tgt.id = sr.target_staff_id
     WHERE b.club_id = :clubId
-      AND ci.checked_in_at BETWEEN :from AND :to
+      AND sr.status = 'PENDING_APPROVAL'
+    ORDER BY sr.created_at
 """, nativeQuery = true)
-fun countByClubAndDateRange(clubId: Long, from: Instant, to: Instant): Long
+fun findPendingApprovalByClub(clubId: Long): List<PendingSwapProjection>
 ```
 
-Interface projection for recent check-ins:
+Interface projections:
 
 ```kotlin
-interface RecentCheckInProjection {
+interface ShiftRosterProjection {
     val publicId: UUID
-    val memberNameEn: String?
-    val memberNameAr: String
-    val phone: String
-    val method: String
-    val checkedInAt: Instant
+    val staffMemberId: Long
+    val staffNameEn: String?
+    val staffNameAr: String
+    val startAt: Instant
+    val endAt: Instant
+    val notes: String?
+}
+
+interface MyShiftProjection {
+    val publicId: UUID
+    val branchName: String
+    val startAt: Instant
+    val endAt: Instant
+    val notes: String?
+}
+
+interface PendingSwapProjection {
+    val publicId: UUID         // swap public_id
+    val shiftStart: Instant
+    val shiftEnd: Instant
+    val requesterNameEn: String?
+    val requesterNameAr: String
+    val targetNameEn: String?
+    val targetNameAr: String
+    val requesterNote: String?
 }
 ```
 
 ---
 
-## Custom Report Builder extension
-
-In `MetricCatalogue.kt`, add:
-
-```kotlin
-MetricDefinition(
-    code = "check_in_count",
-    labelEn = "Check-In Count",
-    labelAr = "عدد تسجيلات الحضور",
-    sqlFragment = "COUNT(DISTINCT mci.id)",
-    requiresJoin = "member_check_ins mci ON mci.member_id = m.id",
-    scope = "operations"
-)
-```
-
-In `DimensionCatalogue.kt`, add:
-
-```kotlin
-DimensionDefinition(
-    code = "day_of_week",
-    labelEn = "Day of Week",
-    labelAr = "يوم الأسبوع",
-    sqlFragment = "TO_CHAR(mci.checked_in_at AT TIME ZONE 'Asia/Riyadh', 'Day')",
-    requiresJoin = "member_check_ins mci ON mci.member_id = m.id"
-)
-```
-
-Update `CompatibilityMatrix` to allow `check_in_count` with dimensions: `branch`, `day_of_week`, `month`, `membership_plan`.
-
----
-
 ## Frontend additions
 
-### web-pulse — `/check-in` new route
+### web-pulse — `/schedule` (new route, manager view)
 
 **Layout:**
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Check-In — Elixir Gym Riyadh     Today: 47 visits  │
-├─────────────────────────────────────────────────────┤
-│  [ Search by phone or name...          🔍 ]         │
-│  [ Or enter QR code value...           📷 ]         │
-├─────────────────────────────────────────────────────┤
-│  Search results:                                    │
-│  ○ Ahmed Al-Rashidi  +966501234567  Active          │
-│    [ Check In ]                                     │
-├─────────────────────────────────────────────────────┤
-│  Recent check-ins (today):                          │
-│  ● Ahmed Al-Rashidi   QR    07:30                   │
-│  ● Sara Al-Zahrani    Phone  07:15                  │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Schedule — Elixir Gym Riyadh     ← Week of Apr 13, 2026 → │
+├──────────┬──────┬──────┬──────┬──────┬──────┬──────┬───────┤
+│ Staff    │ Mon  │ Tue  │ Wed  │ Thu  │ Fri  │ Sat  │ Sun   │
+├──────────┼──────┼──────┼──────┼──────┼──────┼──────┼───────┤
+│ Khalid   │06–14 │      │06–14 │      │      │      │       │
+│ Sara     │      │10–18 │      │10–18 │      │10–18 │       │
+│ Ahmed    │      │      │      │      │08–16 │08–16 │       │
+└──────────┴──────┴──────┴──────┴──────┴──────┴──────┴───────┘
+ + Add Shift button (opens a modal: staff picker, date, start time, end time, notes)
 ```
 
-- Search field calls existing `GET /pulse/members?search=` (debounced 300ms, min 2 chars)
-- QR field: text input where receptionist types or pastes the UUID from the member's screen (no camera API — simpler, no browser permission needed)
-- Search results show: name, phone, membership status badge (Active / Lapsed)
-- "Check In" button calls `POST /pulse/check-in`; on 409 shows inline error ("Already checked in 5 min ago"); on success updates counter and recent list
-- Recent list shows last 20 check-ins for the branch; refreshed after each check-in
-- Sidebar nav item: "Check-In" (visible to Receptionist, Branch Manager, Owner)
+- Branch selector in topbar (existing component) controls which branch is shown
+- Prev/Next week navigation buttons
+- Each shift cell is clickable → shift detail popover (start/end, notes, delete button, swap status badge if pending swap)
+- "Add Shift" opens a modal:
+  - Staff member dropdown (all staff assigned to the active branch)
+  - Date picker (defaults to clicked day)
+  - Start time + End time (time inputs)
+  - Notes (optional, 500 char max)
+  - On 409 SHIFT_OVERLAP: inline error in modal
+- Pending swap badge: orange `⇆` icon on shift cells with a pending swap
+- Sidebar nav item: "Schedule" (visible to users with `shift:manage`)
+
+**Pending swap requests panel** — shown below the roster grid when `swap-requests/pending` returns results:
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Pending Swap Requests                               │
+│  Khalid → Sara  |  Mon Apr 14  06:00–14:00           │
+│  "Can you cover this? Doctor appointment"            │
+│  [ Approve ]  [ Reject ]                             │
+└──────────────────────────────────────────────────────┘
+```
+
+### web-pulse — `/my-shifts` (new route, staff view)
+
+- List of own upcoming shifts (next 14 days), sorted by date
+- Each row: date, time range, branch name, notes
+- "Request Swap" button per shift → modal: target staff member picker (same branch), optional note
+- Swap status badge per shift: "Swap Pending — waiting for Sara to accept" / "Awaiting manager approval" / "Swap Approved" / "Swap Declined"
+- Sidebar nav item: "My Shifts" (visible to all staff with `shift:read`)
 
 **New i18n strings** (`ar.json` + `en.json`):
 ```
-checkin.page_title
-checkin.today_count
-checkin.search_placeholder
-checkin.qr_placeholder
-checkin.check_in_button
-checkin.already_checked_in     // "Already checked in {N} minutes ago"
-checkin.membership_lapsed      // "Membership expired — cannot check in"
-checkin.success_toast          // "Ahmed checked in ✓"
-checkin.recent_title
-checkin.method.staff_phone
-checkin.method.staff_name
-checkin.method.qr_scan
-checkin.empty_recent
-```
-
-### web-arena — Check-In QR screen
-
-**New route** `/qr` (or accessible from Profile screen):
-- Large QR code displaying the member's `publicId`
-- Rendered using `qrcode.react` (add to `package.json` if not present)
-- Caption: "Show this to the receptionist to check in"
-- QR value fetched from `GET /arena/me/qr`
-- Screen brightness note: auto-brighten the screen (set `screen.orientation.lock` or similar) — optional / best-effort
-- No expiry — the QR is static (member publicId never changes)
-
-**New i18n strings** (`ar.json` + `en.json`):
-```
-qr.page_title
-qr.instruction
-qr.member_name
+schedule.page_title
+schedule.week_of
+schedule.add_shift
+schedule.shift_modal_title
+schedule.shift_modal_staff
+schedule.shift_modal_date
+schedule.shift_modal_start
+schedule.shift_modal_end
+schedule.shift_modal_notes
+schedule.overlap_error
+schedule.not_at_branch_error
+schedule.delete_shift_confirm
+schedule.pending_swaps_title
+schedule.swap_approve
+schedule.swap_reject
+myshifts.page_title
+myshifts.no_shifts
+myshifts.request_swap
+myshifts.swap_modal_title
+myshifts.swap_modal_target
+myshifts.swap_modal_note
+myshifts.swap_status.pending_acceptance
+myshifts.swap_status.pending_approval
+myshifts.swap_status.approved
+myshifts.swap_status.declined
+myshifts.swap_status.cancelled
 ```
 
 ---
@@ -356,163 +529,188 @@ qr.member_name
 ### New files
 
 **Backend:**
-- `backend/src/main/kotlin/com/liyaqa/checkin/entity/MemberCheckIn.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/repository/MemberCheckInRepository.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/repository/RecentCheckInProjection.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/service/MemberCheckInService.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/dto/CheckInRequest.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/dto/CheckInResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/dto/TodayCountResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/dto/RecentCheckInsResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/controller/MemberCheckInPulseController.kt`
-- `backend/src/main/kotlin/com/liyaqa/checkin/controller/MemberCheckInArenaController.kt`
-- `backend/src/main/resources/db/migration/V20__member_check_ins.sql`
-- `backend/src/test/kotlin/com/liyaqa/checkin/service/MemberCheckInServiceTest.kt`
-- `backend/src/test/kotlin/com/liyaqa/checkin/controller/MemberCheckInControllerIntegrationTest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/entity/StaffShift.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/entity/ShiftSwapRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/repository/StaffShiftRepository.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/repository/ShiftSwapRequestRepository.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/repository/ShiftRosterProjection.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/repository/MyShiftProjection.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/repository/PendingSwapProjection.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/service/StaffShiftService.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/service/ShiftSwapService.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/CreateShiftRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/UpdateShiftRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/ShiftResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/RosterResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/MyShiftsResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/CreateSwapRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/SwapActionRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/dto/PendingSwapsResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/shift/controller/StaffShiftController.kt`
+- `backend/src/main/resources/db/migration/V21__staff_shifts.sql`
+- `backend/src/test/kotlin/com/liyaqa/shift/service/StaffShiftServiceTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/shift/service/ShiftSwapServiceTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/shift/controller/StaffShiftControllerIntegrationTest.kt`
 
 **Frontend:**
-- `apps/web-pulse/src/routes/check-in/index.tsx`
-- `apps/web-pulse/src/api/checkIn.ts`
-- `apps/web-pulse/src/tests/check-in.test.tsx`
-- `apps/web-arena/src/routes/qr/index.tsx`
-- `apps/web-arena/src/api/memberQr.ts`
-- `apps/web-arena/src/tests/member-qr.test.tsx`
+- `apps/web-pulse/src/routes/schedule/index.tsx`
+- `apps/web-pulse/src/routes/schedule/AddShiftModal.tsx`
+- `apps/web-pulse/src/routes/my-shifts/index.tsx`
+- `apps/web-pulse/src/routes/my-shifts/RequestSwapModal.tsx`
+- `apps/web-pulse/src/api/shifts.ts`
+- `apps/web-pulse/src/tests/schedule.test.tsx`
+- `apps/web-pulse/src/tests/my-shifts.test.tsx`
 
 ### Files to modify
 
-- `backend/.../audit/model/AuditAction.kt` — add `MEMBER_CHECKED_IN`
-- `backend/.../permission/PermissionConstants.kt` — add `CHECK_IN_CREATE`, `CHECK_IN_READ`
-- `backend/DevDataLoader.kt` — seed permissions to Receptionist, Branch Manager, Owner
-- `backend/.../report/catalogue/MetricCatalogue.kt` — add `check_in_count`
-- `backend/.../report/catalogue/DimensionCatalogue.kt` — add `day_of_week`
-- `backend/.../report/catalogue/CompatibilityMatrix.kt` — add `check_in_count` compatibility rows
-- `apps/web-pulse/src/routes/` (sidebar) — add Check-In nav item
+- `backend/.../audit/model/AuditAction.kt` — add `SHIFT_CREATED`, `SHIFT_UPDATED`, `SHIFT_DELETED`, `SHIFT_SWAP_APPROVED`, `SHIFT_SWAP_REJECTED`
+- `backend/.../permission/PermissionConstants.kt` — add `SHIFT_MANAGE = "shift:manage"`, `SHIFT_READ = "shift:read"`
+- `backend/DevDataLoader.kt` — seed `shift:manage` to Owner + Branch Manager; `shift:read` to all club roles
+- `apps/web-pulse/src/routes/` (sidebar) — add Schedule nav item (shift:manage), My Shifts nav item (shift:read)
 - `apps/web-pulse/src/locales/ar.json` + `en.json`
-- `apps/web-arena/src/locales/ar.json` + `en.json`
-- `apps/web-arena/src/routes/_authenticated.tsx` or nav — add QR screen link
 
 ---
 
 ## Implementation order
 
-### Step 1 — Flyway V20 + entity
-- Write `V20__member_check_ins.sql`
-- Write `MemberCheckIn.kt`
-- Write `MemberCheckInRepository.kt` with all 4 native queries
-- Write `RecentCheckInProjection.kt` interface
+### Step 1 — Flyway V21 + entities + repositories
+- Write `V21__staff_shifts.sql`
+- Write `StaffShift.kt`, `ShiftSwapRequest.kt`
+- Write `StaffShiftRepository.kt` with 4 native queries
+- Write `ShiftSwapRequestRepository.kt` with 2 native queries
+- Write 3 projection interfaces
 - Verify: `./gradlew flywayMigrate`
 
-### Step 2 — Permissions + audit action
-- Add `CHECK_IN_CREATE = "check-in:create"` and `CHECK_IN_READ = "check-in:read"` to `PermissionConstants.kt`
-- Add `MEMBER_CHECKED_IN` to `AuditAction.kt`
-- Seed to Receptionist, Branch Manager, Owner in `DevDataLoader`
+### Step 2 — Permissions + audit actions
+- Add `SHIFT_MANAGE`, `SHIFT_READ` to `PermissionConstants.kt`
+- Add `SHIFT_CREATED`, `SHIFT_UPDATED`, `SHIFT_DELETED`, `SHIFT_SWAP_APPROVED`, `SHIFT_SWAP_REJECTED` to `AuditAction.kt`
+- Seed in `DevDataLoader`
 - Verify: `./gradlew compileKotlin`
 
-### Step 3 — MemberCheckInService
+### Step 3 — StaffShiftService
 Implement:
-- `checkIn(memberPublicId, method, actorUserId, branchId)` — enforces all 6 business rules, saves, logs audit, returns `CheckInResponse` including `todayCount`
-- `getTodayCount(branchId)` — queries `countTodayByBranch` using Riyadh-local date
-- `getRecent(branchId)` — queries `findRecentByBranch`, maps to response DTOs
-- Verify: unit tests in `MemberCheckInServiceTest`
+- `createShift()` — validates branch assignment, validates end > start, runs overlap check, saves, logs `SHIFT_CREATED`
+- `updateShift()` — validates end > start, runs overlap check (excluding current shift id), saves, logs `SHIFT_UPDATED`
+- `deleteShift()` — checks for open swaps (409 if found), soft-deletes, logs `SHIFT_DELETED`
+- `getRoster(branchId, weekStart)` — queries week's shifts for a branch, resolves week window (Mon–Sun)
+- `getMyShifts(staffMemberId)` — queries upcoming 14 days, annotates each with any open swap request
+- Verify: unit tests in `StaffShiftServiceTest`
 
-### Step 4 — Controllers
-- `MemberCheckInPulseController` — 3 pulse endpoints with `@Operation` + `@PreAuthorize`
-- `MemberCheckInArenaController` — 1 arena endpoint (`GET /arena/me/qr`) returning `{ qrValue: member.publicId }`
+### Step 4 — ShiftSwapService
+Implement:
+- `requestSwap()` — validates requester owns shift, validates target is same-club staff, checks no duplicate open swap, saves with `PENDING_ACCEPTANCE`
+- `respondToSwap(action: accept|decline)` — validates caller is target staff; if accept → run overlap check for target, move to `PENDING_APPROVAL`; if decline → `DECLINED`
+- `resolveSwap(action: approve|reject)` — validates caller has `shift:manage`; if approve → transfer shift ownership, log `SHIFT_SWAP_APPROVED`; if reject → log `SHIFT_SWAP_REJECTED`
+- `cancelSwap()` — validates caller is requester, status must be `PENDING_ACCEPTANCE` → `CANCELLED`
+- `getPendingApprovals(clubId)` — queries `PENDING_APPROVAL` swaps for the club
+- Verify: unit tests in `ShiftSwapServiceTest`
+
+### Step 5 — Controller
+- `StaffShiftController` — 9 endpoints with `@Operation` + `@PreAuthorize`
+- All endpoints are under `/api/v1/pulse/shifts`
 - Verify: `./gradlew compileKotlin`
 
-### Step 5 — Custom Report Builder extension
-- Add `check_in_count` to `MetricCatalogue`
-- Add `day_of_week` to `DimensionCatalogue`
-- Update `CompatibilityMatrix` — `check_in_count` compatible with `branch`, `day_of_week`, `month`, `membership_plan`
-- Verify: `./gradlew test` — existing report builder tests still pass
-
-### Step 6 — Frontend: web-pulse `/check-in`
-- `/check-in` route with search field, QR input, search results, check-in button, today counter, recent list
-- `checkIn.ts` — 3 API functions (checkIn, getTodayCount, getRecent)
-- Add Check-In sidebar nav item
+### Step 6 — Frontend: web-pulse `/schedule`
+- Weekly grid (7 columns × N staff rows)
+- AddShiftModal component
+- Pending swap panel below grid
+- Approve/Reject swap actions
+- Branch-scoped (reads branchId from existing branch selector state)
+- Add Schedule to sidebar
 - Add i18n strings
-- Verify: `npm run typecheck`
 
-### Step 7 — Frontend: web-arena `/qr`
-- `/qr` route with `qrcode.react` rendering member `publicId`
-- `memberQr.ts` — 1 API function
-- Add QR link to arena nav / profile screen
+### Step 7 — Frontend: web-pulse `/my-shifts`
+- List of upcoming shifts for authenticated staff member
+- RequestSwapModal component
+- Swap status badges
+- Add My Shifts to sidebar
 - Add i18n strings
 - Verify: `npm run typecheck`
 
 ### Step 8 — Tests
 
-**Unit: `MemberCheckInServiceTest`**
-- `checkIn succeeds for active member and records check-in`
-- `checkIn throws 409 with MEMBERSHIP_LAPSED when member is lapsed`
-- `checkIn throws 409 when member is inactive`
-- `checkIn throws 409 when member is terminated`
-- `checkIn throws 409 with duplicate message when checked in within 60 minutes`
-- `checkIn allows check-in after 60-minute window has passed`
-- `checkIn logs MEMBER_CHECKED_IN audit action`
-- `checkIn returns todayCount in response`
-- `getTodayCount returns correct count for branch using Riyadh timezone`
-- `getRecent returns last 20 check-ins for branch`
+**Unit: `StaffShiftServiceTest`**
+- `createShift succeeds for valid staff at assigned branch`
+- `createShift throws 422 when staff is not assigned to branch`
+- `createShift throws 422 when endAt is before startAt`
+- `createShift throws 409 SHIFT_OVERLAP when staff has overlapping shift`
+- `createShift allows non-overlapping shift at different time same branch`
+- `deleteShift throws 409 when shift has pending swap request`
+- `deleteShift soft-deletes and logs audit`
 
-**Integration: `MemberCheckInControllerIntegrationTest`**
-- `POST /pulse/check-in returns 201 for active member`
-- `POST /pulse/check-in returns 409 for lapsed member`
-- `POST /pulse/check-in returns 409 for duplicate check-in within 60 minutes`
-- `POST /pulse/check-in returns 403 without check-in:create permission`
-- `GET /pulse/check-in/today-count returns count for active branch`
-- `GET /pulse/check-in/recent returns last 20 check-ins`
-- `GET /pulse/check-in/recent returns 403 without check-in:read permission`
-- `GET /arena/me/qr returns member publicId`
-- `GET /arena/me/qr returns 401 without arena JWT`
+**Unit: `ShiftSwapServiceTest`**
+- `requestSwap creates PENDING_ACCEPTANCE request`
+- `requestSwap throws 409 when duplicate open swap exists`
+- `respondToSwap accept moves status to PENDING_APPROVAL`
+- `respondToSwap accept throws 409 SHIFT_OVERLAP when target already has overlapping shift`
+- `respondToSwap decline moves status to DECLINED`
+- `resolveSwap approve transfers shift ownership and logs audit`
+- `resolveSwap reject logs audit and leaves shift unchanged`
+- `cancelSwap cancels PENDING_ACCEPTANCE request`
 
-**Frontend: `check-in.test.tsx` (pulse)**
-- renders check-in page with search field and QR input
-- search results appear after debounce
-- Check In button calls check-in endpoint and updates counter
-- error shown when duplicate check-in returned
-- error shown when membership lapsed
-- recent list renders after successful check-in
+**Integration: `StaffShiftControllerIntegrationTest`**
+- `POST /pulse/shifts returns 201 for valid shift`
+- `POST /pulse/shifts returns 409 SHIFT_OVERLAP for overlapping shift`
+- `POST /pulse/shifts returns 422 when staff not at branch`
+- `POST /pulse/shifts returns 403 without shift:manage permission`
+- `GET /pulse/shifts returns roster grid for branch and week`
+- `GET /pulse/shifts/my returns upcoming shifts for authenticated staff`
+- `DELETE /pulse/shifts/{id} returns 204 for valid shift`
+- `DELETE /pulse/shifts/{id} returns 409 when pending swap exists`
+- `POST /pulse/shifts/{id}/swap-requests creates PENDING_ACCEPTANCE swap`
+- `PATCH /pulse/shifts/swap-requests/{id}/respond accept moves to PENDING_APPROVAL`
+- `PATCH /pulse/shifts/swap-requests/{id}/resolve approve transfers ownership`
+- `GET /pulse/shifts/swap-requests/pending returns manager's pending approvals`
 
-**Frontend: `member-qr.test.tsx` (arena)**
-- renders QR code with member publicId
-- renders member name below QR
+**Frontend: `schedule.test.tsx`**
+- renders weekly roster grid with shifts
+- Add Shift modal opens and submits
+- overlap error shown inline in modal
+- pending swap panel renders approve/reject actions
+
+**Frontend: `my-shifts.test.tsx`**
+- renders upcoming shifts list
+- Request Swap modal opens
+- swap status badge renders correct text
 
 ---
 
 ## RBAC matrix rows added by this plan
 
-| Permission | Owner | Branch Manager | Receptionist | Sales Agent |
-|------------|-------|----------------|--------------|-------------|
-| `check-in:create` | ✅ | ✅ | ✅ | — |
-| `check-in:read` | ✅ | ✅ | ✅ | — |
+| Permission | Owner | Branch Manager | Receptionist | Sales Agent | PT Trainer | GX Instructor |
+|---|---|---|---|---|---|---|
+| `shift:manage` | ✅ (seeded) | ✅ (seeded) | — | — | — | — |
+| `shift:read` | ✅ (seeded) | ✅ (seeded) | ✅ (seeded) | ✅ (seeded) | ✅ (seeded) | ✅ (seeded) |
+
+Note: any role can be granted `shift:manage` via the role management UI — the seeded defaults are above.
 
 ---
 
 ## Definition of Done
 
-- [ ] Flyway V20 runs cleanly: `member_check_ins` table with 3 indexes
-- [ ] `MemberCheckIn` entity compiles with no `deletedAt` (immutable records)
-- [ ] `check-in:create` and `check-in:read` permissions seeded to Receptionist, Branch Manager, Owner
-- [ ] `MEMBER_CHECKED_IN` audit action wired into service
-- [ ] Lapsed member check-in blocked with `errorCode: MEMBERSHIP_LAPSED`
-- [ ] Inactive / terminated member check-in blocked
-- [ ] Duplicate check-in within 60 minutes blocked with "Already checked in N minutes ago"
+- [ ] Flyway V21 runs cleanly: `staff_shifts` and `shift_swap_requests` tables with all indexes
+- [ ] `StaffShift` entity has `deletedAt` (soft delete); `ShiftSwapRequest` has no `deletedAt`
+- [ ] `shift:manage` and `shift:read` permissions seeded correctly
+- [ ] All 5 audit actions wired into services
+- [ ] Overlap check blocks duplicate shifts with `errorCode: SHIFT_OVERLAP`
+- [ ] Branch assignment check blocks scheduling staff at unassigned branches with `errorCode: STAFF_NOT_AT_BRANCH`
+- [ ] Shift delete blocked by open swap with `errorCode: SHIFT_HAS_PENDING_SWAP`
+- [ ] Full swap lifecycle: PENDING_ACCEPTANCE → PENDING_APPROVAL → APPROVED / REJECTED (and DECLINED / CANCELLED paths)
+- [ ] Swap approval transfers `StaffShift.staffMemberId` to target
 - [ ] All repository queries use `nativeQuery = true`
-- [ ] Today's count uses Riyadh timezone (`Asia/Riyadh`)
-- [ ] `POST /pulse/check-in` response includes `todayCount`
-- [ ] 4 endpoints live: 3 pulse + 1 arena, all with `@Operation`
-- [ ] Report Builder: `check_in_count` metric and `day_of_week` dimension added to catalogues
-- [ ] Report Builder: `CompatibilityMatrix` updated for new metric + dimension
-- [ ] web-pulse: `/check-in` route with search, QR input, results, counter, recent list
-- [ ] web-pulse: Check-In sidebar nav item visible to Receptionist, Branch Manager, Owner
-- [ ] web-arena: `/qr` route renders QR code of member publicId
-- [ ] All i18n strings added in Arabic and English (web-pulse + web-arena)
+- [ ] `GET /pulse/shifts` returns correct 7-day window (Mon–Sun of requested week)
+- [ ] `GET /pulse/shifts/my` returns next 14 days only, annotated with swap status
+- [ ] 9 endpoints live, all with `@Operation` and `@PreAuthorize`
+- [ ] web-pulse: `/schedule` weekly grid with branch selector, Add Shift modal, pending swaps panel
+- [ ] web-pulse: `/my-shifts` list with Request Swap modal and swap status badges
+- [ ] Sidebar: Schedule nav item (shift:manage only), My Shifts nav item (shift:read)
+- [ ] All i18n strings added in Arabic and English
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] `./gradlew build` — BUILD SUCCESSFUL, no warnings
-- [ ] `npm run typecheck` — no errors in web-pulse or web-arena
-- [ ] `PROJECT-STATE.md` updated: Plan 27 complete, test counts, V20 noted
-- [ ] `PLAN-27-checkin.md` deleted before merging
+- [ ] `npm run typecheck` — no errors in web-pulse
+- [ ] `PROJECT-STATE.md` updated: Plan 26 complete, test counts, V21 noted
+- [ ] `PLAN-26-shifts.md` deleted before merging
 
-When all items are checked, confirm: **"Plan 27 — Member Check-In & Attendance complete. X backend tests, Y frontend tests."**
+When all items are checked, confirm: **"Plan 26 — Staff Scheduling & Shifts complete. X backend tests, Y frontend tests."**
 

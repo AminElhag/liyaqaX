@@ -24,7 +24,9 @@
     "reports": "التقارير",
     "settings": "الإعدادات",
     "lapsed": "أعضاء منتهية الصلاحية",
-    "check_in": "تسجيل الحضور"
+    "check_in": "تسجيل الحضور",
+    "schedule": "الجدول الزمني",
+    "my_shifts": "وردياتي"
   },
   "branch": {
     "selector": "الفرع",
@@ -681,6 +683,42 @@
       "qr_scan": "QR"
     },
     "empty_recent": "لا توجد تسجيلات حضور اليوم بعد"
+  },
+  "schedule": {
+    "page_title": "الجدول الزمني",
+    "week_of": "أسبوع",
+    "add_shift": "إضافة وردية",
+    "shift_modal_title": "إضافة وردية",
+    "shift_modal_staff": "الموظف",
+    "shift_modal_date": "التاريخ",
+    "shift_modal_start": "وقت البداية",
+    "shift_modal_end": "وقت النهاية",
+    "shift_modal_notes": "ملاحظات",
+    "overlap_error": "تتعارض هذه الوردية مع وردية موجودة.",
+    "not_at_branch_error": "الموظف غير معين في هذا الفرع.",
+    "delete_shift_confirm": "هل أنت متأكد من حذف هذه الوردية؟",
+    "pending_swaps_title": "طلبات التبديل المعلقة",
+    "swap_approve": "موافقة",
+    "swap_reject": "رفض",
+    "pending_swap_badge": "تبديل معلق",
+    "select_branch": "اختر فرعاً لعرض الجدول.",
+    "staff_col": "الموظف",
+    "empty": "لا توجد ورديات مجدولة لهذا الأسبوع."
+  },
+  "myshifts": {
+    "page_title": "وردياتي",
+    "no_shifts": "لا توجد ورديات قادمة في الـ 14 يوماً القادمة.",
+    "request_swap": "طلب تبديل",
+    "swap_modal_title": "طلب تبديل وردية",
+    "swap_modal_target": "التبديل مع",
+    "swap_modal_note": "ملاحظة (اختياري)",
+    "swap_status": {
+      "pending_acceptance": "تبديل معلق — بانتظار قبول {{name}}",
+      "pending_approval": "بانتظار موافقة المدير",
+      "approved": "تم الموافقة على التبديل",
+      "declined": "تم رفض التبديل",
+      "cancelled": "تم إلغاء التبديل"
+    }
   },
   "language": {
     "ar": "العربية",

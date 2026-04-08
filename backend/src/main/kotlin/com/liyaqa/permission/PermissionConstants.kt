@@ -163,4 +163,8 @@ object PermissionConstants {
     // ── Check-In ─────────────────────────────────────────────────────────
     const val CHECK_IN_CREATE = "check-in:create"
     const val CHECK_IN_READ = "check-in:read"
+
+    // ── Shift ─────────────────────────────────────────────────────────────
+    const val SHIFT_MANAGE = "shift:manage"
+    const val SHIFT_READ = "shift:read"
 }

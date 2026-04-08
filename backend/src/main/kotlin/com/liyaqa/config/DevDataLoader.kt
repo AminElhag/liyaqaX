@@ -217,6 +217,8 @@ class DevDataLoader(
             PermissionConstants.BRANDING_UPDATE,
             PermissionConstants.CHECK_IN_CREATE,
             PermissionConstants.CHECK_IN_READ,
+            PermissionConstants.SHIFT_MANAGE,
+            PermissionConstants.SHIFT_READ,
         )
 
     private val clubBranchManager =
@@ -249,6 +251,7 @@ class DevDataLoader(
             PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
             PermissionConstants.CHECK_IN_CREATE,
             PermissionConstants.CHECK_IN_READ,
+            PermissionConstants.SHIFT_READ,
         )
 
     private val clubSalesAgent =
@@ -268,6 +271,7 @@ class DevDataLoader(
             PermissionConstants.MEMBER_NOTE_READ,
             PermissionConstants.MEMBER_NOTE_DELETE,
             PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
+            PermissionConstants.SHIFT_READ,
         )
 
     private val trainerPt =
@@ -279,6 +283,7 @@ class DevDataLoader(
             PermissionConstants.MESSAGE_SEND, PermissionConstants.AVAILABILITY_MANAGE,
             PermissionConstants.PROFILE_UPDATE, PermissionConstants.EARNINGS_READ,
             PermissionConstants.MEMBER_NOTE_CREATE, PermissionConstants.MEMBER_NOTE_READ,
+            PermissionConstants.SHIFT_READ,
         )
 
     private val trainerGx =
@@ -291,6 +296,7 @@ class DevDataLoader(
             PermissionConstants.PROFILE_UPDATE,
             PermissionConstants.EARNINGS_READ,
             PermissionConstants.MEMBER_NOTE_CREATE, PermissionConstants.MEMBER_NOTE_READ,
+            PermissionConstants.SHIFT_READ,
         )
 
     private val memberPerms =

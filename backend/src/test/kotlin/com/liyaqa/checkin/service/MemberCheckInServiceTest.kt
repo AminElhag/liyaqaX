@@ -10,8 +10,6 @@ import com.liyaqa.checkin.repository.RecentCheckInProjection
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.member.Member
 import com.liyaqa.member.MemberRepository
-import com.liyaqa.membership.Membership
-import com.liyaqa.membership.MembershipPlan
 import com.liyaqa.membership.MembershipPlanRepository
 import com.liyaqa.membership.MembershipRepository
 import com.liyaqa.organization.Organization
@@ -26,16 +24,13 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import java.time.Instant
-import java.time.LocalDate
 import java.util.Optional
 import java.util.UUID
 
 class MemberCheckInServiceTest {
-
     private val checkInRepository: MemberCheckInRepository = mock()
     private val memberRepository: MemberRepository = mock()
     private val branchRepository: BranchRepository = mock()
@@ -59,11 +54,12 @@ class MemberCheckInServiceTest {
 
     @BeforeEach
     fun setup() {
-        service = MemberCheckInService(
-            checkInRepository, memberRepository, branchRepository,
-            organizationRepository, userRepository, membershipRepository,
-            membershipPlanRepository, auditService,
-        )
+        service =
+            MemberCheckInService(
+                checkInRepository, memberRepository, branchRepository,
+                organizationRepository, userRepository, membershipRepository,
+                membershipPlanRepository, auditService,
+            )
 
         whenever(org.id).thenReturn(1L)
         whenever(org.publicId).thenReturn(orgPublicId)
@@ -101,13 +97,14 @@ class MemberCheckInServiceTest {
     }
 
     private fun setupSavedCheckIn(): MemberCheckIn {
-        val savedCheckIn = MemberCheckIn(
-            id = 1L,
-            memberId = 50L,
-            branchId = 10L,
-            checkedInByUserId = 100L,
-            method = "staff_phone",
-        )
+        val savedCheckIn =
+            MemberCheckIn(
+                id = 1L,
+                memberId = 50L,
+                branchId = 10L,
+                checkedInByUserId = 100L,
+                method = "staff_phone",
+            )
         whenever(checkInRepository.save(any<MemberCheckIn>())).thenReturn(savedCheckIn)
         whenever(checkInRepository.countTodayByBranch(eq(10L), any())).thenReturn(47L)
         whenever(membershipRepository.findByMemberIdAndMembershipStatusInAndDeletedAtIsNull(eq(50L), any()))
@@ -121,10 +118,15 @@ class MemberCheckInServiceTest {
         setupNoDuplicate()
         setupSavedCheckIn()
 
-        val response = service.checkIn(
-            memberPublicId, "staff_phone", actorUserPublicId,
-            branchPublicId, orgPublicId, clubPublicId,
-        )
+        val response =
+            service.checkIn(
+                memberPublicId,
+                "staff_phone",
+                actorUserPublicId,
+                branchPublicId,
+                orgPublicId,
+                clubPublicId,
+            )
 
         assertNotNull(response)
         assertEquals("Ahmed Al-Rashidi", response.memberName)
@@ -143,12 +145,17 @@ class MemberCheckInServiceTest {
         whenever(membershipRepository.findByMemberIdAndMembershipStatusAndDeletedAtIsNull(eq(50L), eq("active")))
             .thenReturn(Optional.empty())
 
-        val ex = assertThrows(ArenaException::class.java) {
-            service.checkIn(
-                memberPublicId, "staff_phone", actorUserPublicId,
-                branchPublicId, orgPublicId, clubPublicId,
-            )
-        }
+        val ex =
+            assertThrows(ArenaException::class.java) {
+                service.checkIn(
+                    memberPublicId,
+                    "staff_phone",
+                    actorUserPublicId,
+                    branchPublicId,
+                    orgPublicId,
+                    clubPublicId,
+                )
+            }
 
         assertEquals(409, ex.status.value())
         assertEquals("MEMBERSHIP_LAPSED", ex.errorCode)
@@ -161,12 +168,17 @@ class MemberCheckInServiceTest {
         whenever(memberRepository.findByPublicIdAndDeletedAtIsNull(memberPublicId))
             .thenReturn(Optional.of(member))
 
-        val ex = assertThrows(ArenaException::class.java) {
-            service.checkIn(
-                memberPublicId, "staff_phone", actorUserPublicId,
-                branchPublicId, orgPublicId, clubPublicId,
-            )
-        }
+        val ex =
+            assertThrows(ArenaException::class.java) {
+                service.checkIn(
+                    memberPublicId,
+                    "staff_phone",
+                    actorUserPublicId,
+                    branchPublicId,
+                    orgPublicId,
+                    clubPublicId,
+                )
+            }
 
         assertEquals(409, ex.status.value())
         assertEquals("Member account is not active.", ex.message)
@@ -179,12 +191,17 @@ class MemberCheckInServiceTest {
         whenever(memberRepository.findByPublicIdAndDeletedAtIsNull(memberPublicId))
             .thenReturn(Optional.of(member))
 
-        val ex = assertThrows(ArenaException::class.java) {
-            service.checkIn(
-                memberPublicId, "staff_phone", actorUserPublicId,
-                branchPublicId, orgPublicId, clubPublicId,
-            )
-        }
+        val ex =
+            assertThrows(ArenaException::class.java) {
+                service.checkIn(
+                    memberPublicId,
+                    "staff_phone",
+                    actorUserPublicId,
+                    branchPublicId,
+                    orgPublicId,
+                    clubPublicId,
+                )
+            }
 
         assertEquals(409, ex.status.value())
         assertEquals("Member account is not active.", ex.message)
@@ -195,19 +212,28 @@ class MemberCheckInServiceTest {
         activeMember()
         whenever(checkInRepository.countRecentCheckIns(eq(50L), eq(10L), any())).thenReturn(1L)
 
-        val recentCheckIn = MemberCheckIn(
-            memberId = 50L, branchId = 10L, checkedInByUserId = 100L, method = "staff_phone",
-            checkedInAt = Instant.now().minusSeconds(300),
-        )
+        val recentCheckIn =
+            MemberCheckIn(
+                memberId = 50L,
+                branchId = 10L,
+                checkedInByUserId = 100L,
+                method = "staff_phone",
+                checkedInAt = Instant.now().minusSeconds(300),
+            )
         whenever(checkInRepository.findTopByMemberIdAndBranchIdOrderByCheckedInAtDesc(50L, 10L))
             .thenReturn(recentCheckIn)
 
-        val ex = assertThrows(ArenaException::class.java) {
-            service.checkIn(
-                memberPublicId, "staff_phone", actorUserPublicId,
-                branchPublicId, orgPublicId, clubPublicId,
-            )
-        }
+        val ex =
+            assertThrows(ArenaException::class.java) {
+                service.checkIn(
+                    memberPublicId,
+                    "staff_phone",
+                    actorUserPublicId,
+                    branchPublicId,
+                    orgPublicId,
+                    clubPublicId,
+                )
+            }
 
         assertEquals(409, ex.status.value())
         assert(ex.message.contains("Already checked in"))
@@ -219,10 +245,15 @@ class MemberCheckInServiceTest {
         setupNoDuplicate()
         setupSavedCheckIn()
 
-        val response = service.checkIn(
-            memberPublicId, "qr_scan", actorUserPublicId,
-            branchPublicId, orgPublicId, clubPublicId,
-        )
+        val response =
+            service.checkIn(
+                memberPublicId,
+                "qr_scan",
+                actorUserPublicId,
+                branchPublicId,
+                orgPublicId,
+                clubPublicId,
+            )
 
         assertNotNull(response)
         verify(checkInRepository).save(any<MemberCheckIn>())
@@ -235,8 +266,12 @@ class MemberCheckInServiceTest {
         setupSavedCheckIn()
 
         service.checkIn(
-            memberPublicId, "staff_phone", actorUserPublicId,
-            branchPublicId, orgPublicId, clubPublicId,
+            memberPublicId,
+            "staff_phone",
+            actorUserPublicId,
+            branchPublicId,
+            orgPublicId,
+            clubPublicId,
         )
 
         verify(auditService).logFromContext(
@@ -253,10 +288,15 @@ class MemberCheckInServiceTest {
         setupNoDuplicate()
         setupSavedCheckIn()
 
-        val response = service.checkIn(
-            memberPublicId, "staff_phone", actorUserPublicId,
-            branchPublicId, orgPublicId, clubPublicId,
-        )
+        val response =
+            service.checkIn(
+                memberPublicId,
+                "staff_phone",
+                actorUserPublicId,
+                branchPublicId,
+                orgPublicId,
+                clubPublicId,
+            )
 
         assertEquals(47L, response.todayCount)
     }
