@@ -59,6 +59,7 @@ import { Route as ReportsBuilderTemplateIdRouteImport } from './routes/reports/b
 import { Route as MembersMemberIdPtRouteImport } from './routes/members/$memberId.pt'
 import { Route as MembersMemberIdPaymentsRouteImport } from './routes/members/$memberId.payments'
 import { Route as MembersMemberIdOverviewRouteImport } from './routes/members/$memberId.overview'
+import { Route as MembersMemberIdOnlinePaymentsRouteImport } from './routes/members/$memberId.online-payments'
 import { Route as MembersMemberIdNotesRouteImport } from './routes/members/$memberId.notes'
 import { Route as MembersMemberIdMembershipRouteImport } from './routes/members/$memberId.membership'
 import { Route as MembersMemberIdGxRouteImport } from './routes/members/$memberId.gx'
@@ -315,6 +316,12 @@ const MembersMemberIdOverviewRoute = MembersMemberIdOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => MembersMemberIdRoute,
 } as any)
+const MembersMemberIdOnlinePaymentsRoute =
+  MembersMemberIdOnlinePaymentsRouteImport.update({
+    id: '/online-payments',
+    path: '/online-payments',
+    getParentRoute: () => MembersMemberIdRoute,
+  } as any)
 const MembersMemberIdNotesRoute = MembersMemberIdNotesRouteImport.update({
   id: '/notes',
   path: '/notes',
@@ -385,6 +392,7 @@ export interface FileRoutesByFullPath {
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
   '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
+  '/members/$memberId/online-payments': typeof MembersMemberIdOnlinePaymentsRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -441,6 +449,7 @@ export interface FileRoutesByTo {
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
   '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
+  '/members/$memberId/online-payments': typeof MembersMemberIdOnlinePaymentsRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -498,6 +507,7 @@ export interface FileRoutesById {
   '/members/$memberId/gx': typeof MembersMemberIdGxRoute
   '/members/$memberId/membership': typeof MembersMemberIdMembershipRoute
   '/members/$memberId/notes': typeof MembersMemberIdNotesRoute
+  '/members/$memberId/online-payments': typeof MembersMemberIdOnlinePaymentsRoute
   '/members/$memberId/overview': typeof MembersMemberIdOverviewRoute
   '/members/$memberId/payments': typeof MembersMemberIdPaymentsRoute
   '/members/$memberId/pt': typeof MembersMemberIdPtRoute
@@ -556,6 +566,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
     | '/members/$memberId/notes'
+    | '/members/$memberId/online-payments'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -612,6 +623,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
     | '/members/$memberId/notes'
+    | '/members/$memberId/online-payments'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -668,6 +680,7 @@ export interface FileRouteTypes {
     | '/members/$memberId/gx'
     | '/members/$memberId/membership'
     | '/members/$memberId/notes'
+    | '/members/$memberId/online-payments'
     | '/members/$memberId/overview'
     | '/members/$memberId/payments'
     | '/members/$memberId/pt'
@@ -1080,6 +1093,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MembersMemberIdOverviewRouteImport
       parentRoute: typeof MembersMemberIdRoute
     }
+    '/members/$memberId/online-payments': {
+      id: '/members/$memberId/online-payments'
+      path: '/online-payments'
+      fullPath: '/members/$memberId/online-payments'
+      preLoaderRoute: typeof MembersMemberIdOnlinePaymentsRouteImport
+      parentRoute: typeof MembersMemberIdRoute
+    }
     '/members/$memberId/notes': {
       id: '/members/$memberId/notes'
       path: '/notes'
@@ -1116,6 +1136,7 @@ interface MembersMemberIdRouteChildren {
   MembersMemberIdGxRoute: typeof MembersMemberIdGxRoute
   MembersMemberIdMembershipRoute: typeof MembersMemberIdMembershipRoute
   MembersMemberIdNotesRoute: typeof MembersMemberIdNotesRoute
+  MembersMemberIdOnlinePaymentsRoute: typeof MembersMemberIdOnlinePaymentsRoute
   MembersMemberIdOverviewRoute: typeof MembersMemberIdOverviewRoute
   MembersMemberIdPaymentsRoute: typeof MembersMemberIdPaymentsRoute
   MembersMemberIdPtRoute: typeof MembersMemberIdPtRoute
@@ -1126,6 +1147,7 @@ const MembersMemberIdRouteChildren: MembersMemberIdRouteChildren = {
   MembersMemberIdGxRoute: MembersMemberIdGxRoute,
   MembersMemberIdMembershipRoute: MembersMemberIdMembershipRoute,
   MembersMemberIdNotesRoute: MembersMemberIdNotesRoute,
+  MembersMemberIdOnlinePaymentsRoute: MembersMemberIdOnlinePaymentsRoute,
   MembersMemberIdOverviewRoute: MembersMemberIdOverviewRoute,
   MembersMemberIdPaymentsRoute: MembersMemberIdPaymentsRoute,
   MembersMemberIdPtRoute: MembersMemberIdPtRoute,

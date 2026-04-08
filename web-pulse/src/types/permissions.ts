@@ -115,6 +115,9 @@ export const Permission = {
   // Shift
   SHIFT_MANAGE: 'shift:manage',
   SHIFT_READ: 'shift:read',
+
+  // Online Payment
+  ONLINE_PAYMENT_READ: 'online-payment:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

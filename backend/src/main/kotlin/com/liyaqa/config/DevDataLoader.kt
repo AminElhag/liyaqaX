@@ -219,6 +219,7 @@ class DevDataLoader(
             PermissionConstants.CHECK_IN_READ,
             PermissionConstants.SHIFT_MANAGE,
             PermissionConstants.SHIFT_READ,
+            PermissionConstants.ONLINE_PAYMENT_READ,
         )
 
     private val clubBranchManager =

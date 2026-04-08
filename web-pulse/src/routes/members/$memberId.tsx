@@ -5,6 +5,8 @@ import { getMember, memberKeys } from '@/api/members'
 import { PageShell } from '@/components/layout/PageShell'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { MemberStatusBadge } from '@/components/members/MemberStatusBadge'
+import { PermissionGate } from '@/components/shared/PermissionGate'
+import { Permission } from '@/types/permissions'
 
 export const Route = createFileRoute('/members/$memberId')({
   component: MemberProfileLayout,
@@ -17,6 +19,7 @@ const tabs = [
   { key: 'pt', to: '/members/$memberId/pt' as const },
   { key: 'gx', to: '/members/$memberId/gx' as const },
   { key: 'notes', to: '/members/$memberId/notes' as const },
+  { key: 'online-payments', to: '/members/$memberId/online-payments' as const, permission: Permission.ONLINE_PAYMENT_READ },
 ] as const
 
 function MemberProfileLayout() {
@@ -70,23 +73,33 @@ function MemberProfileLayout() {
       {/* Tab navigation */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.key}
-              to={tab.to}
-              params={{ memberId }}
-              className="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium"
-              activeProps={{
-                className: 'border-blue-500 text-blue-600',
-              }}
-              inactiveProps={{
-                className:
-                  'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
-              }}
-            >
-              {t(`members.profile.${tab.key}`)}
-            </Link>
-          ))}
+          {tabs.map((tab) => {
+            const link = (
+              <Link
+                key={tab.key}
+                to={tab.to}
+                params={{ memberId }}
+                className="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium"
+                activeProps={{
+                  className: 'border-blue-500 text-blue-600',
+                }}
+                inactiveProps={{
+                  className:
+                    'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                }}
+              >
+                {t(`members.profile.${tab.key}`)}
+              </Link>
+            )
+            if ('permission' in tab && tab.permission) {
+              return (
+                <PermissionGate key={tab.key} permission={tab.permission}>
+                  {link}
+                </PermissionGate>
+              )
+            }
+            return link
+          })}
         </nav>
       </div>
 

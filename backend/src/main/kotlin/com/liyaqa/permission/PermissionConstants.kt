@@ -167,4 +167,7 @@ object PermissionConstants {
     // ── Shift ─────────────────────────────────────────────────────────────
     const val SHIFT_MANAGE = "shift:manage"
     const val SHIFT_READ = "shift:read"
+
+    // ── Online Payment ───────────────────────────────────────────────────
+    const val ONLINE_PAYMENT_READ = "online-payment:read"
 }

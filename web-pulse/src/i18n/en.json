@@ -125,6 +125,7 @@
       "pt": "PT",
       "gx": "GX",
       "notes": "Notes",
+      "online-payments": "Online Payments",
       "emergencyContacts": "Emergency contacts",
       "notFound": "Member not found",
       "comingSoon": "Coming soon"
@@ -723,5 +724,9 @@
   "language": {
     "ar": "العربية",
     "en": "English"
+  },
+  "member": {
+    "online_payments_tab": "Online Payments",
+    "online_payments_empty": "No online payments found"
   }
 }

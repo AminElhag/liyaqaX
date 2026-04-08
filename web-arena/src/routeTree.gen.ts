@@ -15,6 +15,7 @@ import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as QrIndexRouteImport } from './routes/qr/index'
 import { Route as ProgressIndexRouteImport } from './routes/progress/index'
 import { Route as PaymentsIndexRouteImport } from './routes/payments/index'
+import { Route as PaymentCallbackIndexRouteImport } from './routes/payment-callback/index'
 import { Route as MessagesIndexRouteImport } from './routes/messages/index'
 import { Route as MembershipIndexRouteImport } from './routes/membership/index'
 import { Route as ClubIndexRouteImport } from './routes/club/index'
@@ -64,6 +65,11 @@ const ProgressIndexRoute = ProgressIndexRouteImport.update({
 const PaymentsIndexRoute = PaymentsIndexRouteImport.update({
   id: '/payments/',
   path: '/payments/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentCallbackIndexRoute = PaymentCallbackIndexRouteImport.update({
+  id: '/payment-callback/',
+  path: '/payment-callback/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/club/': typeof ClubIndexRoute
   '/membership/': typeof MembershipIndexRoute
   '/messages/': typeof MessagesIndexRoute
+  '/payment-callback/': typeof PaymentCallbackIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
   '/qr/': typeof QrIndexRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/club': typeof ClubIndexRoute
   '/membership': typeof MembershipIndexRoute
   '/messages': typeof MessagesIndexRoute
+  '/payment-callback': typeof PaymentCallbackIndexRoute
   '/payments': typeof PaymentsIndexRoute
   '/progress': typeof ProgressIndexRoute
   '/qr': typeof QrIndexRoute
@@ -245,6 +253,7 @@ export interface FileRoutesById {
   '/club/': typeof ClubIndexRoute
   '/membership/': typeof MembershipIndexRoute
   '/messages/': typeof MessagesIndexRoute
+  '/payment-callback/': typeof PaymentCallbackIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
   '/qr/': typeof QrIndexRoute
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/club/'
     | '/membership/'
     | '/messages/'
+    | '/payment-callback/'
     | '/payments/'
     | '/progress/'
     | '/qr/'
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/club'
     | '/membership'
     | '/messages'
+    | '/payment-callback'
     | '/payments'
     | '/progress'
     | '/qr'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/club/'
     | '/membership/'
     | '/messages/'
+    | '/payment-callback/'
     | '/payments/'
     | '/progress/'
     | '/qr/'
@@ -360,6 +372,7 @@ export interface RootRouteChildren {
   ClubIndexRoute: typeof ClubIndexRoute
   MembershipIndexRoute: typeof MembershipIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
+  PaymentCallbackIndexRoute: typeof PaymentCallbackIndexRoute
   PaymentsIndexRoute: typeof PaymentsIndexRoute
   ProgressIndexRoute: typeof ProgressIndexRoute
   QrIndexRoute: typeof QrIndexRoute
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments/'
       preLoaderRoute: typeof PaymentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payment-callback/': {
+      id: '/payment-callback/'
+      path: '/payment-callback'
+      fullPath: '/payment-callback/'
+      preLoaderRoute: typeof PaymentCallbackIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/': {
@@ -576,6 +596,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClubIndexRoute: ClubIndexRoute,
   MembershipIndexRoute: MembershipIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
+  PaymentCallbackIndexRoute: PaymentCallbackIndexRoute,
   PaymentsIndexRoute: PaymentsIndexRoute,
   ProgressIndexRoute: ProgressIndexRoute,
   QrIndexRoute: QrIndexRoute,

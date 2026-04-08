@@ -37,6 +37,12 @@ arena:
     access-token-expiry: PT15M
     refresh-token-expiry: P7D
 
+moyasar:
+  api-key: ${MOYASAR_API_KEY:sk_test_placeholder}
+  publishable-key: ${MOYASAR_PUBLISHABLE_KEY:pk_test_placeholder}
+  webhook-secret: ${MOYASAR_WEBHOOK_SECRET:whsec_test_placeholder}
+  callback-url-base: ${MOYASAR_CALLBACK_URL_BASE:http://localhost:5176}
+
 zatca:
   environment: ${ZATCA_ENV:sandbox}
   api:

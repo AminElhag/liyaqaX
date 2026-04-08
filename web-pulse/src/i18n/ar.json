@@ -125,6 +125,7 @@
       "pt": "التدريب الشخصي",
       "gx": "التمارين الجماعية",
       "notes": "الملاحظات",
+      "online-payments": "المدفوعات الإلكترونية",
       "emergencyContacts": "جهات الاتصال في الطوارئ",
       "notFound": "العضو غير موجود",
       "comingSoon": "قريباً"
@@ -723,5 +724,9 @@
   "language": {
     "ar": "العربية",
     "en": "English"
+  },
+  "member": {
+    "online_payments_tab": "المدفوعات الإلكترونية",
+    "online_payments_empty": "لا توجد مدفوعات إلكترونية"
   }
 }
