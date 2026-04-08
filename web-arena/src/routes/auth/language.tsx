@@ -28,13 +28,13 @@ function LanguagePage() {
         <div className="grid gap-4">
           <button
             onClick={() => selectLanguage('ar')}
-            className="rounded-xl border-2 border-gray-200 p-6 text-xl font-semibold transition hover:border-blue-500 hover:bg-blue-50"
+            className="rounded-xl border-2 border-gray-200 p-6 text-xl font-semibold transition hover:border-primary hover:bg-primary/10"
           >
             العربية
           </button>
           <button
             onClick={() => selectLanguage('en')}
-            className="rounded-xl border-2 border-gray-200 p-6 text-xl font-semibold transition hover:border-blue-500 hover:bg-blue-50"
+            className="rounded-xl border-2 border-gray-200 p-6 text-xl font-semibold transition hover:border-primary hover:bg-primary/10"
           >
             English
           </button>

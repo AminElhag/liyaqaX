@@ -38,6 +38,10 @@ export interface PortalSettings {
   onlinePaymentEnabled: boolean
   portalMessage: string | null
   selfRegistrationEnabled: boolean
+  logoUrl: string | null
+  primaryColorHex: string | null
+  secondaryColorHex: string | null
+  portalTitle: string | null
 }
 
 export interface MembershipPlanSummary {

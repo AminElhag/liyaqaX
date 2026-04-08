@@ -25,4 +25,12 @@ class ClubPortalSettings(
     var portalMessage: String? = null,
     @Column(name = "self_registration_enabled", nullable = false)
     var selfRegistrationEnabled: Boolean = false,
+    @Column(name = "logo_url", length = 500)
+    var logoUrl: String? = null,
+    @Column(name = "primary_color_hex", length = 7)
+    var primaryColorHex: String? = null,
+    @Column(name = "secondary_color_hex", length = 7)
+    var secondaryColorHex: String? = null,
+    @Column(name = "portal_title", length = 100)
+    var portalTitle: String? = null,
 ) : AuditEntity()

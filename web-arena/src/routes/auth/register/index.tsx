@@ -39,7 +39,7 @@ function StepIndicator({ current }: { current: number }) {
         {[1, 2, 3].map((s) => (
           <div
             key={s}
-            className={`h-2 w-8 rounded-full ${s <= current ? 'bg-blue-600' : 'bg-gray-200'}`}
+            className={`h-2 w-8 rounded-full ${s <= current ? 'bg-primary' : 'bg-gray-200'}`}
           />
         ))}
       </div>
@@ -137,11 +137,11 @@ function PhoneStep({ clubId }: { clubId: string }) {
             <button
               onClick={handleRequestOtp}
               disabled={loading || phone.length < 13}
-              className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-3 font-semibold text-white disabled:opacity-50"
             >
               {loading ? t('common.loading') : t('auth.phone.sendCode')}
             </button>
-            <a href="/auth/login" className="block text-sm text-blue-600">
+            <a href="/auth/login" className="block text-sm text-primary">
               {t('auth.phone.title')}
             </a>
           </div>
@@ -168,14 +168,14 @@ function PhoneStep({ clubId }: { clubId: string }) {
             <button
               onClick={handleVerifyOtp}
               disabled={loading || otp.some(d => !d)}
-              className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-3 font-semibold text-white disabled:opacity-50"
             >
               {loading ? t('common.loading') : t('auth.otp.verify')}
             </button>
             <button
               onClick={handleRequestOtp}
               disabled={countdown > 0 || loading}
-              className="text-sm text-blue-600 disabled:text-gray-400"
+              className="text-sm text-primary disabled:text-gray-400"
             >
               {countdown > 0 ? t('auth.otp.resendIn', { seconds: countdown }) : t('auth.otp.resend')}
             </button>
@@ -294,7 +294,7 @@ function ProfileStep() {
             </button>
             <button
               onClick={handleSubmit}
-              className="flex-1 rounded-lg bg-blue-600 py-3 font-semibold text-white"
+              className="flex-1 rounded-lg bg-primary py-3 font-semibold text-white"
             >
               {t('register.profile.next')}
             </button>
@@ -362,7 +362,7 @@ function PlanStep({ clubId }: { clubId: string }) {
           <button
             onClick={() => handleComplete(null)}
             disabled={loading}
-            className="w-full rounded-lg border-2 border-dashed border-gray-300 py-4 text-gray-500 hover:border-blue-400 hover:text-blue-600 disabled:opacity-50"
+            className="w-full rounded-lg border-2 border-dashed border-gray-300 py-4 text-gray-500 hover:border-primary hover:text-primary disabled:opacity-50"
           >
             {loading ? t('common.loading') : t('register.plan.skip')}
           </button>

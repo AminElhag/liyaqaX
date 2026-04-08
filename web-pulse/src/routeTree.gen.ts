@@ -23,6 +23,7 @@ import { Route as FinanceIndexRouteImport } from './routes/finance/index'
 import { Route as CashDrawerIndexRouteImport } from './routes/cash-drawer/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
 import { Route as SettingsZatcaRouteImport } from './routes/settings/zatca'
+import { Route as SettingsPortalRouteImport } from './routes/settings/portal'
 import { Route as SettingsLeadSourcesRouteImport } from './routes/settings/lead-sources'
 import { Route as ReportsUtilizationRouteImport } from './routes/reports/utilization'
 import { Route as ReportsRevenueRouteImport } from './routes/reports/revenue'
@@ -128,6 +129,11 @@ const StaffStaffIdRoute = StaffStaffIdRouteImport.update({
 const SettingsZatcaRoute = SettingsZatcaRouteImport.update({
   id: '/settings/zatca',
   path: '/settings/zatca',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsPortalRoute = SettingsPortalRouteImport.update({
+  id: '/settings/portal',
+  path: '/settings/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsLeadSourcesRoute = SettingsLeadSourcesRouteImport.update({
@@ -340,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/portal': typeof SettingsPortalRoute
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
@@ -392,6 +399,7 @@ export interface FileRoutesByTo {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/portal': typeof SettingsPortalRoute
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer': typeof CashDrawerIndexRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/reports/revenue': typeof ReportsRevenueRoute
   '/reports/utilization': typeof ReportsUtilizationRoute
   '/settings/lead-sources': typeof SettingsLeadSourcesRoute
+  '/settings/portal': typeof SettingsPortalRoute
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
@@ -499,6 +508,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/portal'
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
@@ -551,6 +561,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/portal'
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer'
@@ -603,6 +614,7 @@ export interface FileRouteTypes {
     | '/reports/revenue'
     | '/reports/utilization'
     | '/settings/lead-sources'
+    | '/settings/portal'
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
@@ -656,6 +668,7 @@ export interface RootRouteChildren {
   ReportsRevenueRoute: typeof ReportsRevenueRoute
   ReportsUtilizationRoute: typeof ReportsUtilizationRoute
   SettingsLeadSourcesRoute: typeof SettingsLeadSourcesRoute
+  SettingsPortalRoute: typeof SettingsPortalRoute
   SettingsZatcaRoute: typeof SettingsZatcaRoute
   StaffStaffIdRoute: typeof StaffStaffIdRoute
   CashDrawerIndexRoute: typeof CashDrawerIndexRoute
@@ -774,6 +787,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/zatca'
       fullPath: '/settings/zatca'
       preLoaderRoute: typeof SettingsZatcaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/portal': {
+      id: '/settings/portal'
+      path: '/settings/portal'
+      fullPath: '/settings/portal'
+      preLoaderRoute: typeof SettingsPortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/lead-sources': {
@@ -1081,6 +1101,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsRevenueRoute: ReportsRevenueRoute,
   ReportsUtilizationRoute: ReportsUtilizationRoute,
   SettingsLeadSourcesRoute: SettingsLeadSourcesRoute,
+  SettingsPortalRoute: SettingsPortalRoute,
   SettingsZatcaRoute: SettingsZatcaRoute,
   StaffStaffIdRoute: StaffStaffIdRoute,
   CashDrawerIndexRoute: CashDrawerIndexRoute,

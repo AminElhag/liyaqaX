@@ -21,7 +21,7 @@ function RegistrationSuccess() {
         <p className="text-gray-500">{t('register.success.body')}</p>
         <button
           onClick={() => navigate({ to: '/auth/login' })}
-          className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white"
+          className="w-full rounded-lg bg-primary py-3 font-semibold text-white"
         >
           {t('register.success.backToLogin')}
         </button>

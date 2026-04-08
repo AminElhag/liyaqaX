@@ -93,6 +93,12 @@ export const Permission = {
   ROLE_UPDATE: 'role:update',
   ROLE_DELETE: 'role:delete',
 
+  // Portal Settings
+  PORTAL_SETTINGS_UPDATE: 'portal-settings:update',
+
+  // Branding
+  BRANDING_UPDATE: 'branding:update',
+
   // ZATCA
   ZATCA_READ: 'zatca:read',
 

@@ -24,11 +24,11 @@ export function NotificationItem({ notification, onRead }: NotificationItemProps
       }}
       className={cn(
         'flex w-full gap-3 border-b border-gray-100 px-4 py-3 text-start',
-        isUnread && 'bg-blue-50/50',
+        isUnread && 'bg-primary/5',
       )}
     >
       {isUnread && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
       )}
       {!isUnread && <span className="mt-1.5 h-2 w-2 shrink-0" />}
       <div className="min-w-0 flex-1">

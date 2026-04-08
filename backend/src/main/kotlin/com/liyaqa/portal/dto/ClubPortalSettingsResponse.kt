@@ -7,4 +7,8 @@ data class ClubPortalSettingsResponse(
     val onlinePaymentEnabled: Boolean,
     val portalMessage: String?,
     val selfRegistrationEnabled: Boolean,
+    val logoUrl: String?,
+    val primaryColorHex: String?,
+    val secondaryColorHex: String?,
+    val portalTitle: String?,
 )

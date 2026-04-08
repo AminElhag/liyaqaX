@@ -19,7 +19,7 @@ function NotificationsPage() {
           <button
             type="button"
             onClick={() => markAllRead()}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-primary hover:text-primary"
           >
             {t('notifications.markAllRead')}
           </button>

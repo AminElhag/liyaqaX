@@ -156,4 +156,7 @@ object PermissionConstants {
     const val MEMBER_NOTE_READ = "member-note:read"
     const val MEMBER_NOTE_DELETE = "member-note:delete"
     const val MEMBER_NOTE_FOLLOW_UP_READ = "member-note:follow-up:read"
+
+    // ── Branding ─────────────────────────────────────────────────────────
+    const val BRANDING_UPDATE = "branding:update"
 }

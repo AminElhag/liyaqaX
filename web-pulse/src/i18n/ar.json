@@ -651,6 +651,19 @@
     "empty": "لا يوجد أعضاء منتهية الصلاحية — احتفاظ ممتاز!",
     "total": "{{count}} عضو منتهية الصلاحية"
   },
+  "branding": {
+    "title": "الهوية البصرية",
+    "logo_url": "رابط الشعار",
+    "logo_url_placeholder": "https://cdn.example.com/logo.png",
+    "portal_title": "عنوان البوابة",
+    "portal_title_placeholder": "اسم النادي",
+    "primary_color": "اللون الأساسي",
+    "secondary_color": "اللون الثانوي",
+    "preview_title": "معاينة",
+    "save_button": "حفظ الهوية البصرية",
+    "saved_toast": "تم حفظ إعدادات الهوية البصرية",
+    "permission_note": "فقط مالك النادي يمكنه إدارة إعدادات الهوية البصرية."
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

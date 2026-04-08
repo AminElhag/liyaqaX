@@ -24,7 +24,7 @@ function ClassesMyClassesPage() {
           onClick={() => setActiveTab('bookings')}
           className={`pb-2 text-sm font-medium ${
             activeTab === 'bookings'
-              ? 'border-b-2 border-blue-600 text-blue-600'
+              ? 'border-b-2 border-primary text-primary'
               : 'text-gray-500'
           }`}
         >
@@ -35,7 +35,7 @@ function ClassesMyClassesPage() {
           onClick={() => setActiveTab('waitlist')}
           className={`pb-2 text-sm font-medium ${
             activeTab === 'waitlist'
-              ? 'border-b-2 border-blue-600 text-blue-600'
+              ? 'border-b-2 border-primary text-primary'
               : 'text-gray-500'
           }`}
         >

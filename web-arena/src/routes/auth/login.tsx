@@ -119,12 +119,12 @@ function LoginPage() {
             <button
               onClick={handleRequestOtp}
               disabled={loading || phone.length < 13}
-              className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-3 font-semibold text-white disabled:opacity-50"
             >
               {loading ? t('common.loading') : t('auth.phone.sendCode')}
             </button>
             {selfRegEnabled && (
-              <Link to="/auth/register" className="block text-sm text-blue-600 hover:underline">
+              <Link to="/auth/register" className="block text-sm text-primary hover:underline">
                 {t('register.link')}
               </Link>
             )}
@@ -152,14 +152,14 @@ function LoginPage() {
             <button
               onClick={handleVerifyOtp}
               disabled={loading || otp.some(d => !d)}
-              className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-3 font-semibold text-white disabled:opacity-50"
             >
               {loading ? t('common.loading') : t('auth.otp.verify')}
             </button>
             <button
               onClick={handleRequestOtp}
               disabled={countdown > 0 || loading}
-              className="text-sm text-blue-600 disabled:text-gray-400"
+              className="text-sm text-primary disabled:text-gray-400"
             >
               {countdown > 0 ? t('auth.otp.resendIn', { seconds: countdown }) : t('auth.otp.resend')}
             </button>

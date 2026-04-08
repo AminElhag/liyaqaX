@@ -88,4 +88,7 @@ enum class AuditAction(val code: String) {
     // Lapse Recovery
     MEMBERSHIP_LAPSED("MEMBERSHIP_LAPSED"),
     MEMBER_REACTIVATED("MEMBER_REACTIVATED"),
+
+    // Portal Branding
+    BRANDING_UPDATED("BRANDING_UPDATED"),
 }

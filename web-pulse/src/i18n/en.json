@@ -651,6 +651,19 @@
     "empty": "No lapsed members — great retention!",
     "total": "{{count}} lapsed members"
   },
+  "branding": {
+    "title": "Branding",
+    "logo_url": "Logo URL",
+    "logo_url_placeholder": "https://cdn.example.com/logo.png",
+    "portal_title": "Portal Title",
+    "portal_title_placeholder": "Your Club Name",
+    "primary_color": "Primary Color",
+    "secondary_color": "Secondary Color",
+    "preview_title": "Preview",
+    "save_button": "Save Branding",
+    "saved_toast": "Branding settings saved",
+    "permission_note": "Only club owners can manage branding settings."
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

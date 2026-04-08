@@ -5,6 +5,8 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { LapsedBanner } from '@/components/LapsedBanner'
+import { applyBranding } from '@/utils/applyBranding'
+import liyaqaLogoUrl from '@/assets/liyaqa-logo.svg'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -27,11 +29,19 @@ function RootComponent() {
     }
   }, [isAuthenticated, isAuthRoute, navigate])
 
+  const portalSettings = useAuthStore((s) => s.portalSettings)
+
   useEffect(() => {
     if (isAuthenticated && member?.preferredLanguage) {
       i18n.changeLanguage(member.preferredLanguage)
     }
   }, [isAuthenticated, member?.preferredLanguage, i18n])
+
+  useEffect(() => {
+    if (portalSettings) {
+      applyBranding(portalSettings)
+    }
+  }, [portalSettings])
 
   if (isAuthRoute) {
     return <Outlet />
@@ -57,9 +67,17 @@ function RootComponent() {
     <div className="flex min-h-screen flex-col bg-gray-50">
       <header className="sticky top-0 z-10 border-b bg-white px-4 py-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">
-            {member?.club?.nameAr || member?.club?.name}
-          </span>
+          <div className="flex items-center gap-2">
+            <img
+              src={portalSettings?.logoUrl ?? liyaqaLogoUrl}
+              onError={(e) => { e.currentTarget.src = liyaqaLogoUrl }}
+              alt={portalSettings?.portalTitle ?? 'Liyaqa'}
+              className="h-8 w-auto"
+            />
+            <span className="text-sm font-medium text-gray-500">
+              {portalSettings?.portalTitle ?? member?.club?.nameAr ?? member?.club?.name}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <NotificationBell />
             <span className="text-sm font-semibold">
@@ -98,7 +116,7 @@ function BottomNav() {
             key={item.path}
             onClick={() => navigate({ to: item.path })}
             className={`flex flex-col items-center px-3 py-1 text-xs ${
-              path === item.path ? 'font-semibold text-blue-600' : 'text-gray-500'
+              path === item.path ? 'font-semibold text-primary' : 'text-gray-500'
             }`}
           >
             {item.label}
