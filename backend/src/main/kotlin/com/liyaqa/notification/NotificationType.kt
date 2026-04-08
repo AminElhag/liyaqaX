@@ -105,4 +105,19 @@ enum class NotificationType(
         "notification.membership_lapsed.body",
         false,
     ),
+    SUBSCRIPTION_EXPIRING_SOON_14(
+        "notification.subscription_expiring_14.title",
+        "notification.subscription_expiring_14.body",
+        false,
+    ),
+    SUBSCRIPTION_EXPIRING_SOON_7(
+        "notification.subscription_expiring_7.title",
+        "notification.subscription_expiring_7.body",
+        false,
+    ),
+    SUBSCRIPTION_EXPIRED(
+        "notification.subscription_expired.title",
+        "notification.subscription_expired.body",
+        false,
+    ),
 }

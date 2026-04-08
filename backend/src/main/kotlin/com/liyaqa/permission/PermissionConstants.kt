@@ -170,4 +170,8 @@ object PermissionConstants {
 
     // ── Online Payment ───────────────────────────────────────────────────
     const val ONLINE_PAYMENT_READ = "online-payment:read"
+
+    // ── Subscription ─────────────────────────────────────────────────────
+    const val SUBSCRIPTION_MANAGE = "subscription:manage"
+    const val SUBSCRIPTION_READ = "subscription:read"
 }

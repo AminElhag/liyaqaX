@@ -55,6 +55,10 @@ import com.liyaqa.rbac.UserRole
 import com.liyaqa.rbac.UserRoleRepository
 import com.liyaqa.report.builder.ReportTemplate
 import com.liyaqa.report.builder.ReportTemplateRepository
+import com.liyaqa.subscription.entity.ClubSubscription
+import com.liyaqa.subscription.entity.SubscriptionPlan
+import com.liyaqa.subscription.repository.ClubSubscriptionRepository
+import com.liyaqa.subscription.repository.SubscriptionPlanRepository
 import com.liyaqa.role.Role
 import com.liyaqa.role.RoleRepository
 import com.liyaqa.staff.StaffBranchAssignment
@@ -119,6 +123,8 @@ class DevDataLoader(
     private val cashDrawerEntryRepository: CashDrawerEntryRepository,
     private val portalSettingsRepository: ClubPortalSettingsRepository,
     private val reportTemplateRepository: ReportTemplateRepository,
+    private val subscriptionPlanRepository: SubscriptionPlanRepository,
+    private val clubSubscriptionRepository: ClubSubscriptionRepository,
     private val ptPackageCatalogRepository: PTPackageCatalogRepository,
     private val ptPackageRepository: PTPackageRepository,
     private val ptSessionRepository: PTSessionRepository,
@@ -145,6 +151,7 @@ class DevDataLoader(
             PermissionConstants.MEMBER_READ, PermissionConstants.PLATFORM_STATS_VIEW,
             PermissionConstants.ZATCA_ONBOARD, PermissionConstants.ZATCA_READ,
             PermissionConstants.ZATCA_RETRY,
+            PermissionConstants.SUBSCRIPTION_MANAGE, PermissionConstants.SUBSCRIPTION_READ,
         )
 
     private val platformReadPlusImpersonate =
@@ -157,6 +164,7 @@ class DevDataLoader(
             PermissionConstants.INTEGRATION_READ,
             PermissionConstants.SYSTEM_IMPERSONATE,
             PermissionConstants.MEMBER_READ,
+            PermissionConstants.SUBSCRIPTION_READ,
         )
 
     private val platformIntegration =
@@ -345,6 +353,7 @@ class DevDataLoader(
         seedLeads(org, club, riyadhBranch, staffByEmail)
         seedCashDrawer(org, club, riyadhBranch, staffByEmail)
         seedReportTemplates(club)
+        seedSubscriptionPlans(club, users)
 
         log.info(
             "Seeded 1 org, 1 club, 2 branches, {} users, {} permissions, {} roles, " +
@@ -1397,6 +1406,52 @@ class DevDataLoader(
                 dimensions = """["month","lead_source"]""",
                 metricScope = "leads",
                 isSystem = true,
+            ),
+        )
+    }
+
+    // ── Subscription Plans ──────────────────────────────────────────────
+
+    private fun seedSubscriptionPlans(club: Club, users: List<User>) {
+        val starter = subscriptionPlanRepository.save(
+            SubscriptionPlan(
+                name = "Starter",
+                monthlyPriceHalalas = 50_000,
+                maxBranches = 1,
+                maxStaff = 10,
+            ),
+        )
+        val growth = subscriptionPlanRepository.save(
+            SubscriptionPlan(
+                name = "Growth",
+                monthlyPriceHalalas = 120_000,
+                maxBranches = 3,
+                maxStaff = 30,
+            ),
+        )
+        subscriptionPlanRepository.save(
+            SubscriptionPlan(
+                name = "Enterprise",
+                monthlyPriceHalalas = 300_000,
+                maxBranches = 0,
+                maxStaff = 0,
+            ),
+        )
+
+        val admin = users.first { it.email == "admin@liyaqa.com" }
+        val now = Instant.now()
+        val periodEnd = now.plus(java.time.Duration.ofDays(30))
+        val graceEnd = periodEnd.plus(java.time.Duration.ofDays(7))
+
+        clubSubscriptionRepository.save(
+            ClubSubscription(
+                clubId = club.id,
+                planId = growth.id,
+                status = "ACTIVE",
+                currentPeriodStart = now,
+                currentPeriodEnd = periodEnd,
+                gracePeriodEndsAt = graceEnd,
+                assignedByUserId = admin.id,
             ),
         )
     }

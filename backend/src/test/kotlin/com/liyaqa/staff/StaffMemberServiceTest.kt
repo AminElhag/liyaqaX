@@ -55,6 +55,8 @@ class StaffMemberServiceTest {
 
     @Mock lateinit var auditService: AuditService
 
+    @Mock lateinit var subscriptionService: com.liyaqa.subscription.service.SubscriptionService
+
     @InjectMocks lateinit var service: StaffMemberService
 
     private val org = Organization(nameAr = "منظمة", nameEn = "Org", email = "o@t.com")

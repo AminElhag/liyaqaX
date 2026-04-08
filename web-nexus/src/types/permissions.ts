@@ -23,6 +23,8 @@ export const Permission = {
   ZATCA_READ: 'zatca:read',
   ZATCA_RETRY: 'zatca:retry',
   MEMBER_IMPORT: 'member:import',
+  SUBSCRIPTION_MANAGE: 'subscription:manage',
+  SUBSCRIPTION_READ: 'subscription:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

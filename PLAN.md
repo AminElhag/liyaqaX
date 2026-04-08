@@ -1,315 +1,353 @@
-# Plan 24 — Online Payments (Moyasar)
+# Plan 30 — Liyaqa Subscription Billing (Platform Layer)
 
 ## Status
 Ready for implementation
 
 ## Branch
-`feature/plan-24-moyasar`
+`feature/plan-30-subscription-billing`
 
 ## Goal
-Enable members to pay for new memberships and renewals from web-arena using mada, Visa/Mastercard, or Apple Pay via Moyasar. Completes the self-service loop (Plan 22 self-registration + Plan 33 lapse recovery). Staff see a read-only online payment history tab on each member profile in web-pulse.
+Add the SaaS billing layer that gates all club-scoped API access behind an active subscription. Platform admins assign plans to clubs via web-nexus. Expired clubs get a 7-day grace period, then receive 402 on all requests (staff + members). Usage limits (max branches, max staff) are enforced at plan level.
 
 ## Context
-- `Membership` entity already exists with `status = pending_payment` (set by Plan 22 self-registration)
-- `MemberStatus.LAPSED` exists from Plan 33 — lapsed members can also pay online to renew
-- `ClubPortalSettings.onlinePaymentEnabled` column already exists (created in web-arena plan) but was never wired to a real payment flow
-- `Payment` + `Invoice` entities already exist — Moyasar success creates records in both
-- ZATCA invoice generation already triggered by `Payment` creation — no changes needed there
-- Next Flyway migration: **V22**
+- `Club`, `Organization`, `Branch`, `StaffMember` entities already exist
+- `User` entity has `scope = "platform"` for Super Admin / Support Agent roles
+- Notification system (Plan 21) exists — `SUBSCRIPTION_EXPIRING_SOON` wires into it
+- Redis already used for RBAC permission caching — reuse same `RedisTemplate` for subscription cache
+- `Payment` entity exists for member payments — no dependency here (platform billing is manual invoice, no card)
+- Next Flyway migration: **V23**
 
 ---
 
 ## Scope — what this plan covers
 
-- [ ] Flyway V22 — `online_payment_transactions` table
-- [ ] `OnlinePaymentTransaction` entity
-- [ ] `MoyasarClient` — HTTP client wrapping Moyasar REST API (create payment, fetch payment)
-- [ ] `OnlinePaymentService` — initiate, handle webhook, verify signature, activate membership
-- [ ] Webhook endpoint: `POST /api/v1/webhooks/moyasar` (public — no JWT, HMAC-verified)
-- [ ] 3 arena endpoints: initiate payment, get payment status, get member's transaction history
-- [ ] New audit actions: `ONLINE_PAYMENT_INITIATED`, `ONLINE_PAYMENT_SUCCEEDED`, `ONLINE_PAYMENT_FAILED`
-- [ ] New permission: `online-payment:read` (Owner, Branch Manager)
-- [ ] web-pulse: "Online Payments" tab on member profile — read-only transaction list
-- [ ] web-arena: "Pay Now" button on `/membership` (shown only when `onlinePaymentEnabled = true` and membership is `pending_payment` or member is lapsed)
-- [ ] web-arena: payment callback handler (`/payment-callback`) — reads Moyasar redirect params, redirects to `/membership`
+- [ ] Flyway V23 — `subscription_plans` + `club_subscriptions` tables
+- [ ] `SubscriptionPlan` entity
+- [ ] `ClubSubscription` entity
+- [ ] `SubscriptionEnforcementInterceptor` — reads club subscription status on every club-scoped request
+- [ ] Redis cache for subscription status: key `subscription_status:{clubId}`, TTL 5 minutes
+- [ ] `SubscriptionService` — CRUD for plans, assign to club, extend/cancel, status check
+- [ ] Plan limit enforcement in `BranchService` and `StaffMemberService`
+- [ ] Daily scheduler: transition ACTIVE → GRACE → EXPIRED, fire expiry notifications
+- [ ] New notification types: `SUBSCRIPTION_EXPIRING_SOON_14`, `SUBSCRIPTION_EXPIRING_SOON_7`, `SUBSCRIPTION_EXPIRED`
+- [ ] New audit actions: `SUBSCRIPTION_PLAN_CREATED`, `SUBSCRIPTION_PLAN_UPDATED`, `SUBSCRIPTION_ASSIGNED`, `SUBSCRIPTION_EXTENDED`, `SUBSCRIPTION_CANCELLED`
+- [ ] New permissions: `subscription:manage` (Super Admin), `subscription:read` (Super Admin, Support Agent)
+- [ ] 10 endpoints (nexus only)
+- [ ] web-nexus: Subscriptions section — plan catalog, per-club assignment, expiry dashboard
 - [ ] Tests — unit + integration + frontend
 
 ## Out of scope — do not implement in this plan
 
-- Refunds via Moyasar API
-- Saving card / tokenisation for repeat payments
-- Staff-initiated online payment links (pay-by-link)
-- Subscription auto-renewal via Moyasar
-- Payment method management UI
+- Automated card charging or payment processing for platform billing
+- Self-serve plan selection by club owners
+- Usage reporting beyond branch + staff counts
+- Proration / partial period billing
+- Plan upgrade/downgrade flows
 
 ---
 
 ## Decisions already made
 
-- **Redirect flow**: backend creates Moyasar payment intent → returns `hostedUrl` to frontend → frontend redirects to Moyasar → Moyasar calls our webhook on completion → Moyasar also redirects member's browser to our callback URL
-- **Payment methods**: mada, creditcard (Visa/Mastercard), applepay — all supported by Moyasar hosted page; no code differentiation needed, Moyasar presents the method selector
-- **Webhook verification**: HMAC-SHA256 of the raw request body using `MOYASAR_WEBHOOK_SECRET` env var. If signature mismatch → 401 and do nothing.
-- **Idempotency**: `online_payment_transactions.moyasar_id` has a UNIQUE constraint. If webhook fires twice for the same payment → second call is a no-op (already `PAID`).
-- **Membership activation on success**: `Membership.status → active`, `Membership.startDate = today`, `Membership.endDate = today + plan.durationDays`. If member was `LAPSED`, `Member.status → ACTIVE`.
-- **Payment + Invoice**: a `Payment` record and an `Invoice` record are created on successful webhook — same as cash payment flow. ZATCA invoice generation fires automatically (existing behaviour).
-- **Failed/expired payments**: `OnlinePaymentTransaction.status = FAILED`. Membership stays `pending_payment`. Member retries by initiating a new payment.
-- **`onlinePaymentEnabled = false`**: Pay Now button is hidden in web-arena. No backend enforcement needed (the button simply doesn't render).
-- **Moyasar callback URL**: `{WEB_ARENA_BASE_URL}/payment-callback?paymentId={moyasarId}` — passed to Moyasar at payment creation. Backend `MOYASAR_CALLBACK_URL_BASE` env var holds the arena base URL.
-- **Flyway V22**
-- **No cancel-unpaid scheduler** in this plan — membership stays `pending_payment` indefinitely.
+- **Subscription states**: `ACTIVE`, `GRACE`, `EXPIRED`, `CANCELLED`. Scheduler moves ACTIVE → GRACE (at `currentPeriodEnd`), GRACE → EXPIRED (at `gracePeriodEndsAt`). Cancelled stops enforcement (treated same as EXPIRED for access — blocks new access but does not delete data).
+- **Grace period**: `gracePeriodEndsAt = currentPeriodEnd + 7 days`. Set at the same time as `currentPeriodEnd`.
+- **Enforcement**: `SubscriptionEnforcementInterceptor` intercepts all requests containing `clubId` JWT claim. Checks Redis cache → falls back to DB. If status is `EXPIRED` or `CANCELLED` → 402 with `errorCode: SUBSCRIPTION_EXPIRED`. If `GRACE` → passes request but appends `X-Subscription-Grace: true` response header.
+- **Full lockout**: both `scope = "club"` (staff/pulse) and `scope = "member"` (arena) requests are intercepted. No exemptions for members.
+- **Plan limits**: `maxBranches` and `maxStaff` on `SubscriptionPlan`. Value `0` means unlimited (used for Enterprise). Checked in `BranchService.createBranch()` and `StaffMemberService.createStaffMember()` → 402 `PLAN_LIMIT_EXCEEDED`.
+- **Seeded plans**:
+  - Starter: 500 SAR/month, maxBranches = 1, maxStaff = 10
+  - Growth: 1200 SAR/month, maxBranches = 3, maxStaff = 30
+  - Enterprise: 3000 SAR/month, maxBranches = 0 (unlimited), maxStaff = 0 (unlimited)
+- **Two expiry notifications**: scheduler fires `SUBSCRIPTION_EXPIRING_SOON_14` at `currentPeriodEnd - 14 days` and `SUBSCRIPTION_EXPIRING_SOON_7` at `currentPeriodEnd - 7 days`. Both go to all `scope = "platform"` users with `subscription:read` permission. Deduplication: check if the same notification type was already sent for this clubId in the last 24 hours before sending.
+- **Permissions**: `subscription:manage` → Super Admin only. `subscription:read` → Super Admin + Support Agent.
+- **Dev seed**: Elixir Gym is seeded with an ACTIVE Growth subscription, `currentPeriodEnd = today + 30 days`.
+- **Flyway V23**
 
 ---
 
 ## Entity design
 
-### OnlinePaymentTransaction
+### SubscriptionPlan
 
 ```kotlin
 @Entity
-@Table(name = "online_payment_transactions")
-class OnlinePaymentTransaction(
+@Table(name = "subscription_plans")
+class SubscriptionPlan(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
 
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     val publicId: UUID = UUID.randomUUID(),
 
-    // The Moyasar payment id returned from POST /v1/payments
-    @Column(name = "moyasar_id", nullable = false, unique = true, updatable = false)
-    val moyasarId: String,
+    @Column(name = "name", nullable = false, length = 100)
+    var name: String,
 
-    @Column(name = "membership_id", nullable = false, updatable = false)
-    val membershipId: Long,
+    // Monthly price in halalas (1 SAR = 100 halalas)
+    @Column(name = "monthly_price_halalas", nullable = false)
+    var monthlyPriceHalalas: Long,
 
-    @Column(name = "member_id", nullable = false, updatable = false)
-    val memberId: Long,
+    // 0 = unlimited
+    @Column(name = "max_branches", nullable = false)
+    var maxBranches: Int,
 
-    @Column(name = "club_id", nullable = false, updatable = false)
+    // 0 = unlimited
+    @Column(name = "max_staff", nullable = false)
+    var maxStaff: Int,
+
+    @Column(name = "features", columnDefinition = "jsonb")
+    var features: String? = null,   // JSON string, e.g. {"gxBooking": true, "csvImport": true}
+
+    @Column(name = "is_active", nullable = false)
+    var isActive: Boolean = true,
+
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+)
+```
+
+### ClubSubscription
+
+```kotlin
+@Entity
+@Table(name = "club_subscriptions")
+class ClubSubscription(
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    val id: Long = 0,
+
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    val publicId: UUID = UUID.randomUUID(),
+
+    @Column(name = "club_id", nullable = false)
     val clubId: Long,
 
-    // Amount in halalas (1 SAR = 100 halalas)
-    @Column(name = "amount_halalas", nullable = false, updatable = false)
-    val amountHalalas: Long,
+    @Column(name = "plan_id", nullable = false)
+    var planId: Long,
 
-    // INITIATED | PAID | FAILED | CANCELLED
+    // ACTIVE | GRACE | EXPIRED | CANCELLED
     @Column(name = "status", nullable = false, length = 20)
     var status: String,
 
-    // mada | creditcard | applepay — populated from webhook payload
-    @Column(name = "payment_method", length = 20)
-    var paymentMethod: String? = null,
+    @Column(name = "current_period_start", nullable = false)
+    var currentPeriodStart: Instant,
 
-    @Column(name = "moyasar_hosted_url", length = 500, updatable = false)
-    val moyasarHostedUrl: String,
+    @Column(name = "current_period_end", nullable = false)
+    var currentPeriodEnd: Instant,
 
-    @Column(name = "callback_received_at")
-    var callbackReceivedAt: Instant? = null,
+    // currentPeriodEnd + 7 days
+    @Column(name = "grace_period_ends_at", nullable = false)
+    var gracePeriodEndsAt: Instant,
+
+    @Column(name = "cancelled_at")
+    var cancelledAt: Instant? = null,
+
+    @Column(name = "assigned_by_user_id", nullable = false, updatable = false)
+    val assignedByUserId: Long,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
 )
 ```
 
-No `deletedAt` — payment records are immutable audit trail. Status transitions only.
+No `deletedAt` on `ClubSubscription` — status transitions only. A club can only have one non-CANCELLED subscription at a time (enforced in service layer).
 
 ---
 
-## Flyway V22
+## Flyway V23
 
 ```sql
--- V22__online_payment_transactions.sql
+-- V23__subscription_billing.sql
 
-CREATE TABLE online_payment_transactions (
-    id                  BIGSERIAL PRIMARY KEY,
-    public_id           UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    moyasar_id          VARCHAR(100) NOT NULL UNIQUE,
-    membership_id       BIGINT NOT NULL REFERENCES memberships(id),
-    member_id           BIGINT NOT NULL REFERENCES members(id),
-    club_id             BIGINT NOT NULL REFERENCES clubs(id),
-    amount_halalas      BIGINT NOT NULL,
-    status              VARCHAR(20) NOT NULL DEFAULT 'INITIATED',
-    payment_method      VARCHAR(20),
-    moyasar_hosted_url  VARCHAR(500) NOT NULL,
-    callback_received_at TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE subscription_plans (
+    id                      BIGSERIAL PRIMARY KEY,
+    public_id               UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    name                    VARCHAR(100) NOT NULL,
+    monthly_price_halalas   BIGINT NOT NULL,
+    max_branches            INT NOT NULL DEFAULT 0,
+    max_staff               INT NOT NULL DEFAULT 0,
+    features                JSONB,
+    is_active               BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at              TIMESTAMPTZ
 );
 
-CREATE INDEX idx_otp_member_id    ON online_payment_transactions(member_id);
-CREATE INDEX idx_otp_membership_id ON online_payment_transactions(membership_id);
-CREATE INDEX idx_otp_moyasar_id   ON online_payment_transactions(moyasar_id);
-CREATE INDEX idx_otp_club_status  ON online_payment_transactions(club_id, status, created_at DESC);
+CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active) WHERE deleted_at IS NULL;
+
+CREATE TABLE club_subscriptions (
+    id                      BIGSERIAL PRIMARY KEY,
+    public_id               UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    club_id                 BIGINT NOT NULL REFERENCES clubs(id),
+    plan_id                 BIGINT NOT NULL REFERENCES subscription_plans(id),
+    status                  VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    current_period_start    TIMESTAMPTZ NOT NULL,
+    current_period_end      TIMESTAMPTZ NOT NULL,
+    grace_period_ends_at    TIMESTAMPTZ NOT NULL,
+    cancelled_at            TIMESTAMPTZ,
+    assigned_by_user_id     BIGINT NOT NULL REFERENCES users(id),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX idx_club_subscription_active
+    ON club_subscriptions(club_id)
+    WHERE status NOT IN ('CANCELLED', 'EXPIRED');
+
+CREATE INDEX idx_club_subscription_club_id   ON club_subscriptions(club_id);
+CREATE INDEX idx_club_subscription_status    ON club_subscriptions(status, current_period_end);
+CREATE INDEX idx_club_subscription_expiry    ON club_subscriptions(current_period_end)
+    WHERE status = 'ACTIVE';
 ```
 
 **Index rationale:**
-- `idx_otp_member_id` — member profile Online Payments tab query
-- `idx_otp_membership_id` — link to membership for activation
-- `idx_otp_moyasar_id` — webhook lookup (most critical — called on every payment event)
-- `idx_otp_club_status` — web-pulse per-club transaction list with status filter
+- `idx_subscription_plans_active` (partial) — list available plans quickly
+- `idx_club_subscription_active` (unique partial) — enforces one active subscription per club at DB level
+- `idx_club_subscription_club_id` — look up a club's subscription (enforcement interceptor)
+- `idx_club_subscription_status` — scheduler queries for expiring/expired subscriptions
+- `idx_club_subscription_expiry` (partial, ACTIVE only) — expiry notification scheduler query
 
 ---
 
-## Moyasar API client
-
-### MoyasarClient (Spring `@Component`)
+## Subscription enforcement interceptor
 
 ```kotlin
 @Component
-class MoyasarClient(
-    @Value("\${moyasar.api-key}") private val apiKey: String,
-    private val restTemplate: RestTemplate
-) {
-    // POST https://api.moyasar.com/v1/payments
-    fun createPayment(request: MoyasarCreatePaymentRequest): MoyasarPaymentResponse
+class SubscriptionEnforcementInterceptor(
+    private val subscriptionService: SubscriptionService,
+    private val redisTemplate: RedisTemplate<String, String>
+) : HandlerInterceptor {
 
-    // GET https://api.moyasar.com/v1/payments/{id}
-    fun fetchPayment(moyasarId: String): MoyasarPaymentResponse
+    override fun preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any): Boolean {
+        val clubId = extractClubIdFromJwt(request) ?: return true  // platform scope — skip
+        val status = getCachedStatus(clubId) ?: fetchAndCacheStatus(clubId)
+
+        return when (status) {
+            "ACTIVE", "GRACE" -> {
+                if (status == "GRACE") response.setHeader("X-Subscription-Grace", "true")
+                true
+            }
+            "EXPIRED", "CANCELLED" -> {
+                response.status = 402
+                response.contentType = "application/json"
+                response.writer.write("""{"errorCode":"SUBSCRIPTION_EXPIRED","message":"Club subscription has expired. Please contact support to renew."}""")
+                false
+            }
+            else -> true  // No subscription found — allow (new clubs)
+        }
+    }
+
+    private fun getCachedStatus(clubId: Long): String? =
+        redisTemplate.opsForValue().get("subscription_status:$clubId")
+
+    private fun fetchAndCacheStatus(clubId: Long): String? {
+        val subscription = subscriptionService.findActiveByClubId(clubId) ?: return null
+        val status = subscription.status
+        redisTemplate.opsForValue().set("subscription_status:$clubId", status, Duration.ofMinutes(5))
+        return status
+    }
 }
 ```
 
-**MoyasarCreatePaymentRequest** (fields sent to Moyasar):
-```json
-{
-  "amount": 15000,
-  "currency": "SAR",
-  "description": "Basic Monthly Membership — Elixir Gym",
-  "publishable_api_key": "pk_...",
-  "callback_url": "https://arena.liyaqa.sa/payment-callback?paymentId=moyasar_id",
-  "source": { "type": "creditcard" },
-  "metadata": {
-    "membershipId": "internal-uuid",
-    "memberId": "internal-uuid",
-    "clubId": "internal-uuid"
-  }
-}
-```
-
-**MoyasarPaymentResponse** (key fields used):
-- `id` — Moyasar payment id
-- `status` — `initiated`, `paid`, `failed`, `cancelled`
-- `source.type` — payment method used
-- `url` — hosted payment page URL
-
-Environment variables required:
-```
-MOYASAR_API_KEY=sk_live_...         # Secret key for server-to-server calls
-MOYASAR_PUBLISHABLE_KEY=pk_live_... # Publishable key embedded in payment request
-MOYASAR_WEBHOOK_SECRET=whsec_...    # For HMAC-SHA256 webhook signature verification
-MOYASAR_CALLBACK_URL_BASE=https://arena.liyaqa.sa  # Arena base URL for redirect
-```
+**Cache invalidation**: whenever a subscription's status changes (assignment, extension, cancellation, scheduler transition), call `redisTemplate.delete("subscription_status:$clubId")`.
 
 ---
 
 ## Business rules — enforce in service layer
 
-1. **Feature flag check**: before initiating, verify `ClubPortalSettings.onlinePaymentEnabled = true` for the member's club. If not → `403 Forbidden`, `errorCode: ONLINE_PAYMENT_DISABLED`, message: "Online payments are not enabled for this club."
-2. **Membership payability check**: membership must be in `pending_payment` state OR member status must be `LAPSED`. Any other state → `409 Conflict`, `errorCode: MEMBERSHIP_NOT_PAYABLE`, message: "This membership is not awaiting payment."
-3. **Amount from plan**: payment amount is always taken from `MembershipPlan.priceHalalas` — never from request body. Frontend passes `membershipPublicId` only.
-4. **Duplicate transaction guard**: if an `INITIATED` transaction already exists for this `membershipId` → return the existing `moyasarHostedUrl` instead of creating a new Moyasar payment (idempotent initiate). This prevents double-charging if the member clicks "Pay Now" twice.
-5. **Webhook signature**: compute `HMAC-SHA256(rawBody, MOYASAR_WEBHOOK_SECRET)`. If the computed value does not match the `Moyasar-Signature` header → `401 Unauthorized`, do not process.
-6. **Idempotent webhook**: if `status` is already `PAID` when webhook fires → return `200 OK` immediately, do nothing.
-7. **Activation on success**: when webhook `status = paid`:
-   - Set `OnlinePaymentTransaction.status = PAID`, `paymentMethod`, `callbackReceivedAt`
-   - Set `Membership.status = active`, `startDate = today`, `endDate = today + plan.durationDays`
-   - If `Member.status = LAPSED` → set to `ACTIVE`
-   - Create `Payment` record (same fields as cash payment)
-   - Create `Invoice` record (ZATCA generation fires automatically)
-   - Log `ONLINE_PAYMENT_SUCCEEDED` audit action
-8. **Failed webhook**: when webhook `status = failed` or `cancelled`:
-   - Set `OnlinePaymentTransaction.status = FAILED`
-   - Membership stays `pending_payment`
-   - Log `ONLINE_PAYMENT_FAILED`
-9. **Club scoping**: member can only pay for memberships belonging to their own club (`clubId` from JWT claim).
+### Subscription management
+1. **One active per club**: a club cannot have two non-CANCELLED/EXPIRED subscriptions simultaneously. If an ACTIVE or GRACE subscription already exists when assigning a new plan → `409 Conflict`, `errorCode: SUBSCRIPTION_ALREADY_ACTIVE`, message: "This club already has an active subscription. Cancel it before assigning a new one."
+2. **Cannot cancel EXPIRED**: if trying to cancel an EXPIRED subscription → `409 Conflict`, `errorCode: SUBSCRIPTION_ALREADY_EXPIRED`.
+3. **Plan must be active**: cannot assign an inactive (soft-deleted) plan → `422`, `errorCode: PLAN_NOT_AVAILABLE`.
+4. **Audit on all changes**: every assignment, extension, or cancellation logs the appropriate audit action.
+
+### Plan limit enforcement
+5. **Branch limit**: in `BranchService.createBranch()` — count non-deleted branches for the club. If `count >= plan.maxBranches AND plan.maxBranches != 0` → `402`, `errorCode: PLAN_LIMIT_EXCEEDED`, message: "Your plan allows a maximum of {maxBranches} branches. Upgrade to add more."
+6. **Staff limit**: in `StaffMemberService.createStaffMember()` — count non-deleted staff for the club. If `count >= plan.maxStaff AND plan.maxStaff != 0` → `402`, `errorCode: PLAN_LIMIT_EXCEEDED`, message: "Your plan allows a maximum of {maxStaff} staff members. Upgrade to add more."
+
+### Scheduler transitions
+7. **ACTIVE → GRACE**: when `currentPeriodEnd <= now()` and status = ACTIVE → set `status = GRACE`. Invalidate Redis cache.
+8. **GRACE → EXPIRED**: when `gracePeriodEndsAt <= now()` and status = GRACE → set `status = EXPIRED`. Invalidate Redis cache. Fire `SUBSCRIPTION_EXPIRED` notification.
+9. **Notification deduplication**: before sending `SUBSCRIPTION_EXPIRING_SOON_14` or `SUBSCRIPTION_EXPIRING_SOON_7`, check if a notification of that type for this clubId was already sent in the last 24 hours → skip if so.
 
 ---
 
 ## API endpoints
 
-| Method | Path | Auth | Permission | Description |
-|--------|------|------|------------|-------------|
-| `POST` | `/api/v1/arena/payments/initiate` | Member JWT | (authenticated member) | Initiate a Moyasar payment for a membership |
-| `GET` | `/api/v1/arena/payments/{moyasarId}/status` | Member JWT | (authenticated member) | Poll payment status after callback redirect |
-| `GET` | `/api/v1/arena/payments/history` | Member JWT | (authenticated member) | Member's own online payment history |
-| `POST` | `/api/v1/webhooks/moyasar` | None (HMAC) | — | Moyasar webhook — public endpoint, HMAC-verified |
-| `GET` | `/api/v1/pulse/members/{memberId}/online-payments` | Club staff JWT | `online-payment:read` | Staff view of member's online payment history |
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `POST` | `/api/v1/nexus/subscription-plans` | `subscription:manage` | Create a subscription plan |
+| `GET` | `/api/v1/nexus/subscription-plans` | `subscription:read` | List all active subscription plans |
+| `PATCH` | `/api/v1/nexus/subscription-plans/{planId}` | `subscription:manage` | Update plan name, price, or limits |
+| `DELETE` | `/api/v1/nexus/subscription-plans/{planId}` | `subscription:manage` | Soft-delete a plan (only if no active subscriptions) |
+| `POST` | `/api/v1/nexus/clubs/{clubId}/subscription` | `subscription:manage` | Assign a plan to a club (sets period start/end) |
+| `GET` | `/api/v1/nexus/clubs/{clubId}/subscription` | `subscription:read` | Get current subscription for a club |
+| `POST` | `/api/v1/nexus/clubs/{clubId}/subscription/extend` | `subscription:manage` | Extend `currentPeriodEnd` by N months; recalculate `gracePeriodEndsAt` |
+| `POST` | `/api/v1/nexus/clubs/{clubId}/subscription/cancel` | `subscription:manage` | Cancel current subscription |
+| `GET` | `/api/v1/nexus/subscriptions` | `subscription:read` | List all clubs with their subscription status + expiry (paginated) |
+| `GET` | `/api/v1/nexus/subscriptions/expiring` | `subscription:read` | Clubs expiring within 30 days (for dashboard widget) |
 
 ---
 
 ## Request / Response shapes
 
-### POST /arena/payments/initiate — request
+### POST /nexus/subscription-plans — request
 ```json
 {
-  "membershipPublicId": "uuid"
+  "name": "Growth",
+  "monthlyPriceHalalas": 120000,
+  "maxBranches": 3,
+  "maxStaff": 30,
+  "features": { "csvImport": true, "customReports": true }
 }
 ```
 
-### POST /arena/payments/initiate — response `201 Created`
+### POST /nexus/clubs/{clubId}/subscription — request
 ```json
 {
-  "transactionId": "uuid",
-  "hostedUrl": "https://payment.moyasar.com/...",
-  "amountSar": "150.00",
-  "planName": "Basic Monthly"
+  "planPublicId": "uuid",
+  "periodStartDate": "2026-04-08",
+  "periodMonths": 1
 }
 ```
 
-### GET /arena/payments/{moyasarId}/status — response
+The `currentPeriodEnd = periodStartDate + periodMonths * 30 days`. `gracePeriodEndsAt = currentPeriodEnd + 7 days`.
+
+### POST /nexus/clubs/{clubId}/subscription/extend — request
 ```json
 {
-  "moyasarId": "pay_abc123",
-  "status": "PAID",
-  "paymentMethod": "mada",
-  "amountSar": "150.00",
-  "paidAt": "2026-04-08T09:00:00Z"
+  "additionalMonths": 1
 }
 ```
 
-### GET /arena/payments/history — response
+`currentPeriodEnd += additionalMonths * 30 days`. `gracePeriodEndsAt = new currentPeriodEnd + 7 days`. Status resets to ACTIVE if GRACE.
+
+### GET /nexus/subscriptions — response
 ```json
 {
-  "transactions": [
+  "subscriptions": [
     {
-      "transactionId": "uuid",
-      "moyasarId": "pay_abc123",
-      "planName": "Basic Monthly",
-      "amountSar": "150.00",
-      "status": "PAID",
-      "paymentMethod": "mada",
-      "createdAt": "2026-04-08T08:55:00Z"
+      "clubId": "uuid",
+      "clubName": "Elixir Gym",
+      "planName": "Growth",
+      "status": "ACTIVE",
+      "currentPeriodEnd": "2026-05-08",
+      "gracePeriodEndsAt": "2026-05-15",
+      "daysUntilExpiry": 30,
+      "monthlyPriceSar": "1200.00"
     }
-  ]
+  ],
+  "totalCount": 1,
+  "page": 0,
+  "pageSize": 20
 }
 ```
 
-### POST /webhooks/moyasar — request body (Moyasar format)
+### GET /nexus/subscriptions/expiring — response
 ```json
 {
-  "id": "pay_abc123",
-  "type": "payment_paid",
-  "data": {
-    "id": "pay_abc123",
-    "status": "paid",
-    "amount": 15000,
-    "currency": "SAR",
-    "source": { "type": "mada" },
-    "metadata": { "membershipId": "...", "memberId": "...", "clubId": "..." }
-  }
-}
-```
-Response: `200 OK` (always — Moyasar retries on non-200)
-
-### GET /pulse/members/{memberId}/online-payments — response
-```json
-{
-  "transactions": [
+  "expiringSoon": [
     {
-      "transactionId": "uuid",
-      "moyasarId": "pay_abc123",
-      "planName": "Basic Monthly",
-      "amountSar": "150.00",
-      "status": "PAID",
-      "paymentMethod": "mada",
-      "createdAt": "2026-04-08T08:55:00Z"
+      "clubId": "uuid",
+      "clubName": "Elixir Gym",
+      "planName": "Growth",
+      "status": "ACTIVE",
+      "currentPeriodEnd": "2026-04-22",
+      "daysUntilExpiry": 14
     }
   ]
 }
@@ -322,160 +360,210 @@ Response: `200 OK` (always — Moyasar retries on non-200)
 All must use `nativeQuery = true`:
 
 ```kotlin
-// Find by Moyasar ID — used in webhook handler
-@Query(value = """
-    SELECT * FROM online_payment_transactions
-    WHERE moyasar_id = :moyasarId
-""", nativeQuery = true)
-fun findByMoyasarId(moyasarId: String): OnlinePaymentTransaction?
+// SubscriptionPlanRepository
 
-// Find INITIATED transactions for a membership (idempotent initiate check)
 @Query(value = """
-    SELECT * FROM online_payment_transactions
-    WHERE membership_id = :membershipId
-      AND status = 'INITIATED'
+    SELECT * FROM subscription_plans
+    WHERE deleted_at IS NULL
+      AND is_active = TRUE
+    ORDER BY monthly_price_halalas
+""", nativeQuery = true)
+fun findAllActivePlans(): List<SubscriptionPlan>
+
+// ClubSubscriptionRepository
+
+// Used by enforcement interceptor (must be fast)
+@Query(value = """
+    SELECT * FROM club_subscriptions
+    WHERE club_id = :clubId
+      AND status NOT IN ('CANCELLED', 'EXPIRED')
     LIMIT 1
 """, nativeQuery = true)
-fun findInitiatedByMembership(membershipId: Long): OnlinePaymentTransaction?
+fun findActiveByClubId(clubId: Long): ClubSubscription?
 
-// Member's own transaction history
+// Scheduler: find ACTIVE subscriptions past their period end
 @Query(value = """
-    SELECT t.*, mp.name_en AS plan_name_en, mp.name_ar AS plan_name_ar
-    FROM online_payment_transactions t
-    JOIN memberships m ON m.id = t.membership_id
-    JOIN membership_plans mp ON mp.id = m.plan_id
-    WHERE t.member_id = :memberId
-    ORDER BY t.created_at DESC
+    SELECT * FROM club_subscriptions
+    WHERE status = 'ACTIVE'
+      AND current_period_end <= :now
 """, nativeQuery = true)
-fun findByMemberId(memberId: Long): List<TransactionHistoryProjection>
+fun findActiveExpired(now: Instant): List<ClubSubscription>
 
-// Staff view — member's transaction history scoped to club
+// Scheduler: find GRACE subscriptions past their grace period
 @Query(value = """
-    SELECT t.*, mp.name_en AS plan_name_en, mp.name_ar AS plan_name_ar
-    FROM online_payment_transactions t
-    JOIN memberships m ON m.id = t.membership_id
-    JOIN membership_plans mp ON mp.id = m.plan_id
-    WHERE t.member_id = :memberId
-      AND t.club_id = :clubId
-    ORDER BY t.created_at DESC
+    SELECT * FROM club_subscriptions
+    WHERE status = 'GRACE'
+      AND grace_period_ends_at <= :now
 """, nativeQuery = true)
-fun findByMemberIdAndClubId(memberId: Long, clubId: Long): List<TransactionHistoryProjection>
+fun findGraceExpired(now: Instant): List<ClubSubscription>
+
+// Scheduler: find ACTIVE subscriptions expiring in exactly 14 or 7 days
+@Query(value = """
+    SELECT * FROM club_subscriptions
+    WHERE status = 'ACTIVE'
+      AND DATE(current_period_end AT TIME ZONE 'Asia/Riyadh') = :targetDate
+""", nativeQuery = true)
+fun findExpiringOnDate(targetDate: java.time.LocalDate): List<ClubSubscription>
+
+// Dashboard: all clubs with subscription, paginated
+@Query(value = """
+    SELECT cs.*, c.name AS club_name, sp.name AS plan_name, sp.monthly_price_halalas
+    FROM club_subscriptions cs
+    JOIN clubs c  ON c.id = cs.club_id
+    JOIN subscription_plans sp ON sp.id = cs.plan_id
+    WHERE cs.status != 'CANCELLED'
+    ORDER BY cs.current_period_end
+    LIMIT :pageSize OFFSET :offset
+""", nativeQuery = true)
+fun findAllForDashboard(pageSize: Int, offset: Int): List<SubscriptionDashboardProjection>
+
+@Query(value = """
+    SELECT COUNT(*) FROM club_subscriptions
+    WHERE status != 'CANCELLED'
+""", nativeQuery = true)
+fun countForDashboard(): Long
+
+// Expiring within 30 days
+@Query(value = """
+    SELECT cs.*, c.name AS club_name, sp.name AS plan_name
+    FROM club_subscriptions cs
+    JOIN clubs c  ON c.id = cs.club_id
+    JOIN subscription_plans sp ON sp.id = cs.plan_id
+    WHERE cs.status = 'ACTIVE'
+      AND cs.current_period_end <= :cutoff
+    ORDER BY cs.current_period_end
+""", nativeQuery = true)
+fun findExpiringSoon(cutoff: Instant): List<SubscriptionDashboardProjection>
 ```
 
-Interface projection:
+Interface projections:
 
 ```kotlin
-interface TransactionHistoryProjection {
-    val publicId: UUID
-    val moyasarId: String
-    val planNameEn: String?
-    val planNameAr: String
-    val amountHalalas: Long
+interface SubscriptionDashboardProjection {
+    val publicId: UUID          // club_subscriptions.public_id
+    val clubId: Long
+    val clubName: String
+    val planName: String
+    val monthlyPriceHalalas: Long
     val status: String
-    val paymentMethod: String?
-    val createdAt: Instant
+    val currentPeriodEnd: Instant
+    val gracePeriodEndsAt: Instant
+    val cancelledAt: Instant?
 }
 ```
 
 ---
 
-## Webhook signature verification
+## Scheduler
 
 ```kotlin
 @Component
-class MoyasarWebhookVerifier(
-    @Value("\${moyasar.webhook-secret}") private val secret: String
+class SubscriptionScheduler(
+    private val subscriptionService: SubscriptionService
 ) {
-    fun verify(rawBody: ByteArray, signatureHeader: String): Boolean {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        val computed = mac.doFinal(rawBody).joinToString("") { "%02x".format(it) }
-        return computed == signatureHeader
+    // Runs daily at 03:00 Riyadh time
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Riyadh")
+    fun processSubscriptionLifecycle() {
+        subscriptionService.transitionExpiredToGrace()
+        subscriptionService.transitionGraceToExpired()
+        subscriptionService.sendExpiryNotifications()
     }
 }
 ```
 
-The webhook controller reads the raw body as `ByteArray` via `@RequestBody body: ByteArray` to ensure the signature is computed over the exact bytes received (not re-serialised JSON).
+`sendExpiryNotifications()` fires `SUBSCRIPTION_EXPIRING_SOON_14` for clubs whose `currentPeriodEnd` is exactly 14 days from today (Riyadh date), and `SUBSCRIPTION_EXPIRING_SOON_7` for 7 days from today.
 
 ---
 
 ## Frontend additions
 
-### web-arena — `/membership` (modify existing route)
+### web-nexus — Subscriptions section
 
-Add a "Pay Now" section when:
-- `onlinePaymentEnabled = true` (from `GET /arena/portal-settings`)
-- AND (`membership.status == 'pending_payment'` OR `member.status == 'LAPSED'`)
+**New nav item**: "Subscriptions" in web-nexus sidebar (visible to Super Admin + Support Agent).
 
+**Sub-pages:**
+
+#### `/nexus/subscriptions` — Dashboard
 ```
-┌───────────────────────────────────────┐
-│  Basic Monthly — 150 SAR              │
-│  Status: Awaiting Payment             │
-│                                       │
-│  [ Pay Now with Moyasar  →  ]         │
-│  mada  •  Visa/MC  •  Apple Pay       │
-└───────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Subscriptions                                               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ Active   │  │  Grace   │  │ Expiring │  │ Expired  │   │
+│  │   12     │  │    1     │  │  3 clubs │  │    0     │   │
+│  │  clubs   │  │  clubs   │  │ (30 days)│  │          │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+├──────────────────────────────────────────────────────────────┤
+│  Club          Plan      Status   Expires       Price       │
+│  Elixir Gym    Growth    ✅ Active  May 8        1,200 SAR   │
+│  [Manage]                                                    │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-- "Pay Now" button calls `POST /arena/payments/initiate`
-- On 201: `window.location.href = response.hostedUrl` (full redirect to Moyasar)
-- On 403 ONLINE_PAYMENT_DISABLED: show inline message "Contact reception to complete payment"
-- On 409 MEMBERSHIP_NOT_PAYABLE: hide button silently (should not normally reach this state)
+- 4 KPI cards: Active count, Grace count, Expiring in 30 days count, Expired count
+- Table: paginated, sortable by expiry date
+- Status badges: green (Active), orange (Grace), red (Expired), grey (Cancelled)
+- "Manage" button → club subscription detail page
 
-### web-arena — `/payment-callback` (new route)
+#### `/nexus/subscriptions/plans` — Plan Catalog
+- List of subscription plans (name, price, maxBranches, maxStaff, features JSON, active toggle)
+- "Create Plan" button → modal (name, price SAR, maxBranches, maxStaff, features)
+- Edit plan inline (name, price, limits — changes apply to future assignments only, not current subscriptions)
+- Soft-delete (only if no active clubs on that plan)
 
-Moyasar redirects here after payment attempt: `/payment-callback?id={moyasarId}&status={paid|failed}`
-
-- On mount: read `id` query param → call `GET /arena/payments/{moyasarId}/status`
-- If status is `PAID`: show brief "Payment successful! Activating your membership..." then `navigate('/membership')`
-- If status is `failed` or `cancelled`: show "Payment was not completed. You can try again from your membership page." with a link back to `/membership`
-- Loading state shown while polling
+#### `/nexus/clubs/{clubId}/subscription` — Club Subscription Detail
+- Current plan, status badge, period start/end, grace period end
+- "Assign Plan" button (if no active subscription) → modal: plan picker + period start + months
+- "Extend" button (if ACTIVE or GRACE) → modal: additional months
+- "Cancel" button → confirmation dialog
+- History: list of all past subscriptions for the club
 
 **New i18n strings** (`ar.json` + `en.json`):
 ```
-payment.pay_now
-payment.methods_hint           // "mada · Visa/MC · Apple Pay"
-payment.awaiting_payment
-payment.disabled_message       // "Contact reception to complete payment"
-payment.callback_success
-payment.callback_activating
-payment.callback_failed
-payment.callback_retry_link
-payment.history_title
-payment.method.mada
-payment.method.creditcard
-payment.method.applepay
-payment.status.initiated
-payment.status.paid
-payment.status.failed
-payment.status.cancelled
+subscription.page_title
+subscription.nav_label
+subscription.status.active
+subscription.status.grace
+subscription.status.expired
+subscription.status.cancelled
+subscription.kpi.active_clubs
+subscription.kpi.grace_clubs
+subscription.kpi.expiring_soon
+subscription.kpi.expired_clubs
+subscription.table.club
+subscription.table.plan
+subscription.table.status
+subscription.table.expires
+subscription.table.price
+subscription.assign_title
+subscription.assign_plan
+subscription.assign_period_start
+subscription.assign_months
+subscription.extend_title
+subscription.extend_months
+subscription.cancel_confirm
+subscription.plan.catalog_title
+subscription.plan.create
+subscription.plan.name
+subscription.plan.price
+subscription.plan.max_branches
+subscription.plan.max_staff
+subscription.plan.unlimited
+subscription.error.already_active
+subscription.error.plan_limit_exceeded
+subscription.grace_banner       // "Your subscription has expired. {N} days remaining in grace period."
 ```
 
-### web-pulse — member profile Online Payments tab
+### web-pulse — Grace period banner
 
-New tab on the existing member profile page (alongside Membership, Payments, Notes, etc.):
+When the response header `X-Subscription-Grace: true` is present, show a sticky warning banner at the top of web-pulse:
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Online Payments                                      │
-├────────────┬──────────┬──────────┬────────┬──────────┤
-│  Date      │  Plan    │  Amount  │  Method│  Status  │
-├────────────┼──────────┼──────────┼────────┼──────────┤
-│  Apr 8     │  Basic   │  150 SAR │  mada  │  ✅ Paid │
-│  Mar 1     │  Basic   │  150 SAR │  Visa  │  ✅ Paid │
-│  Feb 28    │  Basic   │  150 SAR │  —     │  ❌ Failed│
-└────────────┴──────────┴──────────┴────────┴──────────┘
+⚠️ Your club subscription has expired. Access will be removed in {N} days. Contact support to renew.
 ```
 
-- Status badge: green "Paid", red "Failed", grey "Initiated", grey "Cancelled"
-- Read-only — no actions
-- Visible to Owner and Branch Manager (gates on `online-payment:read`)
-
-**New i18n strings** (`ar.json` + `en.json`):
-```
-member.online_payments_tab
-member.online_payments_empty
-```
+- Banner persists across pages until the header is no longer returned
+- `N` days computed from a `X-Grace-Days-Remaining` header (add this header alongside `X-Subscription-Grace`)
+- No banner in web-arena (members are not responsible for billing)
 
 ---
 
@@ -484,187 +572,204 @@ member.online_payments_empty
 ### New files
 
 **Backend:**
-- `backend/src/main/kotlin/com/liyaqa/payment/online/entity/OnlinePaymentTransaction.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/repository/OnlinePaymentTransactionRepository.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/repository/TransactionHistoryProjection.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/client/MoyasarClient.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/client/MoyasarCreatePaymentRequest.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/client/MoyasarPaymentResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/service/OnlinePaymentService.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/service/MoyasarWebhookVerifier.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/dto/InitiatePaymentRequest.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/dto/InitiatePaymentResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/dto/PaymentStatusResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/dto/TransactionHistoryResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/controller/OnlinePaymentArenaController.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/controller/MoyasarWebhookController.kt`
-- `backend/src/main/kotlin/com/liyaqa/payment/online/controller/OnlinePaymentPulseController.kt`
-- `backend/src/main/resources/db/migration/V22__online_payment_transactions.sql`
-- `backend/src/test/kotlin/com/liyaqa/payment/online/service/OnlinePaymentServiceTest.kt`
-- `backend/src/test/kotlin/com/liyaqa/payment/online/service/MoyasarWebhookVerifierTest.kt`
-- `backend/src/test/kotlin/com/liyaqa/payment/online/controller/OnlinePaymentControllerIntegrationTest.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/entity/SubscriptionPlan.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/entity/ClubSubscription.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/repository/SubscriptionPlanRepository.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/repository/ClubSubscriptionRepository.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/repository/SubscriptionDashboardProjection.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/service/SubscriptionService.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/interceptor/SubscriptionEnforcementInterceptor.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/scheduler/SubscriptionScheduler.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/CreatePlanRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/UpdatePlanRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/AssignSubscriptionRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/ExtendSubscriptionRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/SubscriptionPlanResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/ClubSubscriptionResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/dto/SubscriptionDashboardResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/controller/SubscriptionPlanController.kt`
+- `backend/src/main/kotlin/com/liyaqa/subscription/controller/ClubSubscriptionController.kt`
+- `backend/src/main/resources/db/migration/V23__subscription_billing.sql`
+- `backend/src/test/kotlin/com/liyaqa/subscription/service/SubscriptionServiceTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/subscription/interceptor/SubscriptionEnforcementInterceptorTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/subscription/controller/SubscriptionControllerIntegrationTest.kt`
 
 **Frontend:**
-- `apps/web-arena/src/routes/payment-callback/index.tsx`
-- `apps/web-arena/src/api/payments.ts`
-- `apps/web-arena/src/tests/payment-callback.test.tsx`
-- `apps/web-pulse/src/components/member/OnlinePaymentsTab.tsx`
-- `apps/web-pulse/src/api/onlinePayments.ts`
-- `apps/web-pulse/src/tests/online-payments-tab.test.tsx`
+- `apps/web-nexus/src/routes/subscriptions/index.tsx`
+- `apps/web-nexus/src/routes/subscriptions/plans.tsx`
+- `apps/web-nexus/src/routes/subscriptions/$clubId.tsx`
+- `apps/web-nexus/src/api/subscriptions.ts`
+- `apps/web-nexus/src/tests/subscriptions.test.tsx`
+- `apps/web-pulse/src/components/GracePeriodBanner.tsx`
+- `apps/web-pulse/src/tests/grace-period-banner.test.tsx`
 
 ### Files to modify
 
-- `backend/.../audit/model/AuditAction.kt` — add `ONLINE_PAYMENT_INITIATED`, `ONLINE_PAYMENT_SUCCEEDED`, `ONLINE_PAYMENT_FAILED`
-- `backend/.../permission/PermissionConstants.kt` — add `ONLINE_PAYMENT_READ = "online-payment:read"`
-- `backend/DevDataLoader.kt` — seed `online-payment:read` to Owner + Branch Manager
-- `backend/src/main/resources/application.yml` — add `moyasar.api-key`, `moyasar.publishable-key`, `moyasar.webhook-secret`, `moyasar.callback-url-base` (values from env vars)
-- `backend/src/main/kotlin/.../security/SecurityConfig.kt` — permit `POST /api/v1/webhooks/moyasar` without JWT
-- `apps/web-arena/src/routes/membership/index.tsx` — add Pay Now section
-- `apps/web-arena/src/locales/ar.json` + `en.json` — add payment i18n strings
-- `apps/web-pulse/src/routes/members/$memberId/index.tsx` (or profile component) — add Online Payments tab
-- `apps/web-pulse/src/locales/ar.json` + `en.json` — add payment i18n strings
+- `backend/.../audit/model/AuditAction.kt` — add 5 new audit actions
+- `backend/.../permission/PermissionConstants.kt` — add `SUBSCRIPTION_MANAGE`, `SUBSCRIPTION_READ`
+- `backend/DevDataLoader.kt` — seed 3 plans + Growth subscription for Elixir Gym; seed permissions to Super Admin + Support Agent
+- `backend/.../notification/model/NotificationType.kt` — add `SUBSCRIPTION_EXPIRING_SOON_14`, `SUBSCRIPTION_EXPIRING_SOON_7`, `SUBSCRIPTION_EXPIRED`
+- `backend/.../WebMvcConfig.kt` (or `InterceptorConfig.kt`) — register `SubscriptionEnforcementInterceptor`
+- `backend/.../branch/service/BranchService.kt` — add plan limit check in `createBranch()`
+- `backend/.../staff/service/StaffMemberService.kt` — add plan limit check in `createStaffMember()`
+- `apps/web-nexus/src/routes/` (sidebar) — add Subscriptions nav item
+- `apps/web-nexus/src/locales/ar.json` + `en.json`
+- `apps/web-pulse/src/components/AppShell.tsx` (or layout) — add `GracePeriodBanner` reading response headers
+- `apps/web-pulse/src/locales/ar.json` + `en.json` — add grace banner string
 
 ---
 
 ## Implementation order
 
-### Step 1 — Flyway V22 + entity + repository
-- Write `V22__online_payment_transactions.sql`
-- Write `OnlinePaymentTransaction.kt`
-- Write `OnlinePaymentTransactionRepository.kt` with 4 native queries
-- Write `TransactionHistoryProjection.kt`
+### Step 1 — Flyway V23 + entities + repositories
+- Write `V23__subscription_billing.sql`
+- Write `SubscriptionPlan.kt`, `ClubSubscription.kt`
+- Write `SubscriptionPlanRepository.kt` with 1 native query
+- Write `ClubSubscriptionRepository.kt` with 7 native queries
+- Write `SubscriptionDashboardProjection.kt`
 - Verify: `./gradlew flywayMigrate`
 
-### Step 2 — Permissions + audit actions
-- Add `ONLINE_PAYMENT_READ` to `PermissionConstants.kt`
-- Add `ONLINE_PAYMENT_INITIATED`, `ONLINE_PAYMENT_SUCCEEDED`, `ONLINE_PAYMENT_FAILED` to `AuditAction.kt`
-- Seed in `DevDataLoader`
-- Add `moyasar.*` config to `application.yml`
-- Permit webhook endpoint in `SecurityConfig`
+### Step 2 — Permissions + audit actions + notification types
+- Add `SUBSCRIPTION_MANAGE`, `SUBSCRIPTION_READ` to `PermissionConstants.kt`
+- Add 5 audit actions to `AuditAction.kt`
+- Add 3 notification types to `NotificationType.kt`
+- Seed in `DevDataLoader` (3 plans + Growth subscription for Elixir Gym + permissions)
 - Verify: `./gradlew compileKotlin`
 
-### Step 3 — MoyasarClient
-- Implement `MoyasarClient` with `createPayment()` and `fetchPayment()`
-- `MoyasarCreatePaymentRequest` + `MoyasarPaymentResponse` DTOs
-- Use `RestTemplate` with basic auth header (`Authorization: Basic base64(apiKey:)`)
-- In tests: mock `MoyasarClient` — do NOT make real HTTP calls in tests
-- Verify: `./gradlew compileKotlin`
-
-### Step 4 — MoyasarWebhookVerifier
-- Implement `verify(rawBody, signatureHeader)` using HMAC-SHA256
-- Unit test in `MoyasarWebhookVerifierTest`: valid signature passes, tampered body fails, wrong secret fails
-
-### Step 5 — OnlinePaymentService
+### Step 3 — SubscriptionService
 Implement:
-- `initiatePayment(memberPublicId, membershipPublicId, clubId)` — all 9 business rules enforced; calls `MoyasarClient.createPayment()`; saves `OnlinePaymentTransaction` with `status = INITIATED`; logs `ONLINE_PAYMENT_INITIATED`
-- `handleWebhook(rawBody, signature, payload)` — verifies signature (401 on fail); idempotency check; dispatches to `handlePaid()` or `handleFailed()`
-- `handlePaid(transaction, payload)` — activates membership, creates Payment + Invoice, sets member status if lapsed, logs `ONLINE_PAYMENT_SUCCEEDED`
-- `handleFailed(transaction)` — sets status FAILED, logs `ONLINE_PAYMENT_FAILED`
-- `getStatus(moyasarId, memberId)` — fetches transaction, validates ownership (member can only see their own)
-- `getMemberHistory(memberId)` — queries by memberId
-- `getMemberHistoryForStaff(memberId, clubId)` — queries by memberId + clubId
-- Verify: unit tests in `OnlinePaymentServiceTest`
+- `createPlan()`, `updatePlan()`, `deletePlan()` (enforce no active clubs on plan before delete)
+- `assignSubscription()` — enforces BR1 (one active per club), sets period dates, logs `SUBSCRIPTION_ASSIGNED`, invalidates cache
+- `extendSubscription()` — updates period end + grace period, resets GRACE → ACTIVE, logs `SUBSCRIPTION_EXTENDED`, invalidates cache
+- `cancelSubscription()` — enforces BR2, sets `cancelledAt`, logs `SUBSCRIPTION_CANCELLED`, invalidates cache
+- `findActiveByClubId()` — used by interceptor
+- `transitionExpiredToGrace()` — queries `findActiveExpired()`, bulk updates to GRACE, invalidates caches
+- `transitionGraceToExpired()` — queries `findGraceExpired()`, bulk updates to EXPIRED, fires `SUBSCRIPTION_EXPIRED` notification, invalidates caches
+- `sendExpiryNotifications()` — queries 14-day and 7-day windows, deduplicates, fires notifications
+- Verify: unit tests in `SubscriptionServiceTest`
+
+### Step 4 — SubscriptionEnforcementInterceptor
+- Implement interceptor with Redis cache
+- Register in `WebMvcConfig`
+- Add `X-Subscription-Grace` and `X-Grace-Days-Remaining` headers
+- Unit test in `SubscriptionEnforcementInterceptorTest`
+
+### Step 5 — Plan limit enforcement
+- Add branch count check to `BranchService.createBranch()`
+- Add staff count check to `StaffMemberService.createStaffMember()`
+- Both check active subscription's plan limits; skip check if no subscription or unlimited (maxBranches/maxStaff = 0)
+- Verify: `./gradlew compileKotlin`
 
 ### Step 6 — Controllers
-- `OnlinePaymentArenaController` — 3 arena endpoints
-- `MoyasarWebhookController` — `POST /api/v1/webhooks/moyasar`, reads raw body as `ByteArray`
-- `OnlinePaymentPulseController` — 1 pulse endpoint
-- All controllers with `@Operation`
+- `SubscriptionPlanController` — 4 endpoints for plan CRUD
+- `ClubSubscriptionController` — 6 endpoints for club subscription management
+- All with `@Operation` + `@PreAuthorize`
 - Verify: `./gradlew compileKotlin`
 
-### Step 7 — Frontend: web-arena
-- Modify `/membership` route: add Pay Now section (conditional on `onlinePaymentEnabled` + membership status)
-- New `/payment-callback` route: reads `id` + `status` params, calls status endpoint, redirects to `/membership` on success
-- `payments.ts` API functions
+### Step 7 — Frontend: web-nexus
+- `/subscriptions` dashboard with 4 KPI cards + paginated table
+- `/subscriptions/plans` plan catalog
+- `/subscriptions/$clubId` club detail with assign/extend/cancel
+- `subscriptions.ts` API module
+- Add Subscriptions nav item
 - Add i18n strings
 - Verify: `npm run typecheck`
 
-### Step 8 — Frontend: web-pulse
-- Add "Online Payments" tab to member profile
-- `OnlinePaymentsTab.tsx` component with transaction table, status badges
-- `onlinePayments.ts` API function
-- Add i18n strings
+### Step 8 — Frontend: web-pulse grace banner
+- `GracePeriodBanner` reads `X-Subscription-Grace` + `X-Grace-Days-Remaining` from API response interceptor (Axios interceptor or TanStack Query middleware)
+- Sticky yellow banner at top of AppShell
+- Add i18n string
 - Verify: `npm run typecheck`
 
 ### Step 9 — Tests
 
-**Unit: `OnlinePaymentServiceTest`**
-- `initiatePayment returns hostedUrl for pending_payment membership`
-- `initiatePayment returns existing INITIATED transaction when duplicate requested`
-- `initiatePayment throws 403 when onlinePaymentEnabled is false`
-- `initiatePayment throws 409 MEMBERSHIP_NOT_PAYABLE for active membership`
-- `initiatePayment works for LAPSED member`
-- `handleWebhook activates membership on paid status`
-- `handleWebhook sets member status to ACTIVE when member was LAPSED`
-- `handleWebhook creates Payment and Invoice records on success`
-- `handleWebhook is idempotent when transaction already PAID`
-- `handleWebhook sets status FAILED on failed payment`
-- `handleWebhook throws 401 on invalid signature`
+**Unit: `SubscriptionServiceTest`**
+- `assignSubscription creates ACTIVE subscription with correct period dates`
+- `assignSubscription throws 409 when club already has active subscription`
+- `assignSubscription throws 422 when plan is not active`
+- `extendSubscription extends period end and grace period`
+- `extendSubscription resets GRACE status to ACTIVE`
+- `cancelSubscription sets cancelled_at`
+- `cancelSubscription throws 409 when subscription already expired`
+- `transitionExpiredToGrace moves ACTIVE past period_end to GRACE`
+- `transitionGraceToExpired moves GRACE past grace_period_ends_at to EXPIRED`
+- `sendExpiryNotifications fires 14-day notification`
+- `sendExpiryNotifications fires 7-day notification`
+- `sendExpiryNotifications deduplicates within 24 hours`
 
-**Unit: `MoyasarWebhookVerifierTest`**
-- `verify returns true for correct signature`
-- `verify returns false for tampered body`
-- `verify returns false for wrong secret`
+**Unit: `SubscriptionEnforcementInterceptorTest`**
+- `allows request when subscription is ACTIVE`
+- `allows request with grace header when subscription is GRACE`
+- `blocks request with 402 when subscription is EXPIRED`
+- `blocks request with 402 when subscription is CANCELLED`
+- `skips check for platform-scope JWT (no clubId claim)`
+- `uses Redis cache and avoids DB call on cache hit`
 
-**Integration: `OnlinePaymentControllerIntegrationTest`**
-- `POST /arena/payments/initiate returns 201 with hostedUrl`
-- `POST /arena/payments/initiate returns 403 when feature disabled`
-- `POST /arena/payments/initiate returns 409 for non-payable membership`
-- `POST /arena/payments/initiate returns 201 for LAPSED member`
-- `GET /arena/payments/{id}/status returns INITIATED status`
-- `GET /arena/payments/history returns member's transactions`
-- `POST /webhooks/moyasar returns 200 and activates membership on paid`
-- `POST /webhooks/moyasar returns 200 and fails gracefully on failed payment`
-- `POST /webhooks/moyasar returns 401 on invalid signature`
-- `POST /webhooks/moyasar is idempotent on duplicate paid event`
-- `GET /pulse/members/{id}/online-payments returns transactions`
-- `GET /pulse/members/{id}/online-payments returns 403 without online-payment:read`
+**Integration: `SubscriptionControllerIntegrationTest`**
+- `POST /nexus/subscription-plans creates plan`
+- `POST /nexus/subscription-plans returns 403 without subscription:manage`
+- `GET /nexus/subscription-plans returns active plans`
+- `POST /nexus/clubs/{id}/subscription assigns plan to club`
+- `POST /nexus/clubs/{id}/subscription returns 409 when already active`
+- `POST /nexus/clubs/{id}/subscription/extend extends period`
+- `POST /nexus/clubs/{id}/subscription/cancel cancels subscription`
+- `GET /nexus/subscriptions returns paginated dashboard`
+- `GET /nexus/subscriptions/expiring returns clubs expiring in 30 days`
+- `POST /nexus/branches (branch create) returns 402 when plan limit exceeded`
+- `POST /nexus/staff (staff create) returns 402 when plan limit exceeded`
 
-**Frontend: `payment-callback.test.tsx` (arena)**
-- renders loading state while polling status
-- redirects to /membership on PAID status
-- renders failure message on failed status
+**Frontend: `subscriptions.test.tsx` (nexus)**
+- renders KPI cards with correct counts
+- renders subscription table with status badges
+- assign plan modal submits correctly
 
-**Frontend: `online-payments-tab.test.tsx` (pulse)**
-- renders transaction list with correct status badges
-- renders empty state when no transactions
+**Frontend: `grace-period-banner.test.tsx` (pulse)**
+- renders banner when X-Subscription-Grace header is present
+- shows correct days remaining
+- does not render when header is absent
 
 ---
 
 ## RBAC matrix rows added by this plan
 
-| Permission | Owner | Branch Manager | Others |
+| Permission | Super Admin | Support Agent | Others |
 |---|---|---|---|
-| `online-payment:read` | ✅ (seeded) | ✅ (seeded) | — |
+| `subscription:manage` | ✅ (seeded) | — | — |
+| `subscription:read` | ✅ (seeded) | ✅ (seeded) | — |
 
 ---
 
 ## Definition of Done
 
-- [ ] Flyway V22 runs cleanly: `online_payment_transactions` table with 4 indexes
-- [ ] `OnlinePaymentTransaction` entity has no `deletedAt` — status transitions only
-- [ ] `online-payment:read` seeded to Owner + Branch Manager
-- [ ] 3 audit actions wired into service
-- [ ] `MoyasarClient` wraps Moyasar REST API with Basic auth header
-- [ ] Webhook endpoint is permitted without JWT in `SecurityConfig`
-- [ ] Webhook signature verification rejects tampered requests with 401
-- [ ] Webhook is idempotent — second call for already-PAID transaction is a no-op
-- [ ] `initiatePayment` is idempotent — returns existing `hostedUrl` for duplicate requests
-- [ ] `onlinePaymentEnabled = false` returns 403 ONLINE_PAYMENT_DISABLED
-- [ ] Payment activation: Membership → active, startDate + endDate set, LAPSED member → ACTIVE
-- [ ] `Payment` + `Invoice` records created on successful webhook (ZATCA fires automatically)
-- [ ] All 4 repository queries use `nativeQuery = true`
-- [ ] 5 endpoints live: 3 arena + 1 webhook + 1 pulse, all with `@Operation`
-- [ ] web-arena: Pay Now button visible only when `onlinePaymentEnabled = true` AND membership is payable
-- [ ] web-arena: `/payment-callback` handles success + failure redirects
-- [ ] web-pulse: Online Payments tab renders on member profile
-- [ ] All i18n strings added in Arabic and English (web-arena + web-pulse)
+- [ ] Flyway V23 runs cleanly: `subscription_plans` and `club_subscriptions` with all indexes
+- [ ] Unique partial index enforces one active subscription per club at DB level
+- [ ] `SubscriptionPlan` has `deletedAt`; `ClubSubscription` does not
+- [ ] `subscription:manage` and `subscription:read` seeded correctly
+- [ ] 5 audit actions and 3 notification types wired in
+- [ ] 3 seed plans (Starter/Growth/Enterprise) and Elixir Gym on Growth in `DevDataLoader`
+- [ ] `SubscriptionEnforcementInterceptor` registered and fires on all club-scoped requests
+- [ ] ACTIVE → GRACE → EXPIRED scheduler transitions correct
+- [ ] Redis cache key `subscription_status:{clubId}` with 5-minute TTL
+- [ ] Cache invalidated on every status change
+- [ ] `X-Subscription-Grace` + `X-Grace-Days-Remaining` headers set for GRACE status
+- [ ] 402 SUBSCRIPTION_EXPIRED returned for EXPIRED and CANCELLED
+- [ ] Platform-scope JWTs (no clubId) bypass enforcement
+- [ ] Branch creation blocked with 402 PLAN_LIMIT_EXCEEDED when at maxBranches
+- [ ] Staff creation blocked with 402 PLAN_LIMIT_EXCEEDED when at maxStaff
+- [ ] 0 = unlimited: no limit check when maxBranches or maxStaff = 0
+- [ ] Two expiry notifications: 14-day and 7-day, deduplicated within 24 hours
+- [ ] All 8 repository queries use `nativeQuery = true`
+- [ ] 10 endpoints live: 4 plan CRUD + 6 club subscription management, all with `@Operation`
+- [ ] web-nexus: Subscriptions dashboard with 4 KPI cards + table
+- [ ] web-nexus: Plan catalog with create/edit/delete
+- [ ] web-nexus: Club subscription detail with assign/extend/cancel
+- [ ] web-pulse: Grace period banner reads response headers
+- [ ] All i18n strings added in Arabic and English (web-nexus + web-pulse)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] `./gradlew build` — BUILD SUCCESSFUL, no warnings
-- [ ] `npm run typecheck` — no errors in web-arena or web-pulse
-- [ ] `PROJECT-STATE.md` updated: Plan 24 complete, test counts, V22 noted
-- [ ] `PLAN-24-moyasar.md` deleted before merging
+- [ ] `npm run typecheck` — no errors in web-nexus or web-pulse
+- [ ] `PROJECT-STATE.md` updated: Plan 30 complete, test counts, V23 noted
+- [ ] `PLAN-30-subscription-billing.md` deleted before merging
 
-When all items are checked, confirm: **"Plan 24 — Online Payments (Moyasar) complete. X backend tests, Y frontend tests."**
-
+When all items are checked, confirm: **"Plan 30 — Liyaqa Subscription Billing complete. X backend tests, Y frontend tests."**

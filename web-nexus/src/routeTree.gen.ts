@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ZatcaRouteImport } from './routes/zatca'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubscriptionsIndexRouteImport } from './routes/subscriptions/index'
 import { Route as RolesIndexRouteImport } from './routes/roles/index'
 import { Route as OrganizationsIndexRouteImport } from './routes/organizations/index'
 import { Route as MembersIndexRouteImport } from './routes/members/index'
+import { Route as SubscriptionsPlansRouteImport } from './routes/subscriptions/plans'
+import { Route as SubscriptionsClubIdRouteImport } from './routes/subscriptions/$clubId'
 import { Route as RolesRoleIdRouteImport } from './routes/roles/$roleId'
 import { Route as OrganizationsOrgIdRouteImport } from './routes/organizations/$orgId'
 import { Route as MembersMemberIdRouteImport } from './routes/members/$memberId'
@@ -37,6 +40,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubscriptionsIndexRoute = SubscriptionsIndexRouteImport.update({
+  id: '/subscriptions/',
+  path: '/subscriptions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RolesIndexRoute = RolesIndexRouteImport.update({
   id: '/roles/',
   path: '/roles/',
@@ -50,6 +58,16 @@ const OrganizationsIndexRoute = OrganizationsIndexRouteImport.update({
 const MembersIndexRoute = MembersIndexRouteImport.update({
   id: '/members/',
   path: '/members/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionsPlansRoute = SubscriptionsPlansRouteImport.update({
+  id: '/subscriptions/plans',
+  path: '/subscriptions/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionsClubIdRoute = SubscriptionsClubIdRouteImport.update({
+  id: '/subscriptions/$clubId',
+  path: '/subscriptions/$clubId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RolesRoleIdRoute = RolesRoleIdRouteImport.update({
@@ -93,9 +111,12 @@ export interface FileRoutesByFullPath {
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
   '/roles/$roleId': typeof RolesRoleIdRoute
+  '/subscriptions/$clubId': typeof SubscriptionsClubIdRoute
+  '/subscriptions/plans': typeof SubscriptionsPlansRoute
   '/members/': typeof MembersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
   '/roles/': typeof RolesIndexRoute
+  '/subscriptions/': typeof SubscriptionsIndexRoute
   '/organizations/$orgId/clubs/$clubId': typeof OrganizationsOrgIdClubsClubIdRouteWithChildren
   '/organizations/$orgId/clubs/$clubId/branches/$branchId': typeof OrganizationsOrgIdClubsClubIdBranchesBranchIdRoute
 }
@@ -107,9 +128,12 @@ export interface FileRoutesByTo {
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
   '/roles/$roleId': typeof RolesRoleIdRoute
+  '/subscriptions/$clubId': typeof SubscriptionsClubIdRoute
+  '/subscriptions/plans': typeof SubscriptionsPlansRoute
   '/members': typeof MembersIndexRoute
   '/organizations': typeof OrganizationsIndexRoute
   '/roles': typeof RolesIndexRoute
+  '/subscriptions': typeof SubscriptionsIndexRoute
   '/organizations/$orgId/clubs/$clubId': typeof OrganizationsOrgIdClubsClubIdRouteWithChildren
   '/organizations/$orgId/clubs/$clubId/branches/$branchId': typeof OrganizationsOrgIdClubsClubIdBranchesBranchIdRoute
 }
@@ -122,9 +146,12 @@ export interface FileRoutesById {
   '/members/$memberId': typeof MembersMemberIdRoute
   '/organizations/$orgId': typeof OrganizationsOrgIdRouteWithChildren
   '/roles/$roleId': typeof RolesRoleIdRoute
+  '/subscriptions/$clubId': typeof SubscriptionsClubIdRoute
+  '/subscriptions/plans': typeof SubscriptionsPlansRoute
   '/members/': typeof MembersIndexRoute
   '/organizations/': typeof OrganizationsIndexRoute
   '/roles/': typeof RolesIndexRoute
+  '/subscriptions/': typeof SubscriptionsIndexRoute
   '/organizations/$orgId/clubs/$clubId': typeof OrganizationsOrgIdClubsClubIdRouteWithChildren
   '/organizations/$orgId/clubs/$clubId/branches/$branchId': typeof OrganizationsOrgIdClubsClubIdBranchesBranchIdRoute
 }
@@ -138,9 +165,12 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/organizations/$orgId'
     | '/roles/$roleId'
+    | '/subscriptions/$clubId'
+    | '/subscriptions/plans'
     | '/members/'
     | '/organizations/'
     | '/roles/'
+    | '/subscriptions/'
     | '/organizations/$orgId/clubs/$clubId'
     | '/organizations/$orgId/clubs/$clubId/branches/$branchId'
   fileRoutesByTo: FileRoutesByTo
@@ -152,9 +182,12 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/organizations/$orgId'
     | '/roles/$roleId'
+    | '/subscriptions/$clubId'
+    | '/subscriptions/plans'
     | '/members'
     | '/organizations'
     | '/roles'
+    | '/subscriptions'
     | '/organizations/$orgId/clubs/$clubId'
     | '/organizations/$orgId/clubs/$clubId/branches/$branchId'
   id:
@@ -166,9 +199,12 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/organizations/$orgId'
     | '/roles/$roleId'
+    | '/subscriptions/$clubId'
+    | '/subscriptions/plans'
     | '/members/'
     | '/organizations/'
     | '/roles/'
+    | '/subscriptions/'
     | '/organizations/$orgId/clubs/$clubId'
     | '/organizations/$orgId/clubs/$clubId/branches/$branchId'
   fileRoutesById: FileRoutesById
@@ -181,9 +217,12 @@ export interface RootRouteChildren {
   MembersMemberIdRoute: typeof MembersMemberIdRoute
   OrganizationsOrgIdRoute: typeof OrganizationsOrgIdRouteWithChildren
   RolesRoleIdRoute: typeof RolesRoleIdRoute
+  SubscriptionsClubIdRoute: typeof SubscriptionsClubIdRoute
+  SubscriptionsPlansRoute: typeof SubscriptionsPlansRoute
   MembersIndexRoute: typeof MembersIndexRoute
   OrganizationsIndexRoute: typeof OrganizationsIndexRoute
   RolesIndexRoute: typeof RolesIndexRoute
+  SubscriptionsIndexRoute: typeof SubscriptionsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -209,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subscriptions/': {
+      id: '/subscriptions/'
+      path: '/subscriptions'
+      fullPath: '/subscriptions/'
+      preLoaderRoute: typeof SubscriptionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/roles/': {
       id: '/roles/'
       path: '/roles'
@@ -228,6 +274,20 @@ declare module '@tanstack/react-router' {
       path: '/members'
       fullPath: '/members/'
       preLoaderRoute: typeof MembersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriptions/plans': {
+      id: '/subscriptions/plans'
+      path: '/subscriptions/plans'
+      fullPath: '/subscriptions/plans'
+      preLoaderRoute: typeof SubscriptionsPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriptions/$clubId': {
+      id: '/subscriptions/$clubId'
+      path: '/subscriptions/$clubId'
+      fullPath: '/subscriptions/$clubId'
+      preLoaderRoute: typeof SubscriptionsClubIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roles/$roleId': {
@@ -310,9 +370,12 @@ const rootRouteChildren: RootRouteChildren = {
   MembersMemberIdRoute: MembersMemberIdRoute,
   OrganizationsOrgIdRoute: OrganizationsOrgIdRouteWithChildren,
   RolesRoleIdRoute: RolesRoleIdRoute,
+  SubscriptionsClubIdRoute: SubscriptionsClubIdRoute,
+  SubscriptionsPlansRoute: SubscriptionsPlansRoute,
   MembersIndexRoute: MembersIndexRoute,
   OrganizationsIndexRoute: OrganizationsIndexRoute,
   RolesIndexRoute: RolesIndexRoute,
+  SubscriptionsIndexRoute: SubscriptionsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

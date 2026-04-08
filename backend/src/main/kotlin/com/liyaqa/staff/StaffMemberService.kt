@@ -23,6 +23,7 @@ import com.liyaqa.staff.dto.StaffMemberResponse
 import com.liyaqa.staff.dto.StaffMemberSummaryResponse
 import com.liyaqa.staff.dto.StaffRoleSummary
 import com.liyaqa.staff.dto.UpdateStaffMemberRequest
+import com.liyaqa.subscription.service.SubscriptionService
 import com.liyaqa.user.User
 import com.liyaqa.user.UserRepository
 import org.springframework.data.domain.Pageable
@@ -46,6 +47,7 @@ class StaffMemberService(
     private val permissionService: PermissionService,
     private val passwordEncoder: PasswordEncoder,
     private val auditService: AuditService,
+    private val subscriptionService: SubscriptionService,
 ) {
     @Transactional
     fun create(
@@ -58,6 +60,9 @@ class StaffMemberService(
     ): StaffMemberResponse {
         val org = findOrgOrThrow(orgPublicId)
         val club = findClubOrThrow(clubPublicId, org.id)
+
+        // Plan limit enforcement
+        enforceStaffLimit(club.id)
 
         // Rule 1 — email uniqueness
         if (userRepository.findByEmailAndDeletedAtIsNull(request.email).isPresent) {
@@ -378,6 +383,21 @@ class StaffMemberService(
     private fun loadBranchesForStaff(staffMemberId: Long): List<Branch> {
         val assignments = staffBranchAssignmentRepository.findAllByStaffMemberId(staffMemberId)
         return branchRepository.findAllById(assignments.map { it.branchId })
+    }
+
+    private fun enforceStaffLimit(clubId: Long) {
+        val subscription = subscriptionService.findActiveByClubId(clubId) ?: return
+        val plan = subscriptionService.findPlanById(subscription.planId) ?: return
+        if (plan.maxStaff == 0) return
+        val currentCount = staffMemberRepository.countByClubIdAndDeletedAtIsNull(clubId)
+        if (currentCount >= plan.maxStaff) {
+            throw ArenaException(
+                HttpStatus.PAYMENT_REQUIRED,
+                "business-rule-violation",
+                "Your plan allows a maximum of ${plan.maxStaff} staff members. Upgrade to add more.",
+                "PLAN_LIMIT_EXCEEDED",
+            )
+        }
     }
 
     // ── Private lookup helpers ────────────────────────────────────────────────

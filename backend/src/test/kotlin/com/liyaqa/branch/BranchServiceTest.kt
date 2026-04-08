@@ -7,6 +7,7 @@ import com.liyaqa.club.ClubRepository
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
+import com.liyaqa.subscription.service.SubscriptionService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -33,6 +34,9 @@ class BranchServiceTest {
 
     @Mock
     lateinit var organizationRepository: OrganizationRepository
+
+    @Mock
+    lateinit var subscriptionService: SubscriptionService
 
     @InjectMocks
     lateinit var branchService: BranchService

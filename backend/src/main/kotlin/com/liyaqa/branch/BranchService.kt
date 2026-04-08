@@ -12,6 +12,7 @@ import com.liyaqa.common.dto.toPageResponse
 import com.liyaqa.common.exception.ArenaException
 import com.liyaqa.organization.Organization
 import com.liyaqa.organization.OrganizationRepository
+import com.liyaqa.subscription.service.SubscriptionService
 import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -24,6 +25,7 @@ class BranchService(
     private val branchRepository: BranchRepository,
     private val clubRepository: ClubRepository,
     private val organizationRepository: OrganizationRepository,
+    private val subscriptionService: SubscriptionService,
 ) {
     @Transactional
     fun create(
@@ -33,6 +35,8 @@ class BranchService(
     ): BranchResponse {
         val organization = findOrgOrThrow(orgPublicId)
         val club = findClubOrThrow(clubPublicId, organization.id)
+
+        enforcebranchLimit(club.id)
 
         val branch =
             Branch(
@@ -108,6 +112,21 @@ class BranchService(
         // TODO(#1): check for active staff and members before allowing soft delete (enforced in Plan 4 and Plan 5)
         branch.softDelete()
         branchRepository.save(branch)
+    }
+
+    private fun enforcebranchLimit(clubId: Long) {
+        val subscription = subscriptionService.findActiveByClubId(clubId) ?: return
+        val plan = subscriptionService.findPlanById(subscription.planId) ?: return
+        if (plan.maxBranches == 0) return
+        val currentCount = branchRepository.countByClubIdAndDeletedAtIsNull(clubId)
+        if (currentCount >= plan.maxBranches) {
+            throw ArenaException(
+                HttpStatus.PAYMENT_REQUIRED,
+                "business-rule-violation",
+                "Your plan allows a maximum of ${plan.maxBranches} branches. Upgrade to add more.",
+                "PLAN_LIMIT_EXCEEDED",
+            )
+        }
     }
 
     private fun findOrgOrThrow(orgPublicId: UUID): Organization =

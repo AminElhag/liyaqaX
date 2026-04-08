@@ -7,6 +7,7 @@ import { ALLOWED_SCOPES } from '@/types/permissions'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
+import { GracePeriodBanner } from '@/components/layout/GracePeriodBanner'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -64,6 +65,7 @@ function RootComponent() {
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar />
+          <GracePeriodBanner />
           <main className="flex-1 overflow-auto bg-gray-50">
             <Outlet />
           </main>

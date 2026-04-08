@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { ApiError } from '@/types/api'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { useGraceStore } from '@/stores/useGraceStore'
 
 const correlationId = crypto.randomUUID()
 
@@ -22,9 +23,18 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Handle error responses
+// Handle grace period headers + error responses
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const graceHeader = response.headers['x-subscription-grace']
+    if (graceHeader === 'true') {
+      const daysStr = response.headers['x-grace-days-remaining'] ?? '0'
+      useGraceStore.getState().setGrace(true, parseInt(daysStr, 10))
+    } else {
+      useGraceStore.getState().setGrace(false, 0)
+    }
+    return response
+  },
   (error) => {
     if (axios.isAxiosError(error) && error.response) {
       const { status, data } = error.response

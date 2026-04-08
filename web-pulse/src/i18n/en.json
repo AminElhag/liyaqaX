@@ -728,5 +728,8 @@
   "member": {
     "online_payments_tab": "Online Payments",
     "online_payments_empty": "No online payments found"
+  },
+  "subscription": {
+    "grace_banner": "Your club subscription has expired. Access will be removed in {{days}} days. Contact support to renew."
   }
 }

@@ -186,4 +186,7 @@ private val SCHEDULER_TYPES =
         NotificationType.ZATCA_CSID_EXPIRING_SOON,
         NotificationType.ZATCA_INVOICE_DEADLINE_AT_RISK,
         NotificationType.FOLLOW_UP_DUE,
+        NotificationType.SUBSCRIPTION_EXPIRING_SOON_14,
+        NotificationType.SUBSCRIPTION_EXPIRING_SOON_7,
+        NotificationType.SUBSCRIPTION_EXPIRED,
     )
