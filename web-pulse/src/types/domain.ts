@@ -91,6 +91,7 @@ export type MembershipStatus =
   | 'frozen'
   | 'expired'
   | 'terminated'
+  | 'lapsed'
 
 export type Gender = 'male' | 'female' | 'unspecified'
 

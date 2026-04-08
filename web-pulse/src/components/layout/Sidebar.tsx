@@ -8,6 +8,7 @@ import { hasPermission } from '@/lib/permissions'
 import { Permission } from '@/types/permissions'
 import { getPendingMembers, memberKeys } from '@/api/members'
 import { getFollowUps, memberNoteKeys } from '@/api/memberNotes'
+import { getLapsedMembers, lapsedKeys } from '@/api/memberLapse'
 
 interface NavItem {
   key: string
@@ -20,6 +21,7 @@ const navItems: NavItem[] = [
   { key: 'staff', to: '/staff', icon: '◈' },
   { key: 'members', to: '/members', icon: '◉' },
   { key: 'memberships', to: '/memberships', icon: '◎' },
+  { key: 'lapsed', to: '/memberships/lapsed', icon: '◌' },
   { key: 'finance', to: '/finance', icon: '◇' },
   { key: 'pt', to: '/pt', icon: '◆' },
   { key: 'gx', to: '/gx', icon: '○' },
@@ -53,6 +55,13 @@ export function Sidebar() {
     refetchInterval: 60_000,
   })
   const followUpTodayCount = followUpData?.followUps.filter((f) => f.daysUntilDue <= 0).length ?? 0
+
+  const { data: lapsedData } = useQuery({
+    queryKey: lapsedKeys.count(),
+    queryFn: () => getLapsedMembers(1, 1),
+    refetchInterval: 120_000,
+  })
+  const lapsedCount = lapsedData?.total ?? 0
 
   return (
     <aside
@@ -93,7 +102,9 @@ export function Sidebar() {
                   ? pendingCount
                   : item.key === 'follow_ups'
                     ? followUpTodayCount
-                    : 0
+                    : item.key === 'lapsed'
+                      ? lapsedCount
+                      : 0
 
               return (
                 <li key={item.key}>

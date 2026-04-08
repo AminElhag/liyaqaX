@@ -100,4 +100,9 @@ enum class NotificationType(
         "notification.follow_up_due.body",
         false,
     ),
+    MEMBERSHIP_LAPSED(
+        "notification.membership_lapsed.title",
+        "notification.membership_lapsed.body",
+        false,
+    ),
 }

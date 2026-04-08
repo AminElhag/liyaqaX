@@ -22,7 +22,8 @@
     "cash_drawer": "Cash Drawer",
     "follow_ups": "Follow-ups",
     "reports": "Reports",
-    "settings": "Settings"
+    "settings": "Settings",
+    "lapsed": "Lapsed Members"
   },
   "branch": {
     "selector": "Branch",
@@ -70,7 +71,8 @@
       "active": "Active",
       "frozen": "Frozen",
       "expired": "Expired",
-      "terminated": "Terminated"
+      "terminated": "Terminated",
+      "lapsed": "Lapsed"
     },
     "empty": "No members found",
     "pendingTitle": "Pending Registrations",
@@ -632,6 +634,23 @@
   "followups.member_name": "Member",
   "followups.content": "Note",
   "followups.created_by": "Created By",
+  "lapsed": {
+    "page_title": "Lapsed Members",
+    "nav_label": "Lapsed Members",
+    "badge": "Lapsed",
+    "columns": {
+      "last_plan": "Last Plan",
+      "expired_on": "Expired On",
+      "days_since": "Days Since Lapse",
+      "follow_up_status": "Follow-up"
+    },
+    "send_offer": "Send Renewal Offer",
+    "send_offer_bulk": "Send Renewal Offer to Selected ({{count}})",
+    "send_offer_bulk_success": "Renewal offers sent: {{created}} created, {{skipped}} skipped",
+    "send_offer_error": "Failed to send renewal offer",
+    "empty": "No lapsed members — great retention!",
+    "total": "{{count}} lapsed members"
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

@@ -37,6 +37,7 @@ class PtArenaController(
     @Operation(summary = "Get member's PT packages with session counts")
     fun getPackages(authentication: Authentication): ResponseEntity<List<PtPackageArenaResponse>> {
         val member = resolveMember(authentication)
+        member.requireNotLapsed()
         portalSettingsService.requireFeatureEnabled(member.clubId, "pt")
         // PT package entities not yet implemented — return empty list
         return ResponseEntity.ok(emptyList())

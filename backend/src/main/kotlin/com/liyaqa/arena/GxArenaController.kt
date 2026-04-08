@@ -114,6 +114,7 @@ class GxArenaController(
         authentication: Authentication,
     ): ResponseEntity<GxBookingResponse> {
         val member = resolveMember(authentication)
+        member.requireNotLapsed()
         portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
 
         val instance =
@@ -241,6 +242,7 @@ class GxArenaController(
         authentication: Authentication,
     ): ResponseEntity<WaitlistJoinResponse> {
         val member = resolveMember(authentication)
+        member.requireNotLapsed()
         portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
 
         val instance =
@@ -279,6 +281,7 @@ class GxArenaController(
         authentication: Authentication,
     ): ResponseEntity<GxBookingResponse> {
         val member = resolveMember(authentication)
+        member.requireNotLapsed()
         portalSettingsService.requireFeatureEnabled(member.clubId, "gx")
 
         val instance =

@@ -4,6 +4,7 @@ import com.liyaqa.gx.GXClassInstanceRepository
 import com.liyaqa.member.MemberNoteRepository
 import com.liyaqa.member.MemberRepository
 import com.liyaqa.membership.MembershipRepository
+import com.liyaqa.membership.service.MemberLapseService
 import com.liyaqa.pt.PTSessionRepository
 import com.liyaqa.trainer.TrainerRepository
 import com.liyaqa.user.UserRepository
@@ -28,6 +29,7 @@ class NotificationSchedulerService(
     private val trainerRepository: TrainerRepository,
     private val userRepository: UserRepository,
     private val memberNoteRepository: MemberNoteRepository,
+    private val memberLapseService: MemberLapseService,
 ) {
     companion object {
         private val log = LoggerFactory.getLogger(NotificationSchedulerService::class.java)
@@ -63,6 +65,18 @@ class NotificationSchedulerService(
             log.warn("Error cleaning up old notifications: {}", e.message)
         }
         log.info("Daily notification scheduler completed")
+    }
+
+    @Scheduled(cron = "0 0 4 * * *", zone = "UTC")
+    @Transactional
+    fun lapseMemberships() {
+        log.info("Starting membership lapse scheduler")
+        try {
+            memberLapseService.lapseExpiredMemberships()
+        } catch (e: Exception) {
+            log.warn("Error lapsing expired memberships: {}", e.message)
+        }
+        log.info("Membership lapse scheduler completed")
     }
 
     private fun generateMembershipExpiringNotifications() {

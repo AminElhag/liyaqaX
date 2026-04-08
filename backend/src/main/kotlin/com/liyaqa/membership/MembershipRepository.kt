@@ -135,6 +135,35 @@ interface MembershipRepository : JpaRepository<Membership, Long> {
 
     @Query(
         value = """
+            SELECT ms.* FROM memberships ms
+            JOIN members m ON m.id = ms.member_id
+            WHERE ms.end_date < :today
+              AND ms.membership_status = 'active'
+              AND m.membership_status = 'active'
+              AND ms.deleted_at IS NULL
+              AND m.deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun findExpiredActiveMemberships(
+        @Param("today") today: LocalDate,
+    ): List<Membership>
+
+    @Query(
+        value = """
+            SELECT COUNT(*) FROM memberships
+            WHERE member_id = :memberId
+              AND membership_status = 'active'
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countActiveMembershipsByMemberId(
+        @Param("memberId") memberId: Long,
+    ): Long
+
+    @Query(
+        value = """
             SELECT ms.id, ms.public_id AS publicId, ms.membership_status AS status,
                    ms.start_date AS startDate, ms.end_date AS endDate,
                    ms.created_at AS createdAt, ms.updated_at AS updatedAt,

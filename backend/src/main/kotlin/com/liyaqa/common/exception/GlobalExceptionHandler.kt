@@ -25,6 +25,9 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         problem.type = URI.create("https://arena.app/errors/${ex.errorType}")
         problem.title = ex.errorType.replace("-", " ").replaceFirstChar { it.uppercase() }
         problem.setProperty("instance", requestUri(request))
+        if (ex.errorCode != null) {
+            problem.setProperty("errorCode", ex.errorCode)
+        }
         return ResponseEntity.status(ex.status).body(problem)
     }
 

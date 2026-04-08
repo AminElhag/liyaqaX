@@ -85,6 +85,7 @@ class MemberProfileArenaController(
                 phone = member.phone,
                 email = user?.email,
                 preferredLanguage = member.preferredLanguage,
+                memberStatus = member.membershipStatus,
                 club =
                     ClubSummary(
                         id = club.publicId,

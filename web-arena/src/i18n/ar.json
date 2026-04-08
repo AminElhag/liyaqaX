@@ -135,5 +135,8 @@
   "register.success.backToLogin": "العودة لتسجيل الدخول",
   "register.error.phoneRegistered": "هذا الرقم مسجل بالفعل. يرجى تسجيل الدخول.",
   "register.error.pendingReview": "التسجيل قيد المراجعة بالفعل.",
-  "register.error.nameRequired": "يرجى إدخال الاسم بلغة واحدة على الأقل."
+  "register.error.nameRequired": "يرجى إدخال الاسم بلغة واحدة على الأقل.",
+  "lapsed.banner_title": "انتهت العضوية",
+  "lapsed.banner_body": "انتهت عضويتك. يرجى زيارة النادي أو التواصل مع الموظفين للتجديد.",
+  "lapsed.banner_contact": "معلومات الاتصال"
 }

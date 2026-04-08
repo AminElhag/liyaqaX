@@ -1,6 +1,7 @@
 package com.liyaqa.arena
 
 import com.liyaqa.common.exception.ArenaException
+import com.liyaqa.member.Member
 import com.liyaqa.security.JwtClaims
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
@@ -14,6 +15,17 @@ fun Authentication.arenaContext(): JwtClaims {
         throw ArenaException(HttpStatus.FORBIDDEN, "forbidden", "This app is for gym members only.")
     }
     return claims
+}
+
+fun Member.requireNotLapsed() {
+    if (membershipStatus == "lapsed") {
+        throw ArenaException(
+            status = HttpStatus.FORBIDDEN,
+            errorType = "membership-lapsed",
+            message = "Your membership has expired. Please contact the gym to renew.",
+            errorCode = "MEMBERSHIP_LAPSED",
+        )
+    }
 }
 
 fun JwtClaims.requireMemberId(): UUID =

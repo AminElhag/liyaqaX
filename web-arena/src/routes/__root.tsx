@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
+import { LapsedBanner } from '@/components/LapsedBanner'
 
 interface RouterContext {
   queryClient: QueryClient
@@ -44,6 +45,12 @@ function RootComponent() {
   if (member && !member.preferredLanguage && !window.location.pathname.startsWith('/auth/language')) {
     navigate({ to: '/auth/language' })
     return null
+  }
+
+  const isLapsed = member?.memberStatus === 'lapsed'
+
+  if (isLapsed) {
+    return <LapsedBanner />
   }
 
   return (

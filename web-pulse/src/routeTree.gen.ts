@@ -32,6 +32,7 @@ import { Route as ReportsCashDrawerRouteImport } from './routes/reports/cash-dra
 import { Route as PtTrainersRouteImport } from './routes/pt/trainers'
 import { Route as PtPackagesRouteImport } from './routes/pt/packages'
 import { Route as MembershipsPlansRouteImport } from './routes/memberships/plans'
+import { Route as MembershipsLapsedRouteImport } from './routes/memberships/lapsed'
 import { Route as MembersPendingRouteImport } from './routes/members/pending'
 import { Route as MembersNewRouteImport } from './routes/members/new'
 import { Route as MembersMemberIdRouteImport } from './routes/members/$memberId'
@@ -172,6 +173,11 @@ const PtPackagesRoute = PtPackagesRouteImport.update({
 const MembershipsPlansRoute = MembershipsPlansRouteImport.update({
   id: '/memberships/plans',
   path: '/memberships/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembershipsLapsedRoute = MembershipsLapsedRouteImport.update({
+  id: '/memberships/lapsed',
+  path: '/memberships/lapsed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembersPendingRoute = MembersPendingRouteImport.update({
@@ -324,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/members/$memberId': typeof MembersMemberIdRouteWithChildren
   '/members/new': typeof MembersNewRoute
   '/members/pending': typeof MembersPendingRoute
+  '/memberships/lapsed': typeof MembershipsLapsedRoute
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
@@ -375,6 +382,7 @@ export interface FileRoutesByTo {
   '/members/$memberId': typeof MembersMemberIdRouteWithChildren
   '/members/new': typeof MembersNewRoute
   '/members/pending': typeof MembersPendingRoute
+  '/memberships/lapsed': typeof MembershipsLapsedRoute
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
@@ -427,6 +435,7 @@ export interface FileRoutesById {
   '/members/$memberId': typeof MembersMemberIdRouteWithChildren
   '/members/new': typeof MembersNewRoute
   '/members/pending': typeof MembersPendingRoute
+  '/memberships/lapsed': typeof MembershipsLapsedRoute
   '/memberships/plans': typeof MembershipsPlansRoute
   '/pt/packages': typeof PtPackagesRoute
   '/pt/trainers': typeof PtTrainersRoute
@@ -480,6 +489,7 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/members/new'
     | '/members/pending'
+    | '/memberships/lapsed'
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
@@ -531,6 +541,7 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/members/new'
     | '/members/pending'
+    | '/memberships/lapsed'
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
@@ -582,6 +593,7 @@ export interface FileRouteTypes {
     | '/members/$memberId'
     | '/members/new'
     | '/members/pending'
+    | '/memberships/lapsed'
     | '/memberships/plans'
     | '/pt/packages'
     | '/pt/trainers'
@@ -634,6 +646,7 @@ export interface RootRouteChildren {
   MembersMemberIdRoute: typeof MembersMemberIdRouteWithChildren
   MembersNewRoute: typeof MembersNewRoute
   MembersPendingRoute: typeof MembersPendingRoute
+  MembershipsLapsedRoute: typeof MembershipsLapsedRoute
   MembershipsPlansRoute: typeof MembershipsPlansRoute
   PtPackagesRoute: typeof PtPackagesRoute
   PtTrainersRoute: typeof PtTrainersRoute
@@ -824,6 +837,13 @@ declare module '@tanstack/react-router' {
       path: '/memberships/plans'
       fullPath: '/memberships/plans'
       preLoaderRoute: typeof MembershipsPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memberships/lapsed': {
+      id: '/memberships/lapsed'
+      path: '/memberships/lapsed'
+      fullPath: '/memberships/lapsed'
+      preLoaderRoute: typeof MembershipsLapsedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members/pending': {
@@ -1051,6 +1071,7 @@ const rootRouteChildren: RootRouteChildren = {
   MembersMemberIdRoute: MembersMemberIdRouteWithChildren,
   MembersNewRoute: MembersNewRoute,
   MembersPendingRoute: MembersPendingRoute,
+  MembershipsLapsedRoute: MembershipsLapsedRoute,
   MembershipsPlansRoute: MembershipsPlansRoute,
   PtPackagesRoute: PtPackagesRoute,
   PtTrainersRoute: PtTrainersRoute,

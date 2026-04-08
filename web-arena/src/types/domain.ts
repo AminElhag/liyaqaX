@@ -17,6 +17,7 @@ export interface MemberMe {
   phone: string
   email: string | null
   preferredLanguage: string | null
+  memberStatus: string
   club: { id: string; name: string; nameAr: string }
   membership: MembershipSummary | null
 }

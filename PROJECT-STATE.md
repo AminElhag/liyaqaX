@@ -205,7 +205,7 @@ All seeded roles have `isSystem = true` — cannot be deleted via UI.
 | Scheduled Reports | ReportSchedule | CRUD /api/v1/report-templates/{id}/schedule, GET /export/pdf |
 | Notifications | Notification | GET /api/v1/pulse/notifications, /arena/notifications, /coach/notifications + mark-read, mark-all-read, unread-count |
 
-**Current test count: 521+ backend tests + 147 frontend tests (web-pulse) + 18 frontend tests (web-nexus)**
+**Current test count: 594 backend tests + 149 frontend tests (web-pulse) + 18 frontend tests (web-nexus)**
 **Current Flyway migrations: V1 through V17** (V7 = skipped/reserved, V8 = lead_sources/leads/lead_notes, V9 = cash_drawer_sessions/cash_drawer_entries, V10 = audit_logs, V11 = report_templates + report_results, V12 = report_schedules, V13 = notifications, V14 = member_self_registration, V15 = zatca_phase2, V16 = member_import, V17 = gx_waitlist)
 ⚠️ NOTE: V7 was skipped.
 
@@ -455,6 +455,23 @@ Root package.json must NOT have a `workspaces` field.
 - web-arena: Join Waitlist button, position badge, amber OFFERED banner, Accept Spot CTA, Waitlist tab on bookings
 - web-pulse: waitlist count on GX class card, Waitlist tab on class detail with Remove button
 - 19 new backend tests (15 service + 4 scheduler), 10 integration tests, 6 frontend tests (4 arena + 2 pulse)
+
+### ✅ Plan 33 — Membership Lapse Recovery — COMPLETE (all 10 steps done)
+- `MemberLapseService` — scheduler-driven lapse detection at 04:00 UTC, re-activation on membership assignment
+- `LAPSED` status added to both Member and Membership entities (string column, no migration)
+- `MEMBERSHIP_LAPSED` notification type fires to all club staff on lapse
+- `MEMBERSHIP_LAPSED` + `MEMBER_REACTIVATED` audit actions
+- 3 native queries: findExpiredActiveMemberships, findLapsedByClub, countLapsedByClub
+- Business rule 3: skip member lapse if another active membership exists
+- Re-activation hooked into MembershipService.assignPlan() and renew()
+- web-arena access gate: blocked endpoints return 403 with MEMBERSHIP_LAPSED errorCode; GET /me remains accessible
+- `MemberLapsePulseController`: 3 endpoints (GET lapsed list, POST renewal-offer, POST bulk renewal-offer)
+- Renewal offer deduplication: skip if FOLLOW_UP note with "Renewal offer sent" exists in last 24h
+- web-pulse: /memberships/lapsed page with table, per-row offer, bulk action, sidebar badge with count
+- web-pulse: Lapsed badge on members list (red, same as terminated)
+- web-arena: full-screen non-dismissable LapsedBanner when memberStatus === 'lapsed', all nav hidden
+- 16 new backend tests (8 unit + 8 integration), 2 new frontend tests (web-pulse), 2 new frontend tests (web-arena)
+- 594 backend tests total, 149 frontend tests (web-pulse), 2 frontend tests (web-arena)
 
 ### Next — Remaining roadmap
 ```

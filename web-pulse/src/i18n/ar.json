@@ -22,7 +22,8 @@
     "cash_drawer": "صندوق النقد",
     "follow_ups": "المتابعات",
     "reports": "التقارير",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "lapsed": "أعضاء منتهية الصلاحية"
   },
   "branch": {
     "selector": "الفرع",
@@ -70,7 +71,8 @@
       "active": "نشط",
       "frozen": "مجمد",
       "expired": "منتهي",
-      "terminated": "ملغى"
+      "terminated": "ملغى",
+      "lapsed": "منتهية الصلاحية"
     },
     "empty": "لا يوجد أعضاء",
     "pendingTitle": "التسجيلات المعلقة",
@@ -632,6 +634,23 @@
   "followups.member_name": "العضو",
   "followups.content": "الملاحظة",
   "followups.created_by": "أنشأ بواسطة",
+  "lapsed": {
+    "page_title": "أعضاء منتهية الصلاحية",
+    "nav_label": "أعضاء منتهية الصلاحية",
+    "badge": "منتهية الصلاحية",
+    "columns": {
+      "last_plan": "آخر خطة",
+      "expired_on": "تاريخ الانتهاء",
+      "days_since": "أيام منذ الانتهاء",
+      "follow_up_status": "المتابعة"
+    },
+    "send_offer": "إرسال عرض تجديد",
+    "send_offer_bulk": "إرسال عرض تجديد للمحددين ({{count}})",
+    "send_offer_bulk_success": "تم إرسال عروض التجديد: {{created}} تم إنشاؤها، {{skipped}} تم تخطيها",
+    "send_offer_error": "فشل إرسال عرض التجديد",
+    "empty": "لا يوجد أعضاء منتهية الصلاحية — احتفاظ ممتاز!",
+    "total": "{{count}} عضو منتهية الصلاحية"
+  },
   "language": {
     "ar": "العربية",
     "en": "English"

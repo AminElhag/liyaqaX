@@ -22,7 +22,7 @@ class Membership(
     val memberId: Long,
     @Column(name = "plan_id", nullable = false, updatable = false)
     val planId: Long,
-    // membership_status: pending | active | frozen | expired | terminated
+    // membership_status: pending | active | frozen | expired | terminated | lapsed
     @Column(name = "membership_status", nullable = false, length = 50)
     var membershipStatus: String = "pending",
     @Column(name = "start_date", nullable = false)

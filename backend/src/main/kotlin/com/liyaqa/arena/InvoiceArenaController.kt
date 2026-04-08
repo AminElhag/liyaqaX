@@ -67,6 +67,7 @@ class InvoiceArenaController(
         authentication: Authentication,
     ): ResponseEntity<InvoiceArenaDetailResponse> {
         val member = resolveMember(authentication)
+        member.requireNotLapsed()
         portalSettingsService.requireFeatureEnabled(member.clubId, "invoice")
 
         val invoice =

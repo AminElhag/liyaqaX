@@ -22,6 +22,7 @@ import com.liyaqa.membership.dto.MembershipSummaryResponse
 import com.liyaqa.membership.dto.RenewMembershipRequest
 import com.liyaqa.membership.dto.TerminateMembershipRequest
 import com.liyaqa.membership.dto.UnfreezeMembershipRequest
+import com.liyaqa.membership.service.MemberLapseService
 import com.liyaqa.notification.events.MembershipAssignedEvent
 import com.liyaqa.notification.events.MembershipFrozenEvent
 import com.liyaqa.organization.Organization
@@ -55,6 +56,7 @@ class MembershipService(
     private val invoiceService: InvoiceService,
     private val auditService: AuditService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val memberLapseService: MemberLapseService,
 ) {
     companion object {
         private val ACTIVE_STATUSES = listOf("active", "frozen")
@@ -160,6 +162,7 @@ class MembershipService(
             )
 
         // Rule 6 — Member status update (in same transaction)
+        memberLapseService.reactivateMemberIfLapsed(member.id)
         member.membershipStatus = "active"
         memberRepository.save(member)
 
@@ -530,6 +533,7 @@ class MembershipService(
             )
 
         // Rule 11 — Member status sync
+        memberLapseService.reactivateMemberIfLapsed(member.id)
         member.membershipStatus = "active"
         memberRepository.save(member)
 

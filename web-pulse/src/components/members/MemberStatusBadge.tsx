@@ -12,6 +12,7 @@ const statusStyles: Record<MembershipStatus, string> = {
   frozen: 'bg-blue-100 text-blue-700',
   expired: 'bg-orange-100 text-orange-700',
   terminated: 'bg-red-100 text-red-700',
+  lapsed: 'bg-red-100 text-red-700',
 }
 
 export function MemberStatusBadge({ status }: MemberStatusBadgeProps) {

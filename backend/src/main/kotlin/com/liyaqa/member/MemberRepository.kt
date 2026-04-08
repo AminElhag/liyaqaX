@@ -100,6 +100,37 @@ interface MemberRepository : JpaRepository<Member, Long> {
         @Param("jobId") jobId: Long,
     ): Int
 
+    @Query(
+        value = """
+            SELECT m.* FROM members m
+            JOIN memberships ms ON ms.member_id = m.id AND ms.deleted_at IS NULL
+            WHERE m.club_id = :clubId
+              AND m.membership_status = 'lapsed'
+              AND m.deleted_at IS NULL
+            ORDER BY ms.end_date DESC
+            LIMIT :limit OFFSET :offset
+        """,
+        nativeQuery = true,
+    )
+    fun findLapsedByClub(
+        @Param("clubId") clubId: Long,
+        @Param("limit") limit: Int,
+        @Param("offset") offset: Int,
+    ): List<Member>
+
+    @Query(
+        value = """
+            SELECT COUNT(*) FROM members
+            WHERE club_id = :clubId
+              AND membership_status = 'lapsed'
+              AND deleted_at IS NULL
+        """,
+        nativeQuery = true,
+    )
+    fun countLapsedByClub(
+        @Param("clubId") clubId: Long,
+    ): Long
+
     @org.springframework.data.jpa.repository.Query(
         value = """
             SELECT m.* FROM members m

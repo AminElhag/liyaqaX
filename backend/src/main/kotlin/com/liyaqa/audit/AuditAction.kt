@@ -84,4 +84,8 @@ enum class AuditAction(val code: String) {
     // Member Note
     MEMBER_NOTE_ADDED("MEMBER_NOTE_ADDED"),
     MEMBER_NOTE_DELETED("MEMBER_NOTE_DELETED"),
+
+    // Lapse Recovery
+    MEMBERSHIP_LAPSED("MEMBERSHIP_LAPSED"),
+    MEMBER_REACTIVATED("MEMBER_REACTIVATED"),
 }

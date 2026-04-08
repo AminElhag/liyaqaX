@@ -11,6 +11,7 @@ data class MemberMeResponse(
     val phone: String,
     val email: String?,
     val preferredLanguage: String?,
+    val memberStatus: String,
     val club: ClubSummary,
     val membership: MembershipSummary?,
 )

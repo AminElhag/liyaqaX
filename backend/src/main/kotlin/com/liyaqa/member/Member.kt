@@ -37,7 +37,7 @@ class Member(
     // gender: male | female | unspecified
     @Column(name = "gender", length = 20)
     var gender: String? = null,
-    // membership_status: pending | active | frozen | expired | terminated
+    // membership_status: pending | active | frozen | expired | terminated | lapsed
     @Column(name = "membership_status", nullable = false, length = 50)
     var membershipStatus: String = "pending",
     @Column(name = "notes", columnDefinition = "TEXT")

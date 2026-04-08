@@ -135,5 +135,8 @@
   "register.success.backToLogin": "Back to Login",
   "register.error.phoneRegistered": "This phone is already registered. Please log in.",
   "register.error.pendingReview": "Registration already pending staff review.",
-  "register.error.nameRequired": "Please enter your name in at least one language."
+  "register.error.nameRequired": "Please enter your name in at least one language.",
+  "lapsed.banner_title": "Membership Expired",
+  "lapsed.banner_body": "Your membership has expired. Please visit the gym or contact staff to renew.",
+  "lapsed.banner_contact": "Contact Info"
 }

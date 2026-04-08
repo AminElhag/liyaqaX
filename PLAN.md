@@ -1,180 +1,272 @@
-# Plan 32 — Member Notes & Activity Timeline
+# Plan 33 — Membership Lapse Recovery
 
 ## Status
 Ready for implementation
 
 ## Branch
-`feature/plan-32-member-notes`
+`feature/plan-33-lapse-recovery`
 
 ## Goal
-Extend the existing `MemberNote` entity (created in Plan 22 for rejection reasons) with four general-purpose note types and a combined activity timeline on each member profile. A `/follow-ups` page gives gated staff a daily view of members with pending follow-up notes due within 7 days. Trainers can read and create notes in web-coach. The activity timeline combines notes, membership events, and payments in a single newest-first view.
+Automatically detect and mark members whose memberships have expired, transition them to a new `lapsed` status, restrict their club access (no QR, no class booking) while still allowing web-arena login, and give staff a focused recovery screen to send renewal offers and re-engage lapsed members at scale.
 
 ## Context
-- `MemberNote` entity already exists from Plan 22 with fields: `id`, `memberId`, `content`, `createdByUserId`, `createdAt`, `deletedAt`
-- Plan 22 used it for rejection reasons only — `noteType` column does NOT exist yet
-- `followUpAt` column does NOT exist yet
-- Notification scheduler (`NotificationSchedulerService`) already runs daily at 06:00 UTC — extend it
-- `AuditService.log()` already established — wire new actions in
-- Trainers have web-coach with their own JWT scope
-- Next Flyway migration: **V18** (this plan needs a small migration to add columns to `member_notes`)
+- `MemberStatus` enum already exists: `active`, `pending_activation`, `inactive`, `terminated`
+- `Membership.status` already has: `active`, `pending_payment`, `frozen`, `terminated`
+- `NotificationSchedulerService` already runs daily at 06:00 UTC — extend it
+- `MemberNoteService` (Plan 32) already exists — "Send Renewal Offer" creates a `follow_up` note
+- `AuditService.log()` already established
+- `MEMBERSHIP_EXPIRING_SOON` notification already fires 7 days before expiry — this plan handles what happens after
+- No Flyway migration — adds a new enum value to `MemberStatus` (handled in Kotlin enum + VARCHAR column)
 
 ---
 
 ## Scope — what this plan covers
 
-- [ ] Flyway V18 — add `note_type`, `follow_up_at`, `created_by_user_id` (if missing) to `member_notes`
-- [ ] Extend `MemberNote` entity with `noteType` and `followUpAt` fields
-- [ ] `MemberNoteService` — create, delete, list (with timeline merge)
-- [ ] Extend `NotificationSchedulerService` — fire `FOLLOW_UP_DUE` for notes due today
-- [ ] New notification type: `FOLLOW_UP_DUE`
-- [ ] New audit actions: `MEMBER_NOTE_ADDED`, `MEMBER_NOTE_DELETED`
-- [ ] New permissions: `member-note:create`, `member-note:read`, `member-note:delete`, `member-note:follow-up:read`
-- [ ] 5 endpoints (3 pulse, 2 coach)
-- [ ] web-pulse: Notes tab on member profile — combined activity timeline
-- [ ] web-pulse: `/follow-ups` page — follow-up notes due within 7 days
-- [ ] web-coach: Notes tab on member profile (read + create)
+- [ ] Add `LAPSED` to `MemberStatus` enum
+- [ ] `MemberLapseService` — lapse detection, lapse transition, re-activation on new membership
+- [ ] Extend `NotificationSchedulerService` — daily lapse scheduler at 07:00 Riyadh (04:00 UTC)
+- [ ] New notification type: `MEMBERSHIP_LAPSED`
+- [ ] New audit actions: `MEMBERSHIP_LAPSED`, `MEMBER_REACTIVATED`
+- [ ] Hook re-activation into existing membership assignment flow
+- [ ] web-arena: full-screen "Membership Expired" banner for lapsed members; gate QR and booking endpoints
+- [ ] web-pulse: `lapsed` badge on `/members` list + dedicated `/memberships/lapsed` recovery screen
 - [ ] Tests — unit + integration + frontend
 
 ## Out of scope — do not implement in this plan
 
-- Editing notes (append-only by design)
-- Pinning notes
-- Email notifications for `FOLLOW_UP_DUE` (bell + drawer only)
-- Note attachments or images
-- Note visibility restrictions by type (all staff with `member-note:read` see all types including health)
-- Member-facing notes (notes are staff/trainer-only)
+- Automated SMS or email outreach to lapsed members
+- Lapsed member self-service renewal via web-arena (Plan 24 — Online Payments)
+- Grace period after expiry
+- Bulk re-activation without assigning a plan
+- Lapse report in the Custom Report Builder (existing dimensions can be extended later)
 
 ---
 
 ## Decisions already made
 
-- **Append-only** — no edit endpoint; soft delete only (`deleted_at = now()`)
-- **5 note types**: `general`, `health`, `complaint`, `follow_up`, `rejection` (rejection already used by Plan 22 — preserve it)
-- **`followUpAt`**: nullable; only meaningful on `follow_up` type notes; ignored on other types
-- **Timeline**: combined view of notes + membership events (JOINED, RENEWED, FROZEN, TERMINATED) + payments (COLLECTED); sorted newest first; assembled in service layer from three separate native queries, merged and sorted in Kotlin
-- **Trainer access**: full — read and create notes in web-coach; trainers should use `general` and `health` types only (enforced by validation: trainers cannot create `complaint` or `follow_up` notes)
-- **`/follow-ups` page**: gated by `member-note:follow-up:read` permission; shows all notes where `follow_up_at` is between today and today + 7 days, ordered by `follow_up_at ASC`
-- **`FOLLOW_UP_DUE` notification**: fired daily by scheduler for notes where `follow_up_at = today`; sent to the user who created the note (`created_by_user_id`)
-- **Flyway V18** — migration needed (adds columns to `member_notes`)
+- **New `MemberStatus.LAPSED`** — clean separation from `inactive` (manual staff action). Lapsed = expired membership. Inactive = manually disabled.
+- **No Flyway migration** — `member_status` is stored as `VARCHAR` with `@Enumerated(EnumType.STRING)`; adding a new enum value requires no DDL change.
+- **Scheduler**: daily at 04:00 UTC (07:00 Riyadh) — finds memberships where `end_date < today` AND `membership.status = 'active'` AND `member.status = 'active'`. Transitions both membership → `lapsed` and member → `lapsed`.
+- **web-arena lapsed UX**: member can log in; all action endpoints (QR, book GX, book PT) return `403` with a specific `MEMBERSHIP_LAPSED` error code; frontend shows a full-screen banner.
+- **Re-activation**: when staff assigns a new membership to a lapsed member (existing `POST /api/v1/members/{id}/memberships` flow), the service checks `member.status == LAPSED` → auto-sets `member.status = ACTIVE`. Logs `MEMBER_REACTIVATED`.
+- **Renewal offer**: "Send Renewal Offer" button on the `/lapsed` screen creates a `MemberNote` of type `FOLLOW_UP` with content `"Renewal offer sent"` and `followUpAt = today + 3 days`. Uses existing `MemberNoteService.createNote()`.
+- **Bulk action**: select multiple lapsed members → "Send Renewal Offer to Selected" → creates a follow_up note for each.
 
 ---
 
-## Entity design
-
-### MemberNote (extended)
-
-The entity already exists. Add these fields:
+## MemberStatus enum change
 
 ```kotlin
-// Add to existing MemberNote entity
-
-@Enumerated(EnumType.STRING)
-@Column(name = "note_type", nullable = false)
-var noteType: MemberNoteType = MemberNoteType.GENERAL
-
-@Column(name = "follow_up_at")
-var followUpAt: Instant? = null
-```
-
-```kotlin
-enum class MemberNoteType {
-    GENERAL,
-    HEALTH,
-    COMPLAINT,
-    FOLLOW_UP,
-    REJECTION   // existing — used by Plan 22 activation flow
+// Add to existing MemberStatus enum
+enum class MemberStatus {
+    ACTIVE,
+    PENDING_ACTIVATION,
+    INACTIVE,
+    TERMINATED,
+    LAPSED          // ← new — membership expired, scheduler-driven
 }
 ```
 
-No new entity. No new table.
+No SQL migration needed — column is `VARCHAR`, Hibernate reads/writes the string value.
 
 ---
 
-## Flyway V18
-
-```sql
--- V18__member_notes_extend.sql
-
-ALTER TABLE member_notes
-    ADD COLUMN IF NOT EXISTS note_type  VARCHAR(20) NOT NULL DEFAULT 'GENERAL',
-    ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ;
-
--- Backfill: all existing notes created by Plan 22 are rejection notes
-UPDATE member_notes SET note_type = 'REJECTION' WHERE note_type = 'GENERAL' AND content LIKE '%rejection%';
-
-CREATE INDEX idx_member_notes_follow_up_at ON member_notes(follow_up_at)
-    WHERE follow_up_at IS NOT NULL AND deleted_at IS NULL;
-
-CREATE INDEX idx_member_notes_member_type ON member_notes(member_id, note_type)
-    WHERE deleted_at IS NULL;
-```
-
-> Note: If `created_by_user_id` column was already added by Plan 22, do NOT re-add it. Check the existing schema before writing the migration. Use `ADD COLUMN IF NOT EXISTS` for safety.
-
----
-
-## Activity Timeline — assembled in service layer
-
-The timeline is a unified list of events for a single member, newest first. Three sources:
-
-| Source | Event types included |
-|--------|---------------------|
-| `member_notes` | All non-deleted notes for this member |
-| `memberships` | Created (JOINED), renewed (RENEWED), frozen (FROZEN), terminated (TERMINATED) — use `status` transitions + `created_at` / `updatedAt` — or use `audit_logs` filtered by `entity_type = 'Membership'` and `entity_id` |
-| `payments` | All payments for this member — use `payment_date` or `created_at` |
-
-**Assembly strategy**: three separate native queries → three lists → merge into a single `List<TimelineEvent>` sealed class in Kotlin → sort by `eventAt DESC` → paginate (20 items per page, cursor-based using `eventAt + id`).
-
-```kotlin
-sealed class TimelineEvent {
-    abstract val eventAt: Instant
-    abstract val eventType: String
-
-    data class NoteEvent(
-        override val eventAt: Instant,
-        override val eventType: String,  // "NOTE_GENERAL", "NOTE_HEALTH", etc.
-        val noteId: UUID,
-        val content: String,
-        val noteType: String,
-        val followUpAt: Instant?,
-        val createdByName: String,
-        val canDelete: Boolean  // true if current user is the author or has manager role
-    ) : TimelineEvent()
-
-    data class MembershipEvent(
-        override val eventAt: Instant,
-        override val eventType: String,  // "MEMBERSHIP_JOINED", "MEMBERSHIP_RENEWED", etc.
-        val membershipId: UUID,
-        val planName: String,
-        val detail: String  // e.g. "Frozen until 15 Apr 2026"
-    ) : TimelineEvent()
-
-    data class PaymentEvent(
-        override val eventAt: Instant,
-        override val eventType: String,  // "PAYMENT_COLLECTED"
-        val paymentId: UUID,
-        val amountSar: String,
-        val method: String
-    ) : TimelineEvent()
-}
-```
-
----
-
-## Notification type
+## New notification type
 
 Add to `NotificationType.kt`:
 
 ```kotlin
-FOLLOW_UP_DUE,  // member follow-up note is due today — sent to note creator
+MEMBERSHIP_LAPSED,  // fired to club staff when a member's membership expires
 ```
 
-Body strings:
+- **Target**: all staff with `membership:read` permission in the member's club
+- **Body (en)**: `"{memberName}'s membership expired on {endDate}. They have been moved to lapsed status."`
+- **Body (ar)**: `"انتهت عضوية {memberName} في {endDate}. تم نقلهم إلى حالة منتهية الصلاحية."`
 
-| Lang | Body |
-|------|------|
-| EN | "Follow-up due today for {memberName}: {noteContent truncated to 80 chars}" |
-| AR | "متابعة مستحقة اليوم لـ {memberName}: {noteContent}" |
+> Note: This notifies staff, not the member. The member already received `MEMBERSHIP_EXPIRING_SOON` 7 days prior.
+
+---
+
+## Lapse logic — MemberLapseService
+
+```kotlin
+@Service
+class MemberLapseService(
+    private val membershipRepository: MembershipRepository,
+    private val memberRepository: MemberRepository,
+    private val auditService: AuditService,
+    private val notificationService: NotificationService
+) {
+
+    /**
+     * Called by scheduler daily.
+     * Finds all active memberships whose end_date < today and whose member is still active.
+     * Transitions both to LAPSED.
+     */
+    @Transactional
+    fun lapseExpiredMemberships() {
+        val today = LocalDate.now(ZoneId.of("Asia/Riyadh"))
+        val expired = membershipRepository.findExpiredActiveMemberships(today)
+
+        expired.forEach { membership ->
+            membership.status = MembershipStatus.LAPSED
+            membershipRepository.save(membership)
+
+            val member = memberRepository.findById(membership.memberId).orElse(null) ?: return@forEach
+            if (member.status == MemberStatus.ACTIVE) {
+                member.status = MemberStatus.LAPSED
+                memberRepository.save(member)
+
+                auditService.log(
+                    action = AuditAction.MEMBERSHIP_LAPSED,
+                    entityType = "Membership",
+                    entityId = membership.publicId.toString(),
+                    changes = mapOf(
+                        "memberId" to member.publicId.toString(),
+                        "endDate" to membership.endDate.toString()
+                    )
+                )
+
+                notificationService.createForClubStaffWithPermission(
+                    clubId = member.clubId,
+                    permission = "membership:read",
+                    type = "MEMBERSHIP_LAPSED",
+                    entityId = member.publicId.toString(),
+                    entityType = "Member",
+                    titleEn = "Membership Lapsed",
+                    titleAr = "انتهت العضوية",
+                    bodyEn = "${member.nameEn ?: member.nameAr}'s membership expired on ${membership.endDate}.",
+                    bodyAr = "انتهت عضوية ${member.nameAr} في ${membership.endDate}."
+                )
+            }
+        }
+    }
+
+    /**
+     * Called when staff assigns a new membership to a lapsed member.
+     * Automatically re-activates the member.
+     */
+    @Transactional
+    fun reactivateMemberIfLapsed(memberId: Long) {
+        val member = memberRepository.findById(memberId).orElse(null) ?: return
+        if (member.status == MemberStatus.LAPSED) {
+            member.status = MemberStatus.ACTIVE
+            memberRepository.save(member)
+            auditService.log(
+                action = AuditAction.MEMBER_REACTIVATED,
+                entityType = "Member",
+                entityId = member.publicId.toString(),
+                changes = mapOf("previousStatus" to "LAPSED")
+            )
+        }
+    }
+}
+```
+
+---
+
+## MembershipStatus enum change
+
+Add `LAPSED` to `MembershipStatus` as well — the membership itself also needs to reflect the expired state distinctly from `terminated`:
+
+```kotlin
+enum class MembershipStatus {
+    ACTIVE,
+    PENDING_PAYMENT,
+    FROZEN,
+    TERMINATED,
+    LAPSED      // ← new — expired via scheduler; not manually terminated
+}
+```
+
+---
+
+## Repository queries
+
+Add to `MembershipRepository`:
+
+```kotlin
+// Memberships that expired before today, still marked active (for lapse scheduler)
+@Query(value = """
+    SELECT ms.* FROM memberships ms
+    JOIN members m ON m.id = ms.member_id
+    WHERE ms.end_date < :today
+      AND ms.status = 'ACTIVE'
+      AND m.status = 'ACTIVE'
+      AND ms.deleted_at IS NULL
+      AND m.deleted_at IS NULL
+""", nativeQuery = true)
+fun findExpiredActiveMemberships(today: java.time.LocalDate): List<Membership>
+```
+
+Add to `MemberRepository`:
+
+```kotlin
+// Lapsed members for a club, ordered by most recently lapsed (for /lapsed screen)
+@Query(value = """
+    SELECT m.* FROM members m
+    JOIN memberships ms ON ms.member_id = m.id
+    WHERE m.club_id = :clubId
+      AND m.status = 'LAPSED'
+      AND m.deleted_at IS NULL
+    ORDER BY ms.end_date DESC
+    LIMIT :limit OFFSET :offset
+""", nativeQuery = true)
+fun findLapsedByClub(clubId: Long, limit: Int, offset: Int): List<Member>
+
+@Query(value = """
+    SELECT COUNT(*) FROM members
+    WHERE club_id = :clubId
+      AND status = 'LAPSED'
+      AND deleted_at IS NULL
+""", nativeQuery = true)
+fun countLapsedByClub(clubId: Long): Long
+```
+
+---
+
+## Re-activation hook
+
+In the existing membership creation service (wherever `POST /api/v1/members/{id}/memberships` is handled — likely `MembershipService.assignMembership()`), add after saving the new membership:
+
+```kotlin
+// Auto-reactivate member if they were lapsed
+memberLapseService.reactivateMemberIfLapsed(member.id)
+```
+
+This is the only change needed to the existing membership flow.
+
+---
+
+## web-arena access gates for lapsed members
+
+Add a check in `ArenaAuthHelper` (or equivalent request filter used by arena controllers):
+
+```kotlin
+// After validating the JWT and loading the member:
+if (member.status == MemberStatus.LAPSED) {
+    // Allow: GET /me, GET /portal-settings, GET /notifications, auth endpoints
+    // Block with 403 + MEMBERSHIP_LAPSED error code: everything else
+}
+```
+
+Specifically block:
+- `GET /api/v1/arena/invoices/{id}` — QR code endpoint
+- `POST /api/v1/arena/gx/{id}/book`
+- `POST /api/v1/arena/gx/{id}/waitlist`
+- `POST /api/v1/arena/gx/{id}/waitlist/accept`
+- `GET /api/v1/arena/pt/packages`
+
+Error response for blocked endpoints:
+```json
+{
+  "type": "https://liyaqa.com/errors/membership-lapsed",
+  "title": "Membership Expired",
+  "status": 403,
+  "detail": "Your membership has expired. Please contact the gym to renew.",
+  "errorCode": "MEMBERSHIP_LAPSED"
+}
+```
 
 ---
 
@@ -182,111 +274,97 @@ Body strings:
 
 | Method | Path | Scope | Permission | Description |
 |--------|------|-------|------------|-------------|
-| `POST` | `/api/v1/pulse/members/{memberPublicId}/notes` | club staff | `member-note:create` | Create a new note |
-| `DELETE` | `/api/v1/pulse/members/{memberPublicId}/notes/{notePublicId}` | club staff | `member-note:delete` | Soft-delete a note |
-| `GET` | `/api/v1/pulse/members/{memberPublicId}/timeline` | club staff | `member-note:read` | Combined activity timeline (paginated) |
-| `GET` | `/api/v1/pulse/follow-ups` | club staff | `member-note:follow-up:read` | Follow-up notes due within 7 days |
-| `POST` | `/api/v1/coach/members/{memberPublicId}/notes` | trainer | (authenticated trainer) | Trainer creates a note — types limited to `general` and `health` |
-| `GET` | `/api/v1/coach/members/{memberPublicId}/notes` | trainer | (authenticated trainer) | Trainer reads notes for a member they train |
+| `GET` | `/api/v1/pulse/memberships/lapsed` | club staff | `membership:read` | Paginated list of lapsed members for this club |
+| `POST` | `/api/v1/pulse/members/{memberPublicId}/renewal-offer` | club staff | `member-note:create` | Creates a follow_up note + 3-day due date on the member |
+| `POST` | `/api/v1/pulse/memberships/lapsed/renewal-offer-bulk` | club staff | `member-note:create` | Bulk renewal offer — creates follow_up note for each given member ID |
+
+No new permissions needed — all endpoints use existing `membership:read` and `member-note:create`.
 
 ---
 
 ## Request / Response shapes
 
-### POST /pulse/members/{id}/notes
-
-Request:
-```json
-{
-  "noteType": "follow_up",
-  "content": "Member mentioned knee pain — check with trainer before renewing PT package.",
-  "followUpAt": "2026-04-14"
-}
-```
-
-Response `201 Created`:
-```json
-{
-  "noteId": "uuid",
-  "noteType": "follow_up",
-  "content": "Member mentioned knee pain...",
-  "followUpAt": "2026-04-14T00:00:00Z",
-  "createdByName": "Ahmed Al-Mansoori",
-  "createdAt": "2026-04-07T09:30:00Z"
-}
-```
-
-### GET /pulse/members/{id}/timeline
+### GET /pulse/memberships/lapsed
 
 ```json
 {
-  "events": [
+  "total": 47,
+  "page": 1,
+  "pageSize": 20,
+  "members": [
     {
-      "eventType": "NOTE_FOLLOW_UP",
-      "eventAt": "2026-04-07T09:30:00Z",
-      "noteId": "uuid",
-      "content": "Member mentioned knee pain...",
-      "followUpAt": "2026-04-14T00:00:00Z",
-      "createdByName": "Ahmed Al-Mansoori",
-      "canDelete": true
-    },
-    {
-      "eventType": "PAYMENT_COLLECTED",
-      "eventAt": "2026-04-01T10:00:00Z",
-      "paymentId": "uuid",
-      "amountSar": "150.00",
-      "method": "cash"
-    },
-    {
-      "eventType": "MEMBERSHIP_JOINED",
-      "eventAt": "2026-03-01T08:00:00Z",
-      "membershipId": "uuid",
-      "planName": "Basic Monthly",
-      "detail": "Joined on Basic Monthly plan"
-    }
-  ],
-  "nextCursor": "2026-03-01T08:00:00Z_123"
-}
-```
-
-### GET /pulse/follow-ups
-
-```json
-{
-  "followUps": [
-    {
-      "noteId": "uuid",
-      "followUpAt": "2026-04-07T00:00:00Z",
-      "content": "Member mentioned knee pain...",
-      "memberName": "Sarah Al-Zahrani",
       "memberPublicId": "uuid",
-      "createdByName": "Ahmed Al-Mansoori",
-      "daysUntilDue": 0
+      "nameAr": "سارة الزهراني",
+      "nameEn": "Sarah Al-Zahrani",
+      "phone": "+966501234567",
+      "lastMembershipPlan": "Basic Monthly",
+      "expiredOn": "2026-03-31",
+      "daysSinceLapse": 8,
+      "hasOpenFollowUp": false
     }
   ]
 }
 ```
 
+### POST /pulse/members/{id}/renewal-offer → 201
+
+```json
+{
+  "noteId": "uuid",
+  "followUpAt": "2026-04-10T00:00:00Z",
+  "message": "Renewal offer follow-up created for Sarah Al-Zahrani. Due in 3 days."
+}
+```
+
+### POST /pulse/memberships/lapsed/renewal-offer-bulk
+
+Request:
+```json
+{ "memberPublicIds": ["uuid1", "uuid2", "uuid3"] }
+```
+
+Response `200 OK`:
+```json
+{ "created": 3, "skipped": 0 }
+```
+
+`skipped` = members who already have an open follow_up note created in the last 24h (deduplication).
+
 ---
 
 ## Business rules — enforce in service layer
 
-1. **Create — type validation**: `noteType` must be one of `general`, `health`, `complaint`, `follow_up`. Trainers (coach scope) may only use `general` or `health` — attempting `complaint` or `follow_up` returns `403 Forbidden`.
-2. **Create — content required**: `content` must be 1–1000 characters → `400 Bad Request` if empty or over limit.
-3. **Create — `followUpAt` guard**: `followUpAt` is only accepted on `follow_up` type notes. If provided on any other type, return `400 Bad Request`. If provided, must be a future date.
-4. **Delete — soft delete only**: sets `deletedAt = Instant.now()`. Never hard deletes.
-5. **Delete — author or manager only**: only the user who created the note OR a user with `member-note:delete` permission who has a role with `isManager = true` (Owner / Branch Manager) may delete. All others → `403 Forbidden`.
-6. **Delete — REJECTION notes**: notes with `noteType = REJECTION` cannot be deleted — return `409 Conflict` ("Rejection notes cannot be deleted").
-7. **Timeline — club scoping**: timeline queries are scoped to the current user's `clubId` from the JWT. Staff cannot view timelines of members in other clubs.
-8. **Trainer — member scoping**: trainer can only view/create notes for members who have at least one active `PTPackage` or `GXBooking` associated with this trainer. Attempting to access another member → `403 Forbidden`.
-9. **Follow-ups page**: returns notes where `follow_up_at BETWEEN now() AND now() + 7 days` AND `deleted_at IS NULL`, ordered by `follow_up_at ASC`. Scoped to the current user's club.
-10. **`FOLLOW_UP_DUE` notification**: scheduler fires daily; finds notes where `DATE(follow_up_at) = today` AND `deleted_at IS NULL`; sends notification to `created_by_user_id` (resolved to their `userId`). Deduplication: check last 24h for same `(type, entityId = noteId)` before creating.
+1. **Lapse scheduler idempotent**: if a membership is already `LAPSED`, skip it. If member is already `LAPSED`, skip re-transitioning. Safe to run multiple times.
+2. **Only active → lapsed**: the scheduler only transitions memberships with `status = 'ACTIVE'`. Frozen, terminated, and pending_payment memberships are NOT lapsed by this scheduler.
+3. **Member lapse only if no other active membership**: if a member has multiple memberships (e.g. a new one already assigned), do NOT lapse the member even if the old one expired. Check: `SELECT COUNT(*) FROM memberships WHERE member_id = ? AND status = 'ACTIVE'` — if > 0, skip member status transition.
+4. **Re-activation is automatic**: when a new `active` or `pending_payment` membership is assigned to a lapsed member, call `reactivateMemberIfLapsed()` immediately — do not wait for the scheduler.
+5. **Renewal offer deduplication**: before creating a follow_up note via "Send Renewal Offer", check if a `FOLLOW_UP` note with content starting with `"Renewal offer sent"` already exists for this member in the last 24 hours. If yes, skip and count as `skipped` in the bulk result.
+6. **Lapsed member in web-arena**: `GET /me` and notification endpoints remain accessible. All booking, QR, and package endpoints return `403` with `errorCode: MEMBERSHIP_LAPSED`.
+7. **Lapsed screen scoping**: lapsed members are scoped to the current staff user's `clubId` from the JWT. Staff cannot see lapsed members from other clubs.
+8. **`hasOpenFollowUp` field**: computed in service layer — `true` if there is an open (non-deleted) `FOLLOW_UP` note created in the last 7 days for this member.
+9. **Bulk offer cap**: maximum 100 member IDs per bulk request. Exceeding the cap returns `400 Bad Request`.
+
+---
+
+## Scheduler extension
+
+Add to existing `NotificationSchedulerService` (or create a new `MemberLapseScheduler`):
+
+```kotlin
+// Daily at 04:00 UTC (07:00 Riyadh) — run AFTER expiry notifications
+@Scheduled(cron = "0 0 4 * * *")
+fun lapseMemberships() {
+    memberLapseService.lapseExpiredMemberships()
+}
+```
+
+> Run at 04:00 UTC, same cron window as ZATCA CSID expiry check. Order within the same cron minute does not matter since they are independent.
 
 ---
 
 ## Seed data updates
 
-No new seed data needed. The dev member (Ahmed Al-Rashidi) will show an empty timeline until notes are created manually.
+No new seed data needed. In the dev environment, Ahmed Al-Rashidi has an active Basic Monthly membership — it will not lapse during development unless the date is advanced manually.
 
 ---
 
@@ -294,60 +372,49 @@ No new seed data needed. The dev member (Ahmed Al-Rashidi) will show an empty ti
 
 ### web-pulse
 
-**Member profile — new "Notes & Timeline" tab** (replace or add alongside existing tabs):
-- Combined timeline view: newest first, 20 items per scroll page (infinite scroll)
-- Event type icons: note icon (general=grey, health=red, complaint=amber, follow_up=blue), membership icon (green), payment icon (teal)
-- "Add Note" button → slide-in form: type selector (radio), text area (max 1000 chars), optional date picker (follow_up type only)
-- Each note row: type badge, content, author name, created-at (relative: "2 hours ago"), delete icon (shown only if `canDelete = true`)
-- Delete: confirmation toast before calling DELETE endpoint
+**`/members` list** (existing screen):
+- Members with `status = LAPSED` show a red "Lapsed" badge on their row
+- Existing member list already fetches `status` — no API change needed, just a badge condition in the UI
 
-**`/follow-ups` page** (new route in sidebar, visible only with `member-note:follow-up:read`):
-- Table: Due Date, Member Name (link to profile), Note Content (truncated 80 chars), Created By, Days Until Due
-- Color coding: due today = red row, due tomorrow = amber, later = default
-- No pagination needed for MVP — fetch all (API returns up to 200)
-- Sidebar nav item: "Follow-ups" with a count badge of items due today
+**`/memberships/lapsed` — new route**:
+- Table columns: Member Name (link to profile), Phone, Last Plan, Expired On, Days Since Lapse, Follow-up status (green tick if `hasOpenFollowUp`, grey dash if not)
+- "Send Renewal Offer" button per row — calls `POST /renewal-offer`, shows success toast
+- Checkbox column for bulk selection
+- "Send Renewal Offer to Selected (N)" bulk action button — calls bulk endpoint
+- Pagination: 20 per page
+- Empty state: "No lapsed members — great retention!"
+- Sidebar nav item: "Lapsed Members" under Memberships section, with a count badge showing `countLapsedByClub`
 
 **New i18n strings** (`ar.json` + `en.json`):
 ```
-notes.tab_title
-notes.add_button
-notes.type.general
-notes.type.health
-notes.type.complaint
-notes.type.follow_up
-notes.type.rejection
-notes.follow_up_date
-notes.content_placeholder
-notes.delete_confirm
-notes.empty
-timeline.payment_collected
-timeline.membership_joined
-timeline.membership_renewed
-timeline.membership_frozen
-timeline.membership_terminated
-followups.page_title
-followups.due_today
-followups.due_tomorrow
-followups.days_until_due
-followups.empty
-followups.nav_badge
+lapsed.page_title
+lapsed.nav_label
+lapsed.badge
+lapsed.columns.expired_on
+lapsed.columns.days_since
+lapsed.columns.follow_up_status
+lapsed.columns.has_follow_up
+lapsed.send_offer
+lapsed.send_offer_bulk
+lapsed.send_offer_success
+lapsed.empty
+members.status.lapsed
 ```
 
-### web-coach
+### web-arena
 
-**Member detail — new "Notes" tab**:
-- List of notes for this member (read: all types visible, no distinction)
-- "Add Note" button → form with type limited to `general` and `health` only
-- No delete button (trainers cannot delete notes)
-- No timeline — notes list only (not merged with membership/payment events)
+**Lapsed banner** (shown when `member.status = 'lapsed'` from `GET /me`):
+- Full-screen overlay (not a dismissable toast — it cannot be closed)
+- Message (en): "Your membership has expired. Please visit the gym or contact staff to renew."
+- Message (ar): "انتهت عضويتك. يرجى زيارة النادي أو التواصل مع الموظفين للتجديد."
+- Contact info pulled from `ClubPortalSettings.portalMessage` if set
+- All nav items except Profile are hidden/disabled when banner is showing
 
-**New i18n strings** (coach `ar.json` + `en.json`):
+**New i18n strings** (`ar.json` + `en.json`):
 ```
-notes.tab_title
-notes.add_button
-notes.type.general
-notes.type.health
-notes.empty
+lapsed.banner_title
+lapsed.banner_body
+lapsed.banner_contact
 ```
 
 ---
@@ -357,281 +424,164 @@ notes.empty
 ### New files
 
 **Backend:**
-- `backend/src/main/kotlin/com/liyaqa/member/entity/MemberNoteType.kt`
-- `backend/src/main/kotlin/com/liyaqa/member/service/MemberNoteService.kt`
-- `backend/src/main/kotlin/com/liyaqa/member/dto/CreateNoteRequest.kt`
-- `backend/src/main/kotlin/com/liyaqa/member/dto/NoteResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/member/dto/TimelineEvent.kt` (sealed class)
-- `backend/src/main/kotlin/com/liyaqa/member/dto/TimelineResponse.kt`
-- `backend/src/main/kotlin/com/liyaqa/member/dto/FollowUpResponse.kt`
-- `backend/src/main/resources/db/migration/V18__member_notes_extend.sql`
-- `backend/src/test/kotlin/com/liyaqa/member/service/MemberNoteServiceTest.kt`
-- `backend/src/test/kotlin/com/liyaqa/member/controller/MemberNoteControllerIntegrationTest.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/service/MemberLapseService.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/dto/LapsedMemberResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/dto/RenewalOfferResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/dto/BulkRenewalOfferRequest.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/dto/BulkRenewalOfferResponse.kt`
+- `backend/src/main/kotlin/com/liyaqa/membership/controller/MemberLapsePulseController.kt`
+- `backend/src/test/kotlin/com/liyaqa/membership/service/MemberLapseServiceTest.kt`
+- `backend/src/test/kotlin/com/liyaqa/membership/controller/MemberLapseControllerIntegrationTest.kt`
 
 **Frontend:**
-- `apps/web-pulse/src/components/members/NotesTimeline.tsx`
-- `apps/web-pulse/src/components/members/AddNoteForm.tsx`
-- `apps/web-pulse/src/routes/follow-ups/index.tsx`
-- `apps/web-pulse/src/api/memberNotes.ts`
-- `apps/web-coach/src/components/members/MemberNotes.tsx`
-- `apps/web-coach/src/api/memberNotes.ts`
-- `apps/web-pulse/src/tests/notes-timeline.test.tsx`
-- `apps/web-coach/src/tests/member-notes-coach.test.tsx`
+- `apps/web-pulse/src/routes/memberships/lapsed/index.tsx`
+- `apps/web-pulse/src/api/memberLapse.ts`
+- `apps/web-arena/src/components/LapsedBanner.tsx`
+- `apps/web-pulse/src/tests/lapsed-members.test.tsx`
+- `apps/web-arena/src/tests/lapsed-banner.test.tsx`
 
 ### Files to modify
 
-- `backend/.../member/entity/MemberNote.kt` — add `noteType`, `followUpAt` fields
-- `backend/.../member/repository/MemberNoteRepository.kt` — add native queries
-- `backend/.../notification/model/NotificationType.kt` — add `FOLLOW_UP_DUE`
-- `backend/.../notification/service/NotificationSchedulerService.kt` — add `FOLLOW_UP_DUE` daily check
-- `backend/.../audit/model/AuditAction.kt` — add `MEMBER_NOTE_ADDED`, `MEMBER_NOTE_DELETED`
-- `backend/.../permission/PermissionConstants.kt` — add 4 new permission codes
-- `backend/DevDataLoader.kt` — seed new permissions to appropriate roles
-- `backend/.../member/controller/MemberPulseController.kt` (or new `MemberNotePulseController.kt`) — add 3 pulse endpoints
-- `backend/.../coach/controller/CoachMemberController.kt` (or new) — add 2 coach endpoints
-- `apps/web-pulse/src/routes/members/$memberId.tsx` — add Notes & Timeline tab
+- `backend/.../member/entity/MemberStatus.kt` — add `LAPSED`
+- `backend/.../membership/entity/MembershipStatus.kt` — add `LAPSED`
+- `backend/.../membership/repository/MembershipRepository.kt` — add `findExpiredActiveMemberships`
+- `backend/.../member/repository/MemberRepository.kt` — add `findLapsedByClub`, `countLapsedByClub`
+- `backend/.../notification/model/NotificationType.kt` — add `MEMBERSHIP_LAPSED`
+- `backend/.../audit/model/AuditAction.kt` — add `MEMBERSHIP_LAPSED`, `MEMBER_REACTIVATED`
+- `backend/.../notification/service/NotificationSchedulerService.kt` — add lapse scheduler cron
+- `backend/.../membership/service/MembershipService.kt` — hook `reactivateMemberIfLapsed()` into assignment
+- `backend/.../arena/auth/ArenaAuthHelper.kt` — add lapsed member access gate
+- `apps/web-pulse/src/routes/members/index.tsx` — add Lapsed badge to member rows
+- `apps/web-pulse/src/routes/memberships/index.tsx` — add "Lapsed Members" sidebar link + badge
+- `apps/web-arena/src/routes/_authenticated.tsx` (or root layout) — check lapsed status, render banner
 - `apps/web-pulse/src/locales/ar.json` + `en.json`
-- `apps/web-coach/src/routes/members/$memberId.tsx` — add Notes tab
-- `apps/web-coach/src/locales/ar.json` + `en.json`
-
----
-
-## Repository queries
-
-All must use `nativeQuery = true`:
-
-```kotlin
-// Notes for a member (non-deleted, newest first, paginated)
-@Query(value = """
-    SELECT * FROM member_notes
-    WHERE member_id = :memberId
-      AND deleted_at IS NULL
-    ORDER BY created_at DESC
-    LIMIT :limit OFFSET :offset
-""", nativeQuery = true)
-fun findByMemberId(memberId: Long, limit: Int, offset: Int): List<MemberNote>
-
-// Follow-up notes due within N days for a club (via member → membership → club join)
-@Query(value = """
-    SELECT mn.* FROM member_notes mn
-    JOIN members m ON m.id = mn.member_id
-    WHERE mn.follow_up_at BETWEEN :from AND :to
-      AND mn.deleted_at IS NULL
-      AND m.club_id = :clubId
-    ORDER BY mn.follow_up_at ASC
-    LIMIT 200
-""", nativeQuery = true)
-fun findFollowUpsDueWithin(clubId: Long, from: Instant, to: Instant): List<MemberNote>
-
-// Follow-up notes due exactly today (for scheduler — across all clubs)
-@Query(value = """
-    SELECT * FROM member_notes
-    WHERE DATE(follow_up_at AT TIME ZONE 'Asia/Riyadh') = :today
-      AND deleted_at IS NULL
-      AND note_type = 'FOLLOW_UP'
-""", nativeQuery = true)
-fun findFollowUpsDueToday(today: java.time.LocalDate): List<MemberNote>
-
-// Find specific note by publicId
-@Query(value = """
-    SELECT * FROM member_notes
-    WHERE public_id = :publicId
-      AND deleted_at IS NULL
-""", nativeQuery = true)
-fun findByPublicId(publicId: UUID): MemberNote?
-```
-
-Add to `PaymentRepository`:
-```kotlin
-// Payments for a member (for timeline)
-@Query(value = """
-    SELECT id, public_id, amount_halalas, payment_method, payment_date, created_at
-    FROM payments
-    WHERE member_id = :memberId
-      AND deleted_at IS NULL
-    ORDER BY payment_date DESC
-    LIMIT :limit
-""", nativeQuery = true)
-fun findByMemberIdForTimeline(memberId: Long, limit: Int): List<PaymentTimelineProjection>
-```
-
-Add to `MembershipRepository`:
-```kotlin
-// Membership events for a member (for timeline)
-@Query(value = """
-    SELECT id, public_id, status, start_date, end_date, created_at, updated_at,
-           mp.name_en AS plan_name_en, mp.name_ar AS plan_name_ar
-    FROM memberships ms
-    JOIN membership_plans mp ON mp.id = ms.membership_plan_id
-    WHERE ms.member_id = :memberId
-      AND ms.deleted_at IS NULL
-    ORDER BY ms.created_at DESC
-    LIMIT :limit
-""", nativeQuery = true)
-fun findByMemberIdForTimeline(memberId: Long, limit: Int): List<MembershipTimelineProjection>
-```
+- `apps/web-arena/src/locales/ar.json` + `en.json`
 
 ---
 
 ## Implementation order
 
-### Step 1 — Flyway V18 + entity extension
-- Write `V18__member_notes_extend.sql` (check existing columns first)
-- Add `noteType: MemberNoteType` and `followUpAt: Instant?` to `MemberNote.kt`
-- Write `MemberNoteType.kt` enum
-- Verify: `./gradlew flywayMigrate`
+### Step 1 — Enum extensions
+- Add `LAPSED` to `MemberStatus.kt`
+- Add `LAPSED` to `MembershipStatus.kt`
+- Verify: `./gradlew compileKotlin`
 
-### Step 2 — Permissions + audit actions + notification type
-- Add `MEMBER_NOTE_CREATE`, `MEMBER_NOTE_READ`, `MEMBER_NOTE_DELETE`, `MEMBER_NOTE_FOLLOW_UP_READ` to `PermissionConstants.kt`
-- Add `MEMBER_NOTE_ADDED`, `MEMBER_NOTE_DELETED` to `AuditAction.kt`
-- Add `FOLLOW_UP_DUE` to `NotificationType.kt`
-- Seed permissions to roles in `DevDataLoader`:
-  - `member-note:create` → Owner, Branch Manager, Receptionist, Sales Agent + all trainer roles
-  - `member-note:read` → Owner, Branch Manager, Receptionist, Sales Agent + all trainer roles
-  - `member-note:delete` → Owner, Branch Manager, Receptionist, Sales Agent
-  - `member-note:follow-up:read` → Owner, Branch Manager, Receptionist, Sales Agent
+### Step 2 — Notification type + audit actions
+- Add `MEMBERSHIP_LAPSED` to `NotificationType.kt`
+- Add `MEMBERSHIP_LAPSED`, `MEMBER_REACTIVATED` to `AuditAction.kt`
 - Verify: `./gradlew compileKotlin`
 
 ### Step 3 — Repository queries
-- Add 4 queries to `MemberNoteRepository`
-- Add `PaymentTimelineProjection` interface + query to `PaymentRepository`
-- Add `MembershipTimelineProjection` interface + query to `MembershipRepository`
+- Add `findExpiredActiveMemberships` to `MembershipRepository`
+- Add `findLapsedByClub`, `countLapsedByClub` to `MemberRepository`
+- All must use `nativeQuery = true`
 - Verify: `./gradlew compileKotlin`
 
-### Step 4 — MemberNoteService
-Implement:
-- `createNote(memberPublicId, request, actorUserId, actorScope)` — enforces rules 1–3, saves, logs audit
-- `deleteNote(notePublicId, actorUserId, actorRole)` — enforces rules 4–6, soft-deletes, logs audit
-- `getTimeline(memberPublicId, clubId, cursor, limit)` — fetches 3 sources, merges, sorts, paginates
-- `getFollowUps(clubId)` — fetches follow-up notes due within 7 days
-- Verify: unit tests in `MemberNoteServiceTest`
+### Step 4 — MemberLapseService
+- Implement `lapseExpiredMemberships()` — full transition logic with business rule 3 (skip if other active membership)
+- Implement `reactivateMemberIfLapsed()` — idempotent re-activation
+- Verify: unit tests in `MemberLapseServiceTest`
 
-### Step 5 — Extend NotificationSchedulerService
-Add to the existing daily 06:00 UTC scheduler method:
-```kotlin
-// Fire FOLLOW_UP_DUE for notes due today
-val today = LocalDate.now(ZoneId.of("Asia/Riyadh"))
-val dueNotes = memberNoteRepository.findFollowUpsDueToday(today)
-dueNotes.forEach { note ->
-    // deduplication check: last 24h for same (FOLLOW_UP_DUE, noteId)
-    notificationService.createIfNotDuplicate(
-        userId = resolveUserId(note.createdByUserId),
-        type = "FOLLOW_UP_DUE",
-        entityId = note.publicId.toString(),
-        entityType = "MemberNote",
-        titleEn = "Follow-up Due Today",
-        titleAr = "متابعة مستحقة اليوم",
-        bodyEn = "Follow-up for ${resolveMemberName(note.memberId)}: ${note.content.take(80)}",
-        bodyAr = "متابعة لـ ${resolveMemberName(note.memberId)}: ${note.content.take(80)}"
-    )
-}
-```
+### Step 5 — Extend scheduler + re-activation hook
+- Add lapse cron method to `NotificationSchedulerService` (or new `MemberLapseScheduler`)
+- Hook `reactivateMemberIfLapsed()` into `MembershipService.assignMembership()`
+- Verify: `./gradlew compileKotlin`
 
-### Step 6 — Controllers
+### Step 6 — web-arena access gate
+- Add lapsed status check in `ArenaAuthHelper`
+- Blocked endpoints return RFC 7807 `403` with `errorCode: MEMBERSHIP_LAPSED`
+- Allowed endpoints: `/me`, `/notifications`, `/portal-settings`, all auth endpoints
+- Verify: integration test covers 403 on QR + booking endpoints for lapsed member
 
-**`MemberNotePulseController`** (or add to existing `MemberPulseController`):
-- `POST /pulse/members/{id}/notes` → `memberNoteService.createNote(...)`
-- `DELETE /pulse/members/{id}/notes/{noteId}` → `memberNoteService.deleteNote(...)`
-- `GET /pulse/members/{id}/timeline` → `memberNoteService.getTimeline(...)`
-- `GET /pulse/follow-ups` → `memberNoteService.getFollowUps(clubId)`
+### Step 7 — MemberLapsePulseController
+- `GET /pulse/memberships/lapsed` — paginated lapsed member list
+- `POST /pulse/members/{id}/renewal-offer` — single renewal offer
+- `POST /pulse/memberships/lapsed/renewal-offer-bulk` — bulk renewal offers (cap 100)
+- All with `@Operation` + `@PreAuthorize`
+- Verify: `./gradlew compileKotlin`
 
-**Coach controller** (add to existing or new `CoachMemberController`):
-- `POST /coach/members/{id}/notes` → `memberNoteService.createNote(...)` with scope=trainer, type restriction
-- `GET /coach/members/{id}/notes` → notes-only list (no timeline merge), scoped to trainer's members
+### Step 8 — Frontend: web-pulse
+- `/memberships/lapsed` route — table, per-row offer button, bulk action, pagination, empty state
+- `memberLapse.ts` — 3 API functions
+- Add Lapsed badge to existing members list rows
+- Add Lapsed Members sidebar nav item with count badge
+- Add all i18n strings
 
-### Step 7 — Frontend: web-pulse
-- `NotesTimeline.tsx` — infinite scroll timeline with event type icons, add note button, delete with confirmation
-- `AddNoteForm.tsx` — type selector, text area, date picker (follow_up only)
-- `/follow-ups` route — table with color-coded rows, count badge on sidebar nav
-- `memberNotes.ts` — 4 API functions (create, delete, timeline, follow-ups)
-- Add Notes & Timeline tab to member profile page
+### Step 9 — Frontend: web-arena
+- `LapsedBanner.tsx` — full-screen non-dismissable overlay
+- Check `member.status === 'lapsed'` from `GET /me` response in root layout
+- Hide/disable nav items when banner is showing
 - Add i18n strings
 
-### Step 8 — Frontend: web-coach
-- `MemberNotes.tsx` — notes list + add form (types: general, health only)
-- `memberNotes.ts` — 2 API functions (create, list)
-- Add Notes tab to coach member detail page
-- Add i18n strings
+### Step 10 — Tests
 
-### Step 9 — Tests
+**Unit: `MemberLapseServiceTest`**
+- `lapseExpiredMemberships transitions active membership and member to LAPSED`
+- `lapseExpiredMemberships skips already-lapsed memberships (idempotent)`
+- `lapseExpiredMemberships skips member if another active membership exists`
+- `lapseExpiredMemberships fires MEMBERSHIP_LAPSED notification for each lapsed member`
+- `lapseExpiredMemberships logs MEMBERSHIP_LAPSED audit action`
+- `reactivateMemberIfLapsed transitions LAPSED member to ACTIVE`
+- `reactivateMemberIfLapsed does nothing if member is not LAPSED`
+- `reactivateMemberIfLapsed logs MEMBER_REACTIVATED audit action`
 
-**Unit: `MemberNoteServiceTest`**
-- `createNote saves note with correct type and content`
-- `createNote throws 400 when content is empty`
-- `createNote throws 400 when content exceeds 1000 characters`
-- `createNote throws 400 when followUpAt is in the past`
-- `createNote throws 400 when followUpAt is provided on non-follow_up type`
-- `createNote throws 403 when trainer attempts to create complaint note`
-- `createNote throws 403 when trainer attempts to create follow_up note`
-- `deleteNote soft-deletes the note`
-- `deleteNote throws 403 when non-author without manager role attempts delete`
-- `deleteNote throws 409 when attempting to delete a REJECTION note`
-- `getTimeline returns merged and sorted events from all three sources`
-- `getTimeline returns empty list when member has no events`
-- `getFollowUps returns notes due within 7 days for the club`
-- `getFollowUps returns empty list when no follow-up notes are due`
-
-**Integration: `MemberNoteControllerIntegrationTest`**
-- `POST /pulse/members/{id}/notes returns 201 with note details`
-- `POST /pulse/members/{id}/notes returns 400 when content is empty`
-- `POST /pulse/members/{id}/notes returns 403 without member-note:create permission`
-- `DELETE /pulse/members/{id}/notes/{noteId} returns 204 and soft-deletes`
-- `DELETE /pulse/members/{id}/notes/{noteId} returns 409 for REJECTION note`
-- `GET /pulse/members/{id}/timeline returns combined events sorted by date`
-- `GET /pulse/follow-ups returns 200 with notes due within 7 days`
-- `GET /pulse/follow-ups returns 403 without member-note:follow-up:read permission`
-- `POST /coach/members/{id}/notes returns 201 for general type`
-- `POST /coach/members/{id}/notes returns 403 for complaint type from trainer`
+**Integration: `MemberLapseControllerIntegrationTest`**
+- `GET /pulse/memberships/lapsed returns paginated lapsed members`
+- `GET /pulse/memberships/lapsed returns 403 without membership:read`
+- `POST /pulse/members/{id}/renewal-offer creates follow_up note`
+- `POST /pulse/members/{id}/renewal-offer returns 409 when offer already sent in last 24h` — wait, this is a skip not an error; returns 201 with skipped=1 in bulk, for single returns 201 with a note that it was skipped
+- `POST /pulse/memberships/lapsed/renewal-offer-bulk creates notes for all given members`
+- `POST /pulse/memberships/lapsed/renewal-offer-bulk returns 400 when more than 100 IDs provided`
+- `assigning new membership to lapsed member auto-sets member status to ACTIVE`
+- `lapsed member in web-arena receives 403 on GX booking endpoint`
+- `lapsed member in web-arena can still access GET /me`
 
 **Frontend:**
-- `notes-timeline.test.tsx` (pulse):
-  - renders note events in timeline
-  - renders membership and payment events in timeline
-  - delete icon visible on own notes
-  - delete icon hidden on others' notes
-  - add note form shows date picker only for follow_up type
-  - follow-ups page renders due notes with color coding
-- `member-notes-coach.test.tsx` (coach):
-  - renders notes list for member
-  - add form shows only general and health type options
+- `lapsed-members.test.tsx` (pulse):
+  - renders lapsed members table with correct columns
+  - "Send Renewal Offer" button calls offer endpoint and shows toast
+  - bulk select and bulk offer button calls bulk endpoint
+  - empty state shown when no lapsed members
+- `lapsed-banner.test.tsx` (arena):
+  - renders full-screen banner when member status is lapsed
+  - does not render banner when member status is active
+  - nav items are hidden when banner is showing
 
 ---
 
-## RBAC matrix rows added by this plan
+## RBAC matrix
 
-| Permission | Owner | Branch Mgr | Receptionist | Sales Agent | PT Trainer | GX Instructor |
-|------------|-------|------------|--------------|-------------|------------|---------------|
-| `member-note:create` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `member-note:read` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `member-note:delete` | ✅ | ✅ | ✅ | ✅ | — | — |
-| `member-note:follow-up:read` | ✅ | ✅ | ✅ | ✅ | — | — |
+No new permissions added. Uses existing:
+- `membership:read` — guards GET lapsed list
+- `member-note:create` — guards renewal offer endpoints
 
 ---
 
 ## Definition of Done
 
-- [ ] Flyway V18 runs cleanly: `note_type` and `follow_up_at` columns added to `member_notes`
-- [ ] `MemberNote.noteType` and `MemberNote.followUpAt` fields compile
-- [ ] `MemberNoteType` enum has 5 values including `REJECTION`
-- [ ] 4 new permissions seeded to correct roles
-- [ ] `MEMBER_NOTE_ADDED` and `MEMBER_NOTE_DELETED` audit actions wired
-- [ ] `FOLLOW_UP_DUE` notification type added and fired by daily scheduler
-- [ ] All 10 business rules enforced in `MemberNoteService`
-- [ ] Trainer type restriction: `complaint` and `follow_up` return 403 from coach scope
-- [ ] `REJECTION` notes cannot be deleted — return 409
-- [ ] Timeline merges notes + membership events + payments, sorted newest first
-- [ ] Follow-ups query scoped to club, returns within 7 days, ordered by `follow_up_at ASC`
-- [ ] All repository queries use `nativeQuery = true`
-- [ ] 6 endpoints live: 4 pulse + 2 coach, all with `@Operation`
-- [ ] web-pulse: Notes & Timeline tab on member profile with add/delete
-- [ ] web-pulse: `/follow-ups` page with color-coded rows and count badge
-- [ ] web-coach: Notes tab with add form restricted to `general` and `health`
-- [ ] All i18n strings added in Arabic and English (web-pulse + web-coach)
+- [ ] `LAPSED` added to `MemberStatus` enum
+- [ ] `LAPSED` added to `MembershipStatus` enum
+- [ ] `MEMBERSHIP_LAPSED` and `MEMBER_REACTIVATED` audit actions added
+- [ ] `MEMBERSHIP_LAPSED` notification type added
+- [ ] 3 repository queries added with `nativeQuery = true`
+- [ ] `lapseExpiredMemberships()` correctly transitions only active memberships with no other active membership on the member
+- [ ] Lapse scheduler is idempotent — safe to run multiple times
+- [ ] `reactivateMemberIfLapsed()` hooked into `MembershipService.assignMembership()`
+- [ ] Lapsed member in web-arena: QR and booking endpoints return `403` with `MEMBERSHIP_LAPSED` error code
+- [ ] Lapsed member in web-arena: `GET /me` and notifications remain accessible
+- [ ] `GET /pulse/memberships/lapsed` is scoped to current user's club
+- [ ] Renewal offer deduplication: skip if open follow_up note exists in last 24h
+- [ ] Bulk renewal offer capped at 100 members — returns `400` if exceeded
+- [ ] web-pulse: Lapsed badge on members list
+- [ ] web-pulse: `/memberships/lapsed` page with renewal offer + bulk action + count badge
+- [ ] web-arena: full-screen non-dismissable lapsed banner
+- [ ] web-arena: nav hidden when banner is showing
+- [ ] All i18n strings added in Arabic and English (web-pulse + web-arena)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] `./gradlew build` — BUILD SUCCESSFUL, no warnings
-- [ ] `npm run typecheck` — no errors in web-pulse or web-coach
-- [ ] `PROJECT-STATE.md` updated: Plan 32 complete, test counts, V18 noted
-- [ ] `PLAN-32-member-notes.md` deleted before merging
+- [ ] `npm run typecheck` — no errors in web-pulse or web-arena
+- [ ] `PROJECT-STATE.md` updated: Plan 33 complete, test counts
+- [ ] `PLAN-33-lapse-recovery.md` deleted before merging
 
-When all items are checked, confirm: **"Plan 32 — Member Notes & Activity Timeline complete. X backend tests, Y frontend tests."**
+When all items are checked, confirm: **"Plan 33 — Membership Lapse Recovery complete. X backend tests, Y frontend tests."**
