@@ -107,6 +107,10 @@ export const Permission = {
   MEMBER_NOTE_READ: 'member-note:read',
   MEMBER_NOTE_DELETE: 'member-note:delete',
   MEMBER_NOTE_FOLLOW_UP_READ: 'member-note:follow-up:read',
+
+  // Check-In
+  CHECK_IN_CREATE: 'check-in:create',
+  CHECK_IN_READ: 'check-in:read',
 } as const
 
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]

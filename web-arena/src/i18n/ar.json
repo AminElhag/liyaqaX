@@ -138,5 +138,9 @@
   "register.error.nameRequired": "يرجى إدخال الاسم بلغة واحدة على الأقل.",
   "lapsed.banner_title": "انتهت العضوية",
   "lapsed.banner_body": "انتهت عضويتك. يرجى زيارة النادي أو التواصل مع الموظفين للتجديد.",
-  "lapsed.banner_contact": "معلومات الاتصال"
+  "lapsed.banner_contact": "معلومات الاتصال",
+  "nav.qr": "رمز QR",
+  "qr.page_title": "رمز تسجيل الحضور",
+  "qr.instruction": "أظهر هذا الرمز لموظف الاستقبال لتسجيل حضورك",
+  "qr.member_name": "{{name}}"
 }

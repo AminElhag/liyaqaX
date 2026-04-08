@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
+import { Route as QrIndexRouteImport } from './routes/qr/index'
 import { Route as ProgressIndexRouteImport } from './routes/progress/index'
 import { Route as PaymentsIndexRouteImport } from './routes/payments/index'
 import { Route as MessagesIndexRouteImport } from './routes/messages/index'
@@ -48,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
 const SessionsIndexRoute = SessionsIndexRouteImport.update({
   id: '/sessions/',
   path: '/sessions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QrIndexRoute = QrIndexRouteImport.update({
+  id: '/qr/',
+  path: '/qr/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgressIndexRoute = ProgressIndexRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/messages/': typeof MessagesIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
+  '/qr/': typeof QrIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/auth/register/success': typeof AuthRegisterSuccessRoute
   '/auth/register/': typeof AuthRegisterIndexRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/messages': typeof MessagesIndexRoute
   '/payments': typeof PaymentsIndexRoute
   '/progress': typeof ProgressIndexRoute
+  '/qr': typeof QrIndexRoute
   '/sessions': typeof SessionsIndexRoute
   '/auth/register/success': typeof AuthRegisterSuccessRoute
   '/auth/register': typeof AuthRegisterIndexRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/messages/': typeof MessagesIndexRoute
   '/payments/': typeof PaymentsIndexRoute
   '/progress/': typeof ProgressIndexRoute
+  '/qr/': typeof QrIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/auth/register/success': typeof AuthRegisterSuccessRoute
   '/auth/register/': typeof AuthRegisterIndexRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/messages/'
     | '/payments/'
     | '/progress/'
+    | '/qr/'
     | '/sessions/'
     | '/auth/register/success'
     | '/auth/register/'
@@ -295,6 +305,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/payments'
     | '/progress'
+    | '/qr'
     | '/sessions'
     | '/auth/register/success'
     | '/auth/register'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/messages/'
     | '/payments/'
     | '/progress/'
+    | '/qr/'
     | '/sessions/'
     | '/auth/register/success'
     | '/auth/register/'
@@ -350,6 +362,7 @@ export interface RootRouteChildren {
   MessagesIndexRoute: typeof MessagesIndexRoute
   PaymentsIndexRoute: typeof PaymentsIndexRoute
   ProgressIndexRoute: typeof ProgressIndexRoute
+  QrIndexRoute: typeof QrIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
   AuthRegisterSuccessRoute: typeof AuthRegisterSuccessRoute
   AuthRegisterIndexRoute: typeof AuthRegisterIndexRoute
@@ -376,6 +389,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/sessions/'
       preLoaderRoute: typeof SessionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/qr/': {
+      id: '/qr/'
+      path: '/qr'
+      fullPath: '/qr/'
+      preLoaderRoute: typeof QrIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/progress/': {
@@ -558,6 +578,7 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesIndexRoute: MessagesIndexRoute,
   PaymentsIndexRoute: PaymentsIndexRoute,
   ProgressIndexRoute: ProgressIndexRoute,
+  QrIndexRoute: QrIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
   AuthRegisterSuccessRoute: AuthRegisterSuccessRoute,
   AuthRegisterIndexRoute: AuthRegisterIndexRoute,

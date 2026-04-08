@@ -23,7 +23,8 @@
     "follow_ups": "المتابعات",
     "reports": "التقارير",
     "settings": "الإعدادات",
-    "lapsed": "أعضاء منتهية الصلاحية"
+    "lapsed": "أعضاء منتهية الصلاحية",
+    "check_in": "تسجيل الحضور"
   },
   "branch": {
     "selector": "الفرع",
@@ -663,6 +664,23 @@
     "save_button": "حفظ الهوية البصرية",
     "saved_toast": "تم حفظ إعدادات الهوية البصرية",
     "permission_note": "فقط مالك النادي يمكنه إدارة إعدادات الهوية البصرية."
+  },
+  "checkin": {
+    "page_title": "تسجيل الحضور",
+    "today_count": "اليوم: {{count}} زيارة",
+    "search_placeholder": "البحث بالهاتف أو الاسم...",
+    "qr_placeholder": "أدخل قيمة رمز QR...",
+    "check_in_button": "تسجيل حضور",
+    "already_checked_in": "تم تسجيل الحضور مسبقاً",
+    "membership_lapsed": "انتهت العضوية — لا يمكن تسجيل الحضور",
+    "success_toast": "تم تسجيل حضور {{name}}",
+    "recent_title": "آخر تسجيلات الحضور",
+    "method": {
+      "staff_phone": "هاتف",
+      "staff_name": "اسم",
+      "qr_scan": "QR"
+    },
+    "empty_recent": "لا توجد تسجيلات حضور اليوم بعد"
   },
   "language": {
     "ar": "العربية",

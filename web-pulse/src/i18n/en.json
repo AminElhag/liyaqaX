@@ -23,7 +23,8 @@
     "follow_ups": "Follow-ups",
     "reports": "Reports",
     "settings": "Settings",
-    "lapsed": "Lapsed Members"
+    "lapsed": "Lapsed Members",
+    "check_in": "Check-In"
   },
   "branch": {
     "selector": "Branch",
@@ -663,6 +664,23 @@
     "save_button": "Save Branding",
     "saved_toast": "Branding settings saved",
     "permission_note": "Only club owners can manage branding settings."
+  },
+  "checkin": {
+    "page_title": "Check-In",
+    "today_count": "Today: {{count}} visits",
+    "search_placeholder": "Search by phone or name...",
+    "qr_placeholder": "Enter QR code value...",
+    "check_in_button": "Check In",
+    "already_checked_in": "Already checked in recently",
+    "membership_lapsed": "Membership expired — cannot check in",
+    "success_toast": "{{name}} checked in",
+    "recent_title": "Recent check-ins",
+    "method": {
+      "staff_phone": "Phone",
+      "staff_name": "Name",
+      "qr_scan": "QR"
+    },
+    "empty_recent": "No check-ins yet today"
   },
   "language": {
     "ar": "العربية",

@@ -18,6 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { key: 'dashboard', to: '/', icon: '◻' },
+  { key: 'check_in', to: '/check-in', icon: '◫' },
   { key: 'staff', to: '/staff', icon: '◈' },
   { key: 'members', to: '/members', icon: '◉' },
   { key: 'memberships', to: '/memberships', icon: '◎' },
@@ -40,6 +41,7 @@ export function Sidebar() {
 
   const permissions = useAuthStore((s) => s.permissions)
   const canSeeFollowUps = hasPermission(permissions, Permission.MEMBER_NOTE_FOLLOW_UP_READ)
+  const canSeeCheckIn = hasPermission(permissions, Permission.CHECK_IN_READ)
 
   const { data: pendingData } = useQuery({
     queryKey: memberKeys.pendingCount(),
@@ -89,6 +91,7 @@ export function Sidebar() {
           {navItems
             .filter((item) => {
               if (item.key === 'follow_ups') return canSeeFollowUps
+              if (item.key === 'check_in') return canSeeCheckIn
               return true
             })
             .map((item) => {

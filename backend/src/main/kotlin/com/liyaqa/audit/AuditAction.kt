@@ -91,4 +91,7 @@ enum class AuditAction(val code: String) {
 
     // Portal Branding
     BRANDING_UPDATED("BRANDING_UPDATED"),
+
+    // Check-In
+    MEMBER_CHECKED_IN("MEMBER_CHECKED_IN"),
 }

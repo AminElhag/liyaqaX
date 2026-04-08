@@ -215,6 +215,8 @@ class DevDataLoader(
             PermissionConstants.MEMBER_NOTE_DELETE,
             PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
             PermissionConstants.BRANDING_UPDATE,
+            PermissionConstants.CHECK_IN_CREATE,
+            PermissionConstants.CHECK_IN_READ,
         )
 
     private val clubBranchManager =
@@ -245,6 +247,8 @@ class DevDataLoader(
             PermissionConstants.MEMBER_NOTE_READ,
             PermissionConstants.MEMBER_NOTE_DELETE,
             PermissionConstants.MEMBER_NOTE_FOLLOW_UP_READ,
+            PermissionConstants.CHECK_IN_CREATE,
+            PermissionConstants.CHECK_IN_READ,
         )
 
     private val clubSalesAgent =

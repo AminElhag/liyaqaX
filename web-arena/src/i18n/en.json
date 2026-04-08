@@ -138,5 +138,9 @@
   "register.error.nameRequired": "Please enter your name in at least one language.",
   "lapsed.banner_title": "Membership Expired",
   "lapsed.banner_body": "Your membership has expired. Please visit the gym or contact staff to renew.",
-  "lapsed.banner_contact": "Contact Info"
+  "lapsed.banner_contact": "Contact Info",
+  "nav.qr": "QR Code",
+  "qr.page_title": "Check-In QR Code",
+  "qr.instruction": "Show this to the receptionist to check in",
+  "qr.member_name": "{{name}}"
 }

@@ -159,4 +159,8 @@ object PermissionConstants {
 
     // ── Branding ─────────────────────────────────────────────────────────
     const val BRANDING_UPDATE = "branding:update"
+
+    // ── Check-In ─────────────────────────────────────────────────────────
+    const val CHECK_IN_CREATE = "check-in:create"
+    const val CHECK_IN_READ = "check-in:read"
 }

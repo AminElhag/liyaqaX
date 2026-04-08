@@ -34,7 +34,7 @@ enum class DimensionCatalogue(
         sqlSelectFragment = "DATE_TRUNC('month', {date_column})",
         sqlGroupByFragment = "DATE_TRUNC('month', {date_column})",
         joinFragment = null,
-        compatibleScopes = setOf("revenue", "members", "leads", "gx", "pt", "cash"),
+        compatibleScopes = setOf("revenue", "members", "leads", "gx", "pt", "cash", "operations"),
     ),
     BRANCH(
         code = "branch",
@@ -43,7 +43,7 @@ enum class DimensionCatalogue(
         sqlSelectFragment = "br.name_en",
         sqlGroupByFragment = "br.name_en",
         joinFragment = "JOIN branches br ON br.id = {table}.branch_id",
-        compatibleScopes = setOf("revenue", "members", "leads", "gx", "pt", "cash"),
+        compatibleScopes = setOf("revenue", "members", "leads", "gx", "pt", "cash", "operations"),
     ),
     MEMBERSHIP_PLAN(
         code = "membership_plan",
@@ -52,7 +52,7 @@ enum class DimensionCatalogue(
         sqlSelectFragment = "mp.name_en",
         sqlGroupByFragment = "mp.name_en",
         joinFragment = "JOIN membership_plans mp ON mp.id = {table}.plan_id",
-        compatibleScopes = setOf("revenue", "members"),
+        compatibleScopes = setOf("revenue", "members", "operations"),
     ),
     CLASS_TYPE(
         code = "class_type",
@@ -80,6 +80,15 @@ enum class DimensionCatalogue(
         sqlGroupByFragment = "sm.first_name_en, sm.last_name_en",
         joinFragment = "JOIN staff_members sm ON sm.id = {table}.staff_member_id",
         compatibleScopes = setOf("revenue", "leads"),
+    ),
+    DAY_OF_WEEK(
+        code = "day_of_week",
+        label = "Day of Week",
+        labelAr = "يوم الأسبوع",
+        sqlSelectFragment = "TO_CHAR(mci.checked_in_at AT TIME ZONE 'Asia/Riyadh', 'Day')",
+        sqlGroupByFragment = "TO_CHAR(mci.checked_in_at AT TIME ZONE 'Asia/Riyadh', 'Day')",
+        joinFragment = "JOIN member_check_ins mci ON mci.member_id = m.id",
+        compatibleScopes = setOf("operations"),
     ),
     ;
 

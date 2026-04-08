@@ -20,6 +20,7 @@ import { Route as LeadsIndexRouteImport } from './routes/leads/index'
 import { Route as GxIndexRouteImport } from './routes/gx/index'
 import { Route as FollowUpsIndexRouteImport } from './routes/follow-ups/index'
 import { Route as FinanceIndexRouteImport } from './routes/finance/index'
+import { Route as CheckInIndexRouteImport } from './routes/check-in/index'
 import { Route as CashDrawerIndexRouteImport } from './routes/cash-drawer/index'
 import { Route as StaffStaffIdRouteImport } from './routes/staff/$staffId'
 import { Route as SettingsZatcaRouteImport } from './routes/settings/zatca'
@@ -114,6 +115,11 @@ const FollowUpsIndexRoute = FollowUpsIndexRouteImport.update({
 const FinanceIndexRoute = FinanceIndexRouteImport.update({
   id: '/finance/',
   path: '/finance/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckInIndexRoute = CheckInIndexRouteImport.update({
+  id: '/check-in/',
+  path: '/check-in/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CashDrawerIndexRoute = CashDrawerIndexRouteImport.update({
@@ -350,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
+  '/check-in/': typeof CheckInIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/follow-ups/': typeof FollowUpsIndexRoute
   '/gx/': typeof GxIndexRoute
@@ -403,6 +410,7 @@ export interface FileRoutesByTo {
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer': typeof CashDrawerIndexRoute
+  '/check-in': typeof CheckInIndexRoute
   '/finance': typeof FinanceIndexRoute
   '/follow-ups': typeof FollowUpsIndexRoute
   '/gx': typeof GxIndexRoute
@@ -457,6 +465,7 @@ export interface FileRoutesById {
   '/settings/zatca': typeof SettingsZatcaRoute
   '/staff/$staffId': typeof StaffStaffIdRoute
   '/cash-drawer/': typeof CashDrawerIndexRoute
+  '/check-in/': typeof CheckInIndexRoute
   '/finance/': typeof FinanceIndexRoute
   '/follow-ups/': typeof FollowUpsIndexRoute
   '/gx/': typeof GxIndexRoute
@@ -512,6 +521,7 @@ export interface FileRouteTypes {
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
+    | '/check-in/'
     | '/finance/'
     | '/follow-ups/'
     | '/gx/'
@@ -565,6 +575,7 @@ export interface FileRouteTypes {
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer'
+    | '/check-in'
     | '/finance'
     | '/follow-ups'
     | '/gx'
@@ -618,6 +629,7 @@ export interface FileRouteTypes {
     | '/settings/zatca'
     | '/staff/$staffId'
     | '/cash-drawer/'
+    | '/check-in/'
     | '/finance/'
     | '/follow-ups/'
     | '/gx/'
@@ -672,6 +684,7 @@ export interface RootRouteChildren {
   SettingsZatcaRoute: typeof SettingsZatcaRoute
   StaffStaffIdRoute: typeof StaffStaffIdRoute
   CashDrawerIndexRoute: typeof CashDrawerIndexRoute
+  CheckInIndexRoute: typeof CheckInIndexRoute
   FinanceIndexRoute: typeof FinanceIndexRoute
   FollowUpsIndexRoute: typeof FollowUpsIndexRoute
   GxIndexRoute: typeof GxIndexRoute
@@ -766,6 +779,13 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance/'
       preLoaderRoute: typeof FinanceIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/check-in/': {
+      id: '/check-in/'
+      path: '/check-in'
+      fullPath: '/check-in/'
+      preLoaderRoute: typeof CheckInIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cash-drawer/': {
@@ -1105,6 +1125,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsZatcaRoute: SettingsZatcaRoute,
   StaffStaffIdRoute: StaffStaffIdRoute,
   CashDrawerIndexRoute: CashDrawerIndexRoute,
+  CheckInIndexRoute: CheckInIndexRoute,
   FinanceIndexRoute: FinanceIndexRoute,
   FollowUpsIndexRoute: FollowUpsIndexRoute,
   GxIndexRoute: GxIndexRoute,

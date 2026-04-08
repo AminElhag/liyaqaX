@@ -102,6 +102,7 @@ function BottomNav() {
 
   const items = [
     { label: t('nav.home'), path: '/', show: true },
+    { label: t('nav.qr'), path: '/qr', show: true },
     { label: t('nav.gx'), path: '/classes', show: portalSettings?.gxBookingEnabled ?? true },
     { label: t('nav.pt'), path: '/sessions', show: portalSettings?.ptViewEnabled ?? true },
     { label: t('nav.invoices'), path: '/payments/invoices', show: portalSettings?.invoiceViewEnabled ?? true },

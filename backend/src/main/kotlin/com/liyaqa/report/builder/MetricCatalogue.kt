@@ -157,6 +157,15 @@ enum class MetricCatalogue(
         sqlFragment = "COALESCE(SUM(CASE WHEN cde.entry_type = 'cash_out' THEN cde.amount_halalas ELSE 0 END), 0)",
         sourceTable = "cash_drawer_entries cde",
     ),
+    CHECK_IN_COUNT(
+        code = "check_in_count",
+        label = "Check-In Count",
+        labelAr = "عدد تسجيلات الحضور",
+        unit = "count",
+        scope = "operations",
+        sqlFragment = "COUNT(DISTINCT mci.id)",
+        sourceTable = "member_check_ins mci",
+    ),
     ;
 
     companion object {
